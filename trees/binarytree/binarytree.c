@@ -15,7 +15,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   const size_t NODE_SIZE = sizeof(bt_node) + elem_size;
   const size_t REQUIRED_MEM = length * NODE_SIZE + sizeof(binary_tree);
   binary_tree *const tree_obj = malloc(REQUIRED_MEM);
-  /* Increment past the tree's data. */
+  /* Increment past the tree header. */
   bt_node *const nodes_mem = (void *)(tree_obj + 1);
   if (tree_obj == NULL) return NULL;
 
@@ -159,7 +159,7 @@ bt_node *next_ancestral_divergence(const bt_node *origin) {
   return NULL;
 }
 
-bt_node **search_for_node(bt_node *origin, const bt_node *const target) {
+bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -170,32 +170,27 @@ bt_node **search_for_node(bt_node *origin, const bt_node *const target) {
    * hence why we can always select the right branch of this node.
    */
   bt_node *last_divergence = NULL;
-  bt_node *prev_node = NULL;
   bt_node *cur_node = origin;
   bt_node *next_node = NULL;
   while (cur_node != NULL) {
-    if (cur_node == prev_node) break;
     if (cur_node->left == target) return &cur_node->left;
     if (cur_node->right == target) return &cur_node->right;
     printf("%zu\n", *(size_t *)cur_node->value);
     if (cur_node->left != NULL) {
       /*
-       * Since `cur_node` has two valid branches, `left` and `right`, we
-       * continue down the left branch and save `cur_node` as the last divergent
-       * node.
+       * If both `left` and `right` are valid, continue down the left branch and
+       * save `cur_node` as the last divergent node.
        */
       if (cur_node->right != NULL) last_divergence = cur_node;
       next_node = cur_node->left;
-    } else {
+    } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
-    }
-    if (next_node == NULL) {
+    } else {
       /* If there is no divergence along the traversed path, we're done. */
       if (last_divergence == NULL) break;
       next_node = last_divergence->right;
       last_divergence = next_ancestral_divergence(last_divergence);
     }
-    prev_node = cur_node;
     cur_node = next_node;
   }
   return NULL;
@@ -339,7 +334,7 @@ void force_make_node_child_of(bt_node *const src, bt_node *const dst) {
 }
 
 int main(void) {
-  const size_t data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  const size_t data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23};
   binary_tree *a = new_binary_tree(data, sizeof(data) / sizeof(*data));
   bt_node **found_node = search_for_node(a->root, a->root);
   printf("addressof: %td\n", (ptrdiff_t)found_node);

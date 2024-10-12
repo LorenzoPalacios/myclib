@@ -165,6 +165,8 @@ binary_tree *init_open_nodes(binary_tree *tree);
  */
 void make_node_child_of(bt_node *src, bt_node *dst);
 
+bt_node *next_ancestral_divergence(const bt_node *origin);
+
 bt_node *remove_node_from_tree(binary_tree *tree, bt_node *target);
 
 /*
