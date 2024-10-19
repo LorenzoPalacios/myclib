@@ -83,7 +83,7 @@ int main(void) {
     putchar('\n');
   }
 
-    /*
+  /*
    * Example usage of `heapless_new_empty_stack()`
    *
    * This snippet should output:
