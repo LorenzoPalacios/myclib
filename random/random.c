@@ -2,7 +2,6 @@
 
 #include <limits.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -93,18 +92,18 @@ bool random_bool(void) {
 #else
   /*
    * For this particular cache, the stored elements in the below array are used
-   * as bitfields. The bits within each bitfield are accessed by shifting `0b1`
+   * as bitfields. The bits within each bitfield are accessed by shifting `1`
    * to the left `bit_iterator` times. Once `bit_iterator` reaches the maximum
    * number of bits within that bitfield, `cache_iterator` is incremented so
    * the next bitfield can be used, and `bit_iterator` is reset to 0.
    */
-  static uint_fast8_t cache[CACHE_SIZE];
+  static unsigned char cache[CACHE_SIZE];
   /*
    * Setting the iterator to the end of the cache will prompt its restocking
    * upon the initial call to this function.
    */
   static size_t cache_iterator = CACHE_SIZE;
-  static uint_fast8_t bit_iterator = 1;
+  static unsigned char bit_iterator = 1;
   if (bit_iterator == CHAR_BIT * sizeof(*cache)) {
     bit_iterator = 1;
     cache_iterator++;
