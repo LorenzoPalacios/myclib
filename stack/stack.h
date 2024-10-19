@@ -19,14 +19,21 @@ typedef struct {
 typedef unsigned char byte_t;
 
 /*
- * This is a convenience macro for `_stack_from_arr()`.
+ * This is a convenience macro for `_new_stack()`.
  * Use with caution if `arr` has side effects.
  */
-#define stack_from_arr(arr) \
-  _stack_from_arr(arr, sizeof(arr) / sizeof *(arr), sizeof *(arr))
+#define new_stack(data) \
+  _new_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
+
+/*
+ * This is a convenience macro for `_new_interface_stack().`
+ * Use with caution if `data`
+ */
+#define new_interface_stack(data) \
+  _new_interface_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
 /* Creates a stack based off the elements in `arr`. */
-stack *_stack_from_arr(const void *arr, size_t len, size_t elem_size);
+stack *_new_stack(const void *data, size_t len, size_t elem_size);
 
 /* Resets `stk->length` and `stk->used_capacity` to `0`. */
 void clear_stack(stack *stk);
@@ -45,7 +52,7 @@ void delete_stack(stack **const stk);
 
 /*
  * Same as `delete_stack()`, except this function will overwrite the contents of
- * `stk` with zeros before freeing.
+ * `stk` with zeros before freeing the memory associated with `*stk`.
  */
 void delete_stack_s(stack **stk);
 
@@ -91,7 +98,7 @@ stack *interface_stack_push(stack *stk, const void *elem);
  * memory for its contents. An example of such an operation would be
  * `interface_stack_push()`.
  */
-stack *new_interface_stack(void *data, size_t len, size_t elem_size);
+stack *_new_interface_stack(void *data, size_t len, size_t elem_size);
 
 /*
  * Creates a new `stack` with enough capacity for `num_elems` elements
@@ -99,7 +106,7 @@ stack *new_interface_stack(void *data, size_t len, size_t elem_size);
  *
  * \return A pointer to an empty `stack` or `NULL` upon failure.
  */
-stack *new_stack(size_t num_elems, size_t elem_size);
+stack *new_empty_stack(size_t num_elems, size_t elem_size);
 
 /*
  * Resizes the memory used by `stk->data` to `new_size`.
@@ -145,7 +152,7 @@ void *stack_pop(stack *stk);
 stack *stack_push(stack *stk, const void *const elem);
 
 #ifdef STACK_INCL_HEAPLESS_STACK
-/* Ensures that each stack's allocation gets a fairly unique name. */
+/* Ensures that each stack's allocation gets a unique name. */
 #define GET_STACK_NAME(local_stk) _stk_data_##local_stk
 
 /*
@@ -194,12 +201,16 @@ stack *stack_push(stack *stk, const void *const elem);
  * however it can modify the contents of `data` through `heapless_stack_pop()`
  * and `heapless_stack_push()`.
  */
-#define new_heapless_interface_stack(_data, num_elems, _elem_size) \
-  {.data = _data,                                                  \
-   .capacity = (num_elems) * (_elem_size),                         \
-   .used_capacity = (num_elems) * (_elem_size),                    \
-   .elem_size = _elem_size,                                        \
+#define _new_heapless_interface_stack(_data, num_elems, _elem_size) \
+  {.data = _data,                                                   \
+   .capacity = (num_elems) * (_elem_size),                          \
+   .used_capacity = (num_elems) * (_elem_size),                     \
+   .elem_size = _elem_size,                                         \
    .length = num_elems}
+
+#define new_heapless_interface_stack(_data)                           \
+  _new_heapless_interface_stack(_data, sizeof(data) / sizeof *(data), \
+                                sizeof *(data))
 
 /*
  * Returns, but does not remove, the top element of `stk`.

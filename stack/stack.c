@@ -7,9 +7,9 @@
 /* The factor by which to expand a stack's capacity. */
 #define STACK_EXPANSION_FACTOR (2)
 
-stack *_stack_from_arr(const void *const arr, const size_t len,
-                       const size_t elem_size) {
-  stack *const stk = new_stack(len, elem_size);
+stack *_new_stack(const void *const data, const size_t len,
+                  const size_t elem_size) {
+  stack *const stk = new_empty_stack(len, elem_size);
   if (stk == NULL) return NULL;
   stk->length = len;
   stk->used_capacity = stk->capacity;
@@ -18,9 +18,9 @@ stack *_stack_from_arr(const void *const arr, const size_t len,
    * laid out in reverse order, we iterate from the last element of
    * `arr` to the first.
    */
-  for (size_t stk_i = 0, arr_i = len - 1; stk_i < len; stk_i++, arr_i--) {
+  for (size_t stk_i = 0, data_i = len - 1; stk_i < len; stk_i++, data_i--) {
     memcpy((byte_t *)stk->data + stk_i * elem_size,
-           (byte_t *)arr + arr_i * elem_size, elem_size);
+           (byte_t *)data + data_i * elem_size, elem_size);
   }
   return stk;
 }
@@ -45,7 +45,7 @@ void delete_stack(stack **const stk) {
   *stk = NULL;
 }
 
-void delete_stack_s(stack **stk) {
+void delete_stack_s(stack **const stk) {
   memset(*stk, 0, (*stk)->capacity);
   delete_stack(stk);
 }
@@ -66,7 +66,7 @@ stack *expand_stack(stack *stk) {
   return new_stk;
 }
 
-stack *new_stack(const size_t num_elems, const size_t elem_size) {
+stack *new_empty_stack(const size_t num_elems, const size_t elem_size) {
   const size_t STACK_CAPACITY = num_elems * elem_size;
   stack *const stk = alloc_stack(STACK_CAPACITY);
   if (stk == NULL) return NULL;
@@ -144,8 +144,8 @@ stack *heapless_stack_push(stack *const stk, const void *const elem) {
 
 /* For stacks as interfaces. */
 
-stack *new_interface_stack(void *const data, const size_t len,
-                           const size_t elem_size) {
+stack *_new_interface_stack(void *const data, const size_t len,
+                            const size_t elem_size) {
   /*
    * The stack itself should not be managing any memory as it is an interface.
    * However, it should still have an allocation for its header.

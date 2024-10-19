@@ -9,7 +9,7 @@
 
 int main(void) {
   /*
-   * Example usage of `_stack_from_arr()`.
+   * Example usage of `_new_stack()`.
    *
    * This snippet should output:
    *
@@ -18,7 +18,7 @@ int main(void) {
   {
     const int data[] = {1, 2, 3, 4, 5};
     const size_t DATA_LEN = sizeof(data) / sizeof(*data);
-    stack *stk_from_arr = _stack_from_arr(data, DATA_LEN, sizeof(*data));
+    stack *stk_from_arr = _new_stack(data, DATA_LEN, sizeof(*data));
     if (stk_from_arr == NULL) return 1;
 
     /* Printing and popping all of the values in `stk_from_arr`. */
@@ -42,7 +42,7 @@ int main(void) {
    */
   {
     const int data[] = {1, 2, 3, 4, 5};
-    stack *example_stk = stack_from_arr(data);
+    stack *example_stk = new_stack(data);
 
     /* Print the top value of `example_stk`. */
     int *val = stack_peek(example_stk);
@@ -69,7 +69,7 @@ int main(void) {
   {
     const size_t ELEM_SIZE = sizeof(int);
     size_t num_elems = 1;
-    stack *example_stk = new_stack(num_elems, ELEM_SIZE);
+    stack *example_stk = new_empty_stack(num_elems, ELEM_SIZE);
     if (example_stk == NULL) return 1;
 
     /* Initial capacity. */
@@ -113,7 +113,7 @@ int main(void) {
   {
     const size_t MAX_NUM_ELEMS = 10;
     const size_t ELEM_SIZE = sizeof(int);
-    stack *example_stk = new_stack(MAX_NUM_ELEMS, ELEM_SIZE);
+    stack *example_stk = new_empty_stack(MAX_NUM_ELEMS, ELEM_SIZE);
     if (example_stk == NULL) return 1;
 
     /* Initial capacity. */
@@ -136,7 +136,7 @@ int main(void) {
   }
 
   /*
-   * Example usage of `new_heapless_interface_stack()`.
+   * Example usage of `_new_heapless_interface_stack()`.
    *
    * This snippet should output:
    *
@@ -144,7 +144,7 @@ int main(void) {
    */
   {
     int data[] = {1, 2, 3, 4, 5};
-    stack interface_stk = new_heapless_interface_stack(
+    stack interface_stk = _new_heapless_interface_stack(
         data, sizeof(data) / sizeof(*data), sizeof(*data));
 
     int *val;
@@ -160,7 +160,12 @@ int main(void) {
   }
 
   /*
-   * Example usage of `new_stack()`.
+   * Example usage of `new_heapless_interface_stack()`.
+   *
+   */
+
+  /*
+   * Example usage of `new_empty_stack()`.
    *
    * This snippet should output:
    *
@@ -171,7 +176,7 @@ int main(void) {
     const size_t DATA_LEN = sizeof(data) / sizeof(*data);
 
     const size_t INITIAL_NUM_ELEMS = 5;
-    stack *example_stk = new_stack(INITIAL_NUM_ELEMS, sizeof(*data));
+    stack *example_stk = new_empty_stack(INITIAL_NUM_ELEMS, sizeof(*data));
     if (example_stk == NULL) return 1;
 
     /* Pushing the elements of `data` to `example_stk`. */
@@ -182,7 +187,7 @@ int main(void) {
 
     /* Pushing arbitrary values to `example_stk`. */
 
-    const int RANDOM_VAL_1 = 0; /* 32-bit `signed int` maximum value */
+    const int RANDOM_VAL_1 = 0;
     example_stk = stack_push(example_stk, &RANDOM_VAL_1);
     if (example_stk == NULL) return 1;
 
@@ -194,7 +199,7 @@ int main(void) {
      * Since this is the last element to be pushed onto `example_stk`, it
      * will be the first to be popped.
      */
-    const int RANDOM_VAL_3 = 0x7FFFFFFF;
+    const int RANDOM_VAL_3 = 0x7FFFFFFF; /* 32-bit `signed int` maximum value */
     example_stk = stack_push(example_stk, &RANDOM_VAL_3);
     if (example_stk == NULL) return 1;
 
@@ -211,8 +216,8 @@ int main(void) {
   }
 
   /*
-   * Example usage of `stack_from_arr()`, a convenience macro over
-   * `_stack_from_arr()`.
+   * Example usage of `new_stack()`, a convenience macro over
+   * `_new_stack()`.
    *
    * This snippet should output:
    *
@@ -220,7 +225,7 @@ int main(void) {
    */
   {
     const int data[] = {1, 2, 3, 4, 5};
-    stack *example_stk = stack_from_arr(data);
+    stack *example_stk = new_stack(data);
     if (example_stk == NULL) return 1;
 
     /* Printing and popping all of the values in `example_stk`. */
