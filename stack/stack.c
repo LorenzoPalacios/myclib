@@ -13,10 +13,9 @@ stack *_new_stack(const void *const data, const size_t len,
   if (stk == NULL) return NULL;
   stk->length = len;
   stk->used_capacity = stk->capacity;
-  /*
-   * Since a backward stack requires its constituent elements to be
-   * laid out in reverse order, we iterate from the last element of
-   * `arr` to the first.
+  /* 
+   * Elements of `data` are inserted in reverse so that the first element of
+   * `data` will always be the top-level element in the stack.
    */
   for (size_t stk_i = 0, data_i = len - 1; stk_i < len; stk_i++, data_i--) {
     memcpy((byte_t *)stk->data + stk_i * elem_size,

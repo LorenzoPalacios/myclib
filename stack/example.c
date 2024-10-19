@@ -9,6 +9,30 @@
 
 int main(void) {
   /*
+   * Example usage of `_new_heapless_interface_stack()`.
+   *
+   * This snippet should output:
+   *
+   * `5 4 3 2 1`
+   */
+  {
+    int data[] = {1, 2, 3, 4, 5};
+    stack interface_stk = _new_heapless_interface_stack(
+        data, sizeof(data) / sizeof(*data), sizeof(*data));
+
+    int *val;
+    while ((val = interface_stack_pop(&interface_stk))) {
+      printf("%d ", *val);
+    }
+
+    putchar('\n');
+    /*
+     * Deletion is unnecessary since `interface_stk` was not allocated on the
+     * heap.
+     */
+  }
+
+  /*
    * Example usage of `_new_stack()`.
    *
    * This snippet should output:
@@ -57,6 +81,43 @@ int main(void) {
 
     delete_stack(&example_stk);
     putchar('\n');
+  }
+
+  /*
+   * Example usage of `interface_stack_push()`.
+   *
+   * This snippet should output:
+   *
+   * `0 0 0 | 0 0 1 `
+   *
+   */
+  {
+    int data[] = {0, 0, 0};
+    size_t DATA_LEN = sizeof(data) / sizeof(*data);
+    stack interface_stk = new_heapless_interface_stack(data);
+
+    /* Printing the initial contents of `data`. */
+    for (size_t i = 0; i < DATA_LEN; i++) {
+      printf("%d ", data[i]);
+    }
+
+    printf("| ");
+
+    int new_value = 1;
+    /* "Removes" the last element in `data`. */
+    interface_stack_pop(&interface_stk);
+    /* Writes to the last position in `data`.*/
+    interface_stack_push(&interface_stk, &new_value);
+
+    for (size_t i = 0; i < DATA_LEN; i++) {
+      printf("%d ", data[i]);
+    }
+
+    putchar('\n');
+    /*
+     * Deletion is unnecessary since `interface_stk` was not allocated on the
+     * heap.
+     */
   }
 
   /*
@@ -136,35 +197,6 @@ int main(void) {
   }
 
   /*
-   * Example usage of `_new_heapless_interface_stack()`.
-   *
-   * This snippet should output:
-   *
-   * `5 4 3 2 1`
-   */
-  {
-    int data[] = {1, 2, 3, 4, 5};
-    stack interface_stk = _new_heapless_interface_stack(
-        data, sizeof(data) / sizeof(*data), sizeof(*data));
-
-    int *val;
-    while ((val = interface_stack_pop(&interface_stk))) {
-      printf("%d ", *val);
-    }
-
-    putchar('\n');
-    /*
-     * Deletion is unnecessary since `interface_stk` was not allocated on the
-     * heap.
-     */
-  }
-
-  /*
-   * Example usage of `new_heapless_interface_stack()`.
-   *
-   */
-
-  /*
    * Example usage of `new_empty_stack()`.
    *
    * This snippet should output:
@@ -241,7 +273,7 @@ int main(void) {
   }
 
   /*
-   * Example usage of `heapless_new_stack()`
+   * Example usage of `heapless_new_empty_stack()`
    *
    * This snippet should output:
    *
@@ -249,12 +281,12 @@ int main(void) {
    */
   {
     const size_t NUM_ELEMS = 5;
-    stack heapless_stk =
-        heapless_new_stack(heapless_stk, NUM_ELEMS, sizeof(int));
+    stack example_stk =
+        heapless_new_empty_stack(example_stk, NUM_ELEMS, sizeof(int));
 
     /* Push values onto the stack until capacity is reached. */
     for (size_t i = 0; i < NUM_ELEMS; i++) {
-      heapless_stack_push(&heapless_stk, &i);
+      heapless_stack_push(&example_stk, &i);
     }
 
     /*
@@ -262,11 +294,11 @@ int main(void) {
      * resized.
      */
     const int RANDOM_VAL_1 = -1;
-    heapless_stack_push(&heapless_stk, &RANDOM_VAL_1);
+    heapless_stack_push(&example_stk, &RANDOM_VAL_1);
 
     /* Pop and print all of the values in the stack. */
     int *val;
-    while ((val = heapless_stack_pop(&heapless_stk)) != NULL) {
+    while ((val = heapless_stack_pop(&example_stk)) != NULL) {
       printf("%d ", *val);
     }
     putchar('\n');

@@ -20,19 +20,19 @@ typedef unsigned char byte_t;
 
 /*
  * This is a convenience macro for `_new_stack()`.
- * Use with caution if `arr` has side effects.
+ * Use with caution if `data` has side effects.
  */
 #define new_stack(data) \
   _new_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
 /*
  * This is a convenience macro for `_new_interface_stack().`
- * Use with caution if `data`
+ * Use with caution if `data` has side effects.
  */
 #define new_interface_stack(data) \
   _new_interface_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
-/* Creates a stack based off the elements in `arr`. */
+/* Creates a stack based off the elements in `data`. */
 stack *_new_stack(const void *data, size_t len, size_t elem_size);
 
 /* Resets `stk->length` and `stk->used_capacity` to `0`. */
@@ -164,17 +164,17 @@ stack *stack_push(stack *stk, const void *const elem);
  * \note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define heapless_new_stack(stk_id, num_elems, _elem_size) \
-  {.capacity = (num_elems) * (_elem_size),                \
-   .used_capacity = 0,                                    \
-   .elem_size = _elem_size,                               \
-   .length = 0};                                          \
-  byte_t GET_STACK_NAME(stk_id)[stk_id.capacity];         \
+#define heapless_new_empty_stack(stk_id, num_elems, _elem_size) \
+  {.capacity = (num_elems) * (_elem_size),                      \
+   .used_capacity = 0,                                          \
+   .elem_size = _elem_size,                                     \
+   .length = 0};                                                \
+  byte_t GET_STACK_NAME(stk_id)[stk_id.capacity];               \
   stk_id.data = GET_STACK_NAME(stk_id)
 
 /*
  * Creates a stack with automatic storage duration whose contents are a copy of
- * `arr`.
+ * the contents of `data`.
  *
  * \param stk_id The identifer for the stack being assigned.
  * \param num_elems The maximum number of elements the stack will contain.
@@ -182,11 +182,12 @@ stack *stack_push(stack *stk, const void *const elem);
  * \note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define heapless_new_stack_arr(stk_id, arr)                               \
-  heapless_new_stack(stk_id, sizeof(arr) / sizeof *(arr), sizeof *(arr)); \
-  stk_id.capacity = sizeof(arr);                                          \
-  stk_id.used_capacity = sizeof(arr);                                     \
-  stk_id.length = sizeof(arr) / sizeof *(arr)
+#define heapless_new_stack(stk_id, data)                                   \
+  heapless_new_stack(stk_id, sizeof(data) / sizeof *(data), sizeof *(data)); \
+  stk_id.capacity = sizeof(data);                                          \
+  stk_id.used_capacity = sizeof(data);                                     \
+  stk_id.length = sizeof(data) / sizeof *(data);                            \
+  memcpy(GET_STACK_NAME(stk_id), data, sizeof(data));
 
 /*
  * Creates a stack of automatic storage duration which allocates memory solely
@@ -208,9 +209,10 @@ stack *stack_push(stack *stk, const void *const elem);
    .elem_size = _elem_size,                                         \
    .length = num_elems}
 
-#define new_heapless_interface_stack(_data)                           \
-  _new_heapless_interface_stack(_data, sizeof(data) / sizeof *(data), \
-                                sizeof *(data))
+/* Convenience macro equivalent to `_new_heapless_interface_stack()`. */
+#define new_heapless_interface_stack(_data)                             \
+  _new_heapless_interface_stack(_data, sizeof(_data) / sizeof *(_data), \
+                                sizeof *(_data))
 
 /*
  * Returns, but does not remove, the top element of `stk`.
