@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 typedef struct singly_linked_node {
-  void *data;
+  void *value;
   struct singly_linked_node *next;
 } s_linked_node;
 
@@ -27,6 +27,21 @@ typedef struct singly_linked_list {
  */
 s_linked_list *_new_s_list(const void *data, size_t num_elems,
                            size_t elem_size);
+
+/* 
+ * Appends `val` to `list` as a node, expanding `list` if necessary. 
+ * 
+ * \return A pointer to a singly linked list associated with the contents of `list` or `NULL` upon failure.
+ */
+s_linked_list *add_val_as_node(s_linked_list *list, void *val);
+
+/*
+ * Appends `node` to `list`.
+ *
+ * \return A pointer to a singly linked list associated with the contents of
+ * `list` or `NULL` upon failure.
+ */
+s_linked_list *add_node(s_linked_list list, s_linked_node *node);
 
 /*
  * Creates a new singly linked list with no nodes.
