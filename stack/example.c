@@ -1,5 +1,5 @@
 /*
- * Define this in above `#include "stack.h"` to expose some functionality
+ * Define this above `#include "stack.h"` to expose some functionality
  * allowing the use of stacks that do not rely on heap allocations.
  */
 #define STACK_INCL_HEAPLESS_STACK
