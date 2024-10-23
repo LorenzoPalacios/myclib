@@ -213,7 +213,7 @@ stack *stack_push(stack *stk, const void *const elem);
 
 /* Convenience macro equivalent to `_heapless_new_interface_stack()`. */
 #define heapless_new_interface_stack(_data)                             \
-  _new_heapless_interface_stack(_data, sizeof(_data) / sizeof *(_data), \
+  _heapless_new_interface_stack(_data, sizeof(_data) / sizeof *(_data), \
                                 sizeof *(_data))
 
 /*

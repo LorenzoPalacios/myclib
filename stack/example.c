@@ -17,7 +17,7 @@ int main(void) {
    */
   {
     int data[] = {1, 2, 3, 4, 5};
-    stack interface_stk = _new_heapless_interface_stack(
+    stack interface_stk = _heapless_new_interface_stack(
         data, sizeof(data) / sizeof(*data), sizeof(*data));
 
     int *val;
@@ -94,7 +94,7 @@ int main(void) {
   {
     int data[] = {0, 0, 0};
     size_t DATA_LEN = sizeof(data) / sizeof(*data);
-    stack interface_stk = new_heapless_interface_stack(data);
+    stack interface_stk = heapless_new_interface_stack(data);
 
     /* Printing the initial contents of `data`. */
     for (size_t i = 0; i < DATA_LEN; i++) {
