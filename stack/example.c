@@ -1,5 +1,5 @@
 /*
- * Define this above `#include "stack.h"` to expose some functionality
+ * Define this in above `#include "stack.h"` to expose some functionality
  * allowing the use of stacks that do not rely on heap allocations.
  */
 #define STACK_INCL_HEAPLESS_STACK
@@ -17,7 +17,7 @@ int main(void) {
    */
   {
     int data[] = {1, 2, 3, 4, 5};
-    stack interface_stk = _new_heapless_interface_stack(
+    stack interface_stk = _heapless_new_interface_stack(
         data, sizeof(data) / sizeof(*data), sizeof(*data));
 
     int *val;
@@ -84,42 +84,6 @@ int main(void) {
   }
 
   /*
-   * Example usage of `heapless_new_empty_stack()`
-   *
-   * This snippet should output:
-   *
-   * `4 3 2 1 0 `
-   */
-  {
-    const size_t NUM_ELEMS = 5;
-    stack example_stk =
-        heapless_new_empty_stack(example_stk, NUM_ELEMS, sizeof(int));
-
-    /* Push values onto the stack until capacity is reached. */
-    for (size_t i = 0; i < NUM_ELEMS; i++) {
-      heapless_stack_push(&example_stk, &i);
-    }
-
-    /*
-     * This push should not succeed since the stack is full and cannot be
-     * resized.
-     */
-    const int RANDOM_VAL_1 = -1;
-    heapless_stack_push(&example_stk, &RANDOM_VAL_1);
-
-    /* Pop and print all of the values in the stack. */
-    int *val;
-    while ((val = heapless_stack_pop(&example_stk)) != NULL) {
-      printf("%d ", *val);
-    }
-    putchar('\n');
-    /*
-     * Deletion is unnecessary since `example_stk` was not allocated on the
-     * heap.
-     */
-  }
-
-  /*
    * Example usage of `interface_stack_push()`.
    *
    * This snippet should output:
@@ -130,7 +94,7 @@ int main(void) {
   {
     int data[] = {0, 0, 0};
     size_t DATA_LEN = sizeof(data) / sizeof(*data);
-    stack interface_stk = new_heapless_interface_stack(data);
+    stack interface_stk = heapless_new_interface_stack(data);
 
     /* Printing the initial contents of `data`. */
     for (size_t i = 0; i < DATA_LEN; i++) {
@@ -308,5 +272,40 @@ int main(void) {
     putchar('\n');
   }
 
+  /*
+   * Example usage of `heapless_new_empty_stack()`
+   *
+   * This snippet should output:
+   *
+   * `4 3 2 1 0 `
+   */
+  {
+    const size_t NUM_ELEMS = 5;
+    stack example_stk =
+        heapless_new_empty_stack(example_stk, NUM_ELEMS, sizeof(int));
+
+    /* Push values onto the stack until capacity is reached. */
+    for (size_t i = 0; i < NUM_ELEMS; i++) {
+      heapless_stack_push(&example_stk, &i);
+    }
+
+    /*
+     * This push should not succeed since the stack is full and cannot be
+     * resized.
+     */
+    const int RANDOM_VAL_1 = -1;
+    heapless_stack_push(&example_stk, &RANDOM_VAL_1);
+
+    /* Pop and print all of the values in the stack. */
+    int *val;
+    while ((val = heapless_stack_pop(&example_stk)) != NULL) {
+      printf("%d ", *val);
+    }
+    putchar('\n');
+    /*
+     * Deletion is unnecessary since `interface_stk` was not allocated on the
+     * heap.
+     */
+  }
   return 0;
 }
