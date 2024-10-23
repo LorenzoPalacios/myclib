@@ -152,6 +152,8 @@ void *stack_pop(stack *stk);
 stack *stack_push(stack *stk, const void *const elem);
 
 #ifdef STACK_INCL_HEAPLESS_STACK
+/* For memcpy(). */
+#include <string.h>
 /* Ensures that each stack's allocation gets a unique name. */
 #define GET_STACK_NAME(local_stk) _stk_data_##local_stk
 
@@ -183,7 +185,7 @@ stack *stack_push(stack *stk, const void *const elem);
  * effects.
  */
 #define heapless_new_stack(stk_id, data)                                   \
-  heapless_new_stack(stk_id, sizeof(data) / sizeof *(data), sizeof *(data)); \
+  heapless_new_empty_stack(stk_id, sizeof(data) / sizeof *(data), sizeof *(data)); \
   stk_id.capacity = sizeof(data);                                          \
   stk_id.used_capacity = sizeof(data);                                     \
   stk_id.length = sizeof(data) / sizeof *(data);                            \
@@ -202,15 +204,15 @@ stack *stack_push(stack *stk, const void *const elem);
  * however it can modify the contents of `data` through `heapless_stack_pop()`
  * and `heapless_stack_push()`.
  */
-#define _new_heapless_interface_stack(_data, num_elems, _elem_size) \
+#define _heapless_new_interface_stack(_data, num_elems, _elem_size) \
   {.data = _data,                                                   \
    .capacity = (num_elems) * (_elem_size),                          \
    .used_capacity = (num_elems) * (_elem_size),                     \
    .elem_size = _elem_size,                                         \
    .length = num_elems}
 
-/* Convenience macro equivalent to `_new_heapless_interface_stack()`. */
-#define new_heapless_interface_stack(_data)                             \
+/* Convenience macro equivalent to `_heapless_new_interface_stack()`. */
+#define heapless_new_interface_stack(_data)                             \
   _new_heapless_interface_stack(_data, sizeof(_data) / sizeof *(_data), \
                                 sizeof *(_data))
 
