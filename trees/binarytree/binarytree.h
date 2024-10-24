@@ -72,7 +72,7 @@ node_bt *add_binary_node(binary_tree *tree, const void *elem);
  * `tree->unallocated_nodes` is `NULL`, this function will fail and return
  * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
  */
-binary_tree *add_open_node(binary_tree *tree, node_bt *open_node);
+binary_tree *push_unalloc_node(binary_tree *tree, node_bt *open_node);
 
 /*
  * Calculates the number of descendant nodes linked to `origin`.
@@ -143,10 +143,6 @@ size_t get_depth(const node_bt *origin);
 node_bt *get_open_node(binary_tree *tree);
 
 size_t left_branch_depth(const node_bt *origin);
-
-void operate_over_lineage(node_bt *origin,
-                          void (*op)(node_bt *node, va_list *args),
-                          va_list *args);
 
 /*
  * Initializes a rudimentary stack in `tree` which contains pointers to any

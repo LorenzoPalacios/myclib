@@ -6,8 +6,18 @@
 #include <string.h>
 #include <vadefs.h>
 
+/*
+ * The stack `unallocated_nodes` used by binary trees to track unallocated nodes
+ * is managed by this library, not the stack library, so we need functions that
+ * guarantee not to modify the memory allocations made by this library while
+ * still maintaining the operability of a stack.
+ */
+#define STACK_INCL_HEAPLESS_STACK
+
 #include "../../stack/stack.h"
 #include "../trees.h"
+
+typedef unsigned char byte;
 
 #define BT_REALLOC_FACTOR (2)
 
@@ -28,19 +38,19 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   tree_obj->unallocated_nodes = NULL;
 
   for (size_t i = 0; i < length; i++) {
-    node_bt *const cur_node = (void *)((char *)nodes_mem + i * NODE_SIZE);
+    node_bt *const cur_node = (void *)((byte *)nodes_mem + i * NODE_SIZE);
     node_bt *parent_node;
     if (i == 0)
       parent_node = NULL;
     else {
-      parent_node = (void *)((char *)cur_node - NODE_SIZE * (i / 2 + 1));
+      parent_node = (void *)((byte *)cur_node - NODE_SIZE * (i / 2 + 1));
       if (i & 1)
         parent_node->left = cur_node;
       else
         parent_node->right = cur_node;
     }
-    void *const cur_node_data = (char *)cur_node + sizeof(node_bt);
-    memcpy(cur_node_data, (char *)data + i * elem_size, elem_size);
+    void *const cur_node_data = (byte *)cur_node + sizeof(node_bt);
+    memcpy(cur_node_data, (byte *)data + i * elem_size, elem_size);
     cur_node->value = cur_node_data;
     cur_node->parent = parent_node;
     cur_node->left = cur_node->right = NULL;
@@ -169,7 +179,8 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-node_bt **traverse_from(node_bt *const origin, const node_bt *const target) {
+void traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
+                   const void *const stop_value) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -198,9 +209,9 @@ node_bt **traverse_from(node_bt *const origin, const node_bt *const target) {
   node_bt *next_node = NULL;
   size_t iter = 0;
   while (cur_node != NULL) {
-    iter++;
-    if (cur_node->left == target) return &cur_node->left;
-    if (cur_node->right == target) return &cur_node->right;
+    if (op != NULL) {
+      void *ret_val = op(cur_node);
+      if () }
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
@@ -225,7 +236,6 @@ node_bt **traverse_from(node_bt *const origin, const node_bt *const target) {
     cur_node = next_node;
   }
   printf("iterations: %zu\n", iter);
-  return NULL;
 }
 
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
@@ -284,7 +294,7 @@ binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
     const size_t NUM_NODES = tree->num_nodes;
     for (size_t i = 0; i < NODES_AFFECTED; i++) {
       node_bt *cur_node =
-          (void *)((char *)tree->root + (NUM_NODES - i - 1) * NODE_SIZE);
+          (void *)((byte *)tree->root + (NUM_NODES - i - 1) * NODE_SIZE);
       tree = delete_node_from_tree_s(tree, cur_node);
       if (tree == NULL) return NULL;
     }
@@ -300,13 +310,21 @@ binary_tree *expand_tree(binary_tree *const tree) {
   return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
 }
 
-binary_tree *add_open_node(binary_tree *tree, node_bt *const open_node) {
+binary_tree *push_unalloc_node(binary_tree *tree, node_bt *const open_node) {
   if (tree->unallocated_nodes == NULL) return NULL;
-  const size_t ALLOCATION = tree->allocation;
-  const size_t USED_ALLOCATION = tree->used_allocation;
-  if (ALLOCATION - USED_ALLOCATION < sizeof(node_bt *)) {
-    tree = expand_tree(tree);
-    if (tree == NULL) return NULL;
+  {
+    const size_t STK_AVAILABLE_ALLOC = tree->unallocated_nodes->capacity -
+                                       tree->unallocated_nodes->used_capacity;
+    if (STK_AVAILABLE_ALLOC < sizeof(node_bt **)) {
+      const size_t REQ_ALLOC = STK_AVAILABLE_ALLOC + sizeof(node_bt **);
+      const size_t TREE_AVAILABLE_ALLOC =
+          tree->allocation - tree->used_allocation;
+      if (TREE_AVAILABLE_ALLOC < REQ_ALLOC) {
+        tree = expand_tree(tree);
+        if (tree == NULL) return NULL;
+      }
+      tree.
+    }
   }
   /*
    * This direct access of `tree->unallocated_nodes` exists for two reasons:
@@ -316,12 +334,7 @@ binary_tree *add_open_node(binary_tree *tree, node_bt *const open_node) {
    * interfere with any code reliant upon `tree->unallocated_nodes`, such as
    * `get_open_node`.
    */
-  const node_bt **stack_terminator =
-      (void *)((char *)tree + tree->used_allocation -
-               sizeof(tree->unallocated_nodes));
-  *stack_terminator = open_node;
-  *(stack_terminator + 1) = NULL;
-  tree->used_allocation += sizeof(node_bt *);
+  push tree->used_allocation += sizeof(node_bt *);
   return tree;
 }
 
@@ -336,7 +349,7 @@ binary_tree *init_open_nodes(binary_tree *tree) {
     tree = expand_tree(tree);
     if (tree == NULL) return NULL;
   }
-  tree->unallocated_nodes = (void *)((char *)tree + tree->used_allocation);
+  tree->unallocated_nodes = (void *)((byte *)tree + tree->used_allocation);
 
   *(tree->unallocated_nodes) =
       (stack){/*
@@ -391,7 +404,6 @@ int main(void) {
   srand(time(NULL));
   for (size_t i = 0; i < sizeof(data) / sizeof(*data); i++) data[i] = rand();
   binary_tree *tree = new_binary_tree(data);
-
 
   return 0;
 }
