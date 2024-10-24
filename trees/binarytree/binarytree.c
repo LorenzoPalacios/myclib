@@ -13,21 +13,23 @@
 
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
                               const size_t length) {
-  const size_t NODE_SIZE = sizeof(bt_node) + elem_size;
+  const size_t NODE_SIZE = sizeof(node_bt) + elem_size;
   const size_t REQUIRED_MEM = length * NODE_SIZE + sizeof(binary_tree);
   binary_tree *const tree_obj = malloc(REQUIRED_MEM);
   /* Increment past the tree header. */
-  bt_node *const nodes_mem = (void *)(tree_obj + 1);
+  node_bt *const nodes_mem = (void *)(tree_obj + 1);
   if (tree_obj == NULL) return NULL;
 
   tree_obj->num_nodes = length;
   tree_obj->node_size = NODE_SIZE;
   tree_obj->used_allocation = tree_obj->allocation = REQUIRED_MEM;
-  tree_obj->open_nodes = NULL;
+  /* The tracking of unallocated nodes is an opt-in feature, hence why its
+   * initial value is `NULL`. */
+  tree_obj->unallocated_nodes = NULL;
 
   for (size_t i = 0; i < length; i++) {
-    bt_node *const cur_node = (void *)((char *)nodes_mem + i * NODE_SIZE);
-    bt_node *parent_node;
+    node_bt *const cur_node = (void *)((char *)nodes_mem + i * NODE_SIZE);
+    node_bt *parent_node;
     if (i == 0)
       parent_node = NULL;
     else {
@@ -37,7 +39,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
       else
         parent_node->right = cur_node;
     }
-    void *const cur_node_data = (char *)cur_node + sizeof(bt_node);
+    void *const cur_node_data = (char *)cur_node + sizeof(node_bt);
     memcpy(cur_node_data, (char *)data + i * elem_size, elem_size);
     cur_node->value = cur_node_data;
     cur_node->parent = parent_node;
@@ -57,8 +59,8 @@ void delete_binary_tree_s(binary_tree **const tree) {
   delete_binary_tree(tree);
 }
 
-bt_node *remove_node_from_tree(binary_tree *const tree, bt_node *const target) {
-  bt_node *const node_copy = malloc(tree->node_size);
+node_bt *remove_node_from_tree(binary_tree *const tree, node_bt *const target) {
+  node_bt *const node_copy = malloc(tree->node_size);
   if (node_copy == NULL) return NULL;
   memcpy(node_copy, target, tree->node_size);
   delete_node_from_tree_s(tree, target);
@@ -66,10 +68,10 @@ bt_node *remove_node_from_tree(binary_tree *const tree, bt_node *const target) {
   return node_copy;
 }
 
-void operate_over_lineage(bt_node *const origin,
-                          void (*const op)(bt_node *node, va_list *args),
+void operate_over_lineage(node_bt *const origin,
+                          void (*const op)(node_bt *node, va_list *args),
                           va_list *const args) {
-  bt_node *cur_node = origin->left;
+  node_bt *cur_node = origin->left;
   while (cur_node != NULL) {
     op(cur_node, args);
     if (cur_node->left == NULL)
@@ -88,38 +90,44 @@ void operate_over_lineage(bt_node *const origin,
   }
 }
 
-size_t get_depth(bt_node *const origin) {
-  size_t left_branch_depth = 0;
-  for (bt_node *cur_node = origin->left; cur_node != NULL;
-       left_branch_depth++) {
+size_t left_branch_depth(const node_bt *const origin) {
+  size_t depth = 0;
+  for (node_bt *cur_node = origin->left; cur_node != NULL; depth++) {
     if (cur_node->left == NULL)
       cur_node = cur_node->right;
     else
       cur_node = cur_node->left;
   }
+  return depth;
+}
 
-  size_t right_branch_depth = 0;
-  for (bt_node *cur_node = origin->right; cur_node != NULL;
-       right_branch_depth++) {
+size_t right_branch_depth(const node_bt *const origin) {
+  size_t depth = 0;
+  for (node_bt *cur_node = origin->right; cur_node != NULL; depth++) {
     if (cur_node->right == NULL)
       cur_node = cur_node->left;
     else
       cur_node = cur_node->right;
   }
-  return left_branch_depth > right_branch_depth ? left_branch_depth
-                                                : right_branch_depth;
+  return depth;
 }
 
-size_t count_descendant_nodes(bt_node *const origin) {
+size_t get_depth(const node_bt *const origin) {
+  const size_t left_depth = left_branch_depth(origin);
+  const size_t right_depth = right_branch_depth(origin);
+  return (left_depth > right_depth ? left_depth : right_depth);
+}
+
+size_t count_descendant_nodes(node_bt *const origin) {
   size_t count = 0;
-  for (bt_node *cur_node = origin->left; cur_node != NULL; count++) {
+  for (node_bt *cur_node = origin->left; cur_node != NULL; count++) {
     if (cur_node->left == NULL)
       cur_node = cur_node->right;
     else
       cur_node = cur_node->left;
   }
 
-  for (bt_node *cur_node = origin->right; cur_node != NULL; count++) {
+  for (node_bt *cur_node = origin->right; cur_node != NULL; count++) {
     if (cur_node->left == NULL)
       cur_node = cur_node->right;
     else
@@ -129,38 +137,39 @@ size_t count_descendant_nodes(bt_node *const origin) {
 }
 
 /* NEEDS REDESIGN/REWRITE */
-void delete_node_and_lineage(binary_tree *const tree, bt_node *target) {
+void delete_node_and_lineage(binary_tree *const tree, node_bt *target) {
   {
-    bt_node *parent = target->parent;
+    node_bt *parent = target->parent;
     if (parent->left == target)
       parent->left = NULL;
     else
       parent->right = NULL;
   }
-  const size_t REMOVED_NODES = get_depth(target) + 1;
-  tree->num_nodes -= REMOVED_NODES;
-  tree->used_allocation -= REMOVED_NODES * tree->node_size;
+  /* Adding one to account for the deletion of `target. */
+  const size_t DELETED_NODES = get_depth(target) + 1;
+  tree->num_nodes -= DELETED_NODES;
+  tree->used_allocation -= DELETED_NODES * tree->node_size;
 }
 
 /*
- * Searches upwards along the ancestry of `origin` until a node is found whose
- * `left` and `right` pointers are not `NULL`. Such a node is considered
- * divergent since, during tree traversal, a search algorithm must choose
- * either the `left` or `right` branch of that node.
+ * Searches along the ancestry of `origin` until a node is found whose `left`
+ * and `right` pointers are not `NULL`. Such a node is considered divergent
+ * since, during tree traversal, a search algorithm must choose either the
+ * `left` or `right` branch of that node.
  *
  * \return A pointer to the first ancestral node of `origin` containing a branch
  * divergence or `NULL` if no suitable node is found.
  */
-bt_node *next_ancestral_divergence(const bt_node *origin) {
-  while (origin->parent != NULL) {
-    bt_node *const parent = origin->parent;
-    if (parent->left != NULL && parent->right != NULL) return parent;
-    origin = parent;
+node_bt *next_ancestral_divergence(const node_bt *const origin) {
+  node_bt *cur_node = origin->parent;
+  while (cur_node != NULL) {
+    if (cur_node->left != NULL && cur_node->right != NULL) return cur_node;
+    cur_node = cur_node->parent;
   }
   return NULL;
 }
 
-bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
+node_bt **traverse_from(node_bt *const origin, const node_bt *const target) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -181,12 +190,12 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
    * searches by clearing its contents.
    */
   if (divergent_nodes == NULL)
-    divergent_nodes = new_empty_stack(12, sizeof(bt_node *));
+    divergent_nodes = new_empty_stack(12, sizeof(node_bt *));
   else
     clear_stack(divergent_nodes);
 
-  bt_node *cur_node = origin;
-  bt_node *next_node = NULL;
+  node_bt *cur_node = origin;
+  node_bt *next_node = NULL;
   size_t iter = 0;
   while (cur_node != NULL) {
     iter++;
@@ -208,7 +217,7 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
     } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
     } else {
-      bt_node **const next_divergence = stack_pop(divergent_nodes);
+      node_bt **const next_divergence = stack_pop(divergent_nodes);
       /* If there are no divergent nodes in the traversed path, we're done. */
       if (next_divergence == NULL) break;
       next_node = (*next_divergence)->right;
@@ -219,13 +228,13 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
   return NULL;
 }
 
-binary_tree *delete_node_from_tree_s(binary_tree *tree, bt_node *const target) {
+binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
   if (target != NULL) {
-    bt_node *const parent = target->parent;
+    node_bt *const parent = target->parent;
     if (parent != NULL) {
       /*
        * Overwrite the parent's pointer to `target` with the child nodes of
-       * `target` to ensure the lineage of `target` is not lost.
+       * `target` to ensure the child nodes of `target` are not lost.
        */
       if (parent->left == target) {
         parent->left = target->left;
@@ -237,18 +246,20 @@ binary_tree *delete_node_from_tree_s(binary_tree *tree, bt_node *const target) {
           *find_open_descendant(parent->left) = target->left;
       }
     } else {
-      /* If the node has no parent, assume it is the root node. */
-      tree->root = target->left == NULL ? target->right : target->left;
+      /*
+       * If the node has no parent, assume we are deleting the root node and
+       * replace its position with whichever child node is present. Note that if
+       * neither are present, the value at `tree->root` will be NULL.
+       */
+      tree->root = (target->left != NULL ? target->left : target->right);
     }
     tree->used_allocation -= tree->node_size;
     /*
      * If the tree implements tracking of open blocks of memory, add the node
      * as an open block.
      */
-    if (tree->open_nodes != NULL) {
-      tree = add_open_node(tree, target);
-      if (tree == NULL) return NULL;
-    }
+    if (tree->unallocated_nodes != NULL)
+      stack_push(tree->unallocated_nodes, target);
   }
   return tree;
 }
@@ -272,7 +283,7 @@ binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
     const size_t NODE_SIZE = tree->node_size;
     const size_t NUM_NODES = tree->num_nodes;
     for (size_t i = 0; i < NODES_AFFECTED; i++) {
-      bt_node *cur_node =
+      node_bt *cur_node =
           (void *)((char *)tree->root + (NUM_NODES - i - 1) * NODE_SIZE);
       tree = delete_node_from_tree_s(tree, cur_node);
       if (tree == NULL) return NULL;
@@ -289,54 +300,71 @@ binary_tree *expand_tree(binary_tree *const tree) {
   return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
 }
 
-binary_tree *add_open_node(binary_tree *tree, bt_node *const open_node) {
-  if (tree->open_nodes == NULL) return NULL;
+binary_tree *add_open_node(binary_tree *tree, node_bt *const open_node) {
+  if (tree->unallocated_nodes == NULL) return NULL;
   const size_t ALLOCATION = tree->allocation;
   const size_t USED_ALLOCATION = tree->used_allocation;
-  if (ALLOCATION - USED_ALLOCATION < sizeof(bt_node *)) {
+  if (ALLOCATION - USED_ALLOCATION < sizeof(node_bt *)) {
     tree = expand_tree(tree);
     if (tree == NULL) return NULL;
   }
   /*
-   * This direct access of `tree->open_nodes` exists for two reasons:
+   * This direct access of `tree->unallocated_nodes` exists for two reasons:
    * 1. This gives the address of the terminating `NULL` pointer in
    * `tree->open_node`.
-   * 2. This will not modify `tree->open_nodes` and will therefore not interfere
-   * with any code reliant upon `tree->open_nodes`, such as `get_open_node`.
+   * 2. This will not modify `tree->unallocated_nodes` and will therefore not
+   * interfere with any code reliant upon `tree->unallocated_nodes`, such as
+   * `get_open_node`.
    */
-  const bt_node **stack_terminator =
-      (void *)((char *)tree + tree->used_allocation - sizeof(tree->open_nodes));
+  const node_bt **stack_terminator =
+      (void *)((char *)tree + tree->used_allocation -
+               sizeof(tree->unallocated_nodes));
   *stack_terminator = open_node;
   *(stack_terminator + 1) = NULL;
-  tree->used_allocation += sizeof(bt_node *);
+  tree->used_allocation += sizeof(node_bt *);
   return tree;
 }
 
 binary_tree *init_open_nodes(binary_tree *tree) {
-  const size_t ALLOCATION = tree->allocation;
-  const size_t USED_ALLOCATION = tree->used_allocation;
-  if (ALLOCATION - USED_ALLOCATION < sizeof(bt_node *)) {
+  const size_t AVAILABLE_MEM = tree->allocation - tree->used_allocation;
+  /*
+   * Allocate enough memory for a stack that can hold one pointer to an
+   * unallocated node.
+   */
+  const size_t REQ_ALLOCATION = sizeof(stack) + sizeof(node_bt **);
+  if (AVAILABLE_MEM < REQ_ALLOCATION) {
     tree = expand_tree(tree);
     if (tree == NULL) return NULL;
   }
-  tree->open_nodes = (void *)((char *)tree + USED_ALLOCATION);
-  *tree->open_nodes = NULL;
-  tree->used_allocation += sizeof(tree->open_nodes);
+  tree->unallocated_nodes = (void *)((char *)tree + tree->used_allocation);
+
+  *(tree->unallocated_nodes) =
+      (stack){/*
+               * Set the pointer to the stack's data to the
+               * memory just after the stack header.
+               */
+              .data = tree->unallocated_nodes + 1,
+              .capacity = REQ_ALLOCATION,
+              .used_capacity = 0,
+              .elem_size = sizeof(node_bt **),
+              .length = 0};
+
+  tree->used_allocation += REQ_ALLOCATION;
   return tree;
 }
 
 /* write documentation */
-bt_node *get_open_node(binary_tree *const tree) {
-  if (tree->open_nodes == NULL) return NULL;
-  return *(tree->open_nodes++);
+node_bt *get_open_node(binary_tree *const tree) {
+  if (tree->unallocated_nodes == NULL) return NULL;
+  return stack_pop(tree->unallocated_nodes);
 }
 
-bt_node **find_open_descendant(bt_node *const origin) {
+node_bt **find_open_descendant(node_bt *const origin) {
   return search_for_node(origin, NULL);
 }
 
 /* NEEDS REDESIGN/REWRITE */
-void make_node_child_of(bt_node *const src, bt_node *const dst) {
+void make_node_child_of(node_bt *const src, node_bt *const dst) {
   if (dst->left == NULL) {
     dst->left = src;
     return;
@@ -348,10 +376,22 @@ void make_node_child_of(bt_node *const src, bt_node *const dst) {
 }
 
 /* NEEDS REDESIGN/REWRITE */
-void force_make_node_child_of(bt_node *const src, bt_node *const dst) {
+void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
   make_node_child_of(src, dst);
   if (src->parent == dst) return;
-  bt_node **open_candidate = find_open_descendant(src);
+  node_bt **open_candidate = find_open_descendant(src);
   *open_candidate = dst->left;
   dst->left = src;
+}
+
+#include <time.h>
+
+int main(void) {
+  size_t data[0x10000];
+  srand(time(NULL));
+  for (size_t i = 0; i < sizeof(data) / sizeof(*data); i++) data[i] = rand();
+  binary_tree *tree = new_binary_tree(data);
+
+
+  return 0;
 }
