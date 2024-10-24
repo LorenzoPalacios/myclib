@@ -6,6 +6,7 @@
 #include <string.h>
 #include <vadefs.h>
 
+#include "../../stack/stack.h"
 #include "../trees.h"
 
 #define BT_REALLOC_FACTOR (2)
@@ -163,13 +164,27 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
-   * `NULL`. If both `left` and `right` are `NULL`, then we backtrack to this
-   * node which will have a right branch to be traversed.
+   * `NULL`. If both `left` and `right` are `NULL`, then we backtrack to the
+   * last divergent node that has not yet been traversed.
    *
-   * Note that this node will have already been traversed prior to backtracking,
-   * hence why we can always select the right branch of this node.
+   * Note that these divergent nodes will have already had their left branches
+   * traversed prior to any backtracking, hence why we can always select their
+   * right branch.
+   *
+   * Recursion is the natural solution to tree traversal, however it brings the
+   * issue of stack overflow, which this implementation seeks to avoid.
    */
-  bt_node *last_divergence = NULL;
+  static stack *divergent_nodes = NULL;
+  /*
+   * If the stack is uninitialized, initialize it.
+   * Otherwise, ensure the stack does not contain any divergent nodes from prior
+   * searches by clearing its contents.
+   */
+  if (divergent_nodes == NULL)
+    divergent_nodes = new_empty_stack(1, sizeof(bt_node *));
+  else
+    clear_stack(divergent_nodes);
+
   bt_node *cur_node = origin;
   bt_node *next_node = NULL;
   while (cur_node != NULL) {
@@ -179,17 +194,19 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
-       * save `cur_node` as the last divergent node.
+       * save `cur_node` as a divergent node.
        */
-      if (cur_node->right != NULL) last_divergence = cur_node;
+      if (cur_node->right != NULL)
+        divergent_nodes = stack_push(divergent_nodes, cur_node);
       next_node = cur_node->left;
     } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
     } else {
-      /* If there is no divergence along the traversed path, we're done. */
-      if (last_divergence == NULL) break;
-      next_node = last_divergence->right;
-      last_divergence = next_ancestral_divergence(last_divergence);
+      bt_node *const next_divergence = stack_pop(divergent_nodes);
+      /* If there are no divergent nodes in the traversed path, we're done. */
+      if (next_divergence == NULL) break;
+      printf("%zu\n", *(size_t *)next_divergence->right->value);
+      next_node = next_divergence->right;
     }
     cur_node = next_node;
   }
@@ -334,7 +351,7 @@ void force_make_node_child_of(bt_node *const src, bt_node *const dst) {
 }
 
 int main(void) {
-  const size_t data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23};
+  const size_t data[] = {1, 2, 3};
   binary_tree *a = new_binary_tree(data, sizeof(data) / sizeof(*data));
   bt_node **found_node = search_for_node(a->root, a->root);
   printf("addressof: %td\n", (ptrdiff_t)found_node);
