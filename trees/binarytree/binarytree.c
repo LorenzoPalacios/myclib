@@ -181,35 +181,41 @@ bt_node **search_for_node(bt_node *const origin, const bt_node *const target) {
    * searches by clearing its contents.
    */
   if (divergent_nodes == NULL)
-    divergent_nodes = new_empty_stack(1, sizeof(bt_node *));
+    divergent_nodes = new_empty_stack(12, sizeof(bt_node *));
   else
     clear_stack(divergent_nodes);
 
   bt_node *cur_node = origin;
   bt_node *next_node = NULL;
+  size_t iter = 0;
   while (cur_node != NULL) {
+    iter++;
     if (cur_node->left == target) return &cur_node->left;
     if (cur_node->right == target) return &cur_node->right;
-    printf("%zu\n", *(size_t *)cur_node->value);
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
        * save `cur_node` as a divergent node.
+       *
+       * Taking the address of `cur_node` is necessary since `stack_push()`
+       * expects the `elem` argument to be a pointer to data. Since `cur_node`
+       * is a pointer to a node, but we need to keep track of that pointer, we
+       * take the address of that pointer.
        */
       if (cur_node->right != NULL)
-        divergent_nodes = stack_push(divergent_nodes, cur_node);
+        divergent_nodes = stack_push(divergent_nodes, &cur_node);
       next_node = cur_node->left;
     } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
     } else {
-      bt_node *const next_divergence = stack_pop(divergent_nodes);
+      bt_node **const next_divergence = stack_pop(divergent_nodes);
       /* If there are no divergent nodes in the traversed path, we're done. */
       if (next_divergence == NULL) break;
-      printf("%zu\n", *(size_t *)next_divergence->right->value);
-      next_node = next_divergence->right;
+      next_node = (*next_divergence)->right;
     }
     cur_node = next_node;
   }
+  printf("iterations: %zu\n", iter);
   return NULL;
 }
 
@@ -348,19 +354,4 @@ void force_make_node_child_of(bt_node *const src, bt_node *const dst) {
   bt_node **open_candidate = find_open_descendant(src);
   *open_candidate = dst->left;
   dst->left = src;
-}
-
-int main(void) {
-  const size_t data[] = {1, 2, 3};
-  binary_tree *a = new_binary_tree(data, sizeof(data) / sizeof(*data));
-  bt_node **found_node = search_for_node(a->root, a->root);
-  printf("addressof: %td\n", (ptrdiff_t)found_node);
-  if (found_node != NULL) {
-    printf("node pointer: %td\n", (ptrdiff_t)*found_node);
-    printf("pointer dist from root: %td\n",
-           (char *)*found_node - (char *)a->root);
-    if ((*found_node)->parent != NULL)
-      printf("node value: %zu\n", *(size_t *)(*found_node)->parent->value);
-  }
-  return 0;
 }
