@@ -78,8 +78,17 @@ typedef struct {
  *     / \   / \
  *    3   0 1   0
  *
+ * Shown linearly:
+ * `()` - Denotes a node.
+ * `{}` - Denotes a group of nodes.
+ * `->` - Signifies that the left-hand node is the parent of the right-hand node.
+ * `,`  - Separator.
+ *
+ * `(7) -> {(4) -> {(3), (0)}}`,
+ * `(7) -> {(9) -> {(1), (0)}}`
+ *
  * \return A balanced binary tree whose structure is in accordance with the
- * above example.
+ * above example or `NULL` if the tree could not be created.
  * \note This function returns a `binary_tree` without any way of tracking
  * unused memory accrued after removing/deleting nodes.
  * See `init_open_nodes()` if you would like to enable a stack
@@ -194,6 +203,15 @@ void make_node_child_of(node_bt *src, node_bt *dst);
  */
 binary_tree *push_unalloc_node(binary_tree *tree, node_bt *open_node);
 
+/*
+ * Searches along the ancestry of `origin` until a node is found whose `left`
+ * and `right` pointers are not `NULL`. Such a node is considered divergent
+ * since, during tree traversal, a search algorithm must choose either the
+ * `left` or `right` branch of that node.
+ *
+ * \return A pointer to the first ancestral node of `origin` containing a branch
+ * divergence or `NULL` if no suitable node is found.
+ */
 node_bt *next_ancestral_divergence(const node_bt *origin);
 
 node_bt *remove_node_from_tree(binary_tree *tree, node_bt *target);
@@ -225,6 +243,7 @@ binary_tree *resize_tree(binary_tree *tree, size_t new_size);
 binary_tree *resize_tree_s(binary_tree *tree, size_t new_size);
 
 size_t right_branch_depth(const node_bt *origin);
+
 /*
  * Traverses all descendant nodes from `origin`, passing each encountered node
  * as a pointer to `op` until `stop_condition` returns `true` or all the nodes

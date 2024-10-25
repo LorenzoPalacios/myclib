@@ -67,6 +67,7 @@ void delete_binary_tree_s(binary_tree **const tree) {
   delete_binary_tree(tree);
 }
 
+/* NEEDS REWRITE */
 node_bt *remove_node_from_tree(binary_tree *const tree, node_bt *const target) {
   node_bt *const node_copy = malloc(tree->value_size);
   if (node_copy == NULL) return NULL;
@@ -76,28 +77,7 @@ node_bt *remove_node_from_tree(binary_tree *const tree, node_bt *const target) {
   return node_copy;
 }
 
-void operate_over_lineage(node_bt *const origin,
-                          void (*const op)(node_bt *node, va_list *args),
-                          va_list *const args) {
-  node_bt *cur_node = origin->left;
-  while (cur_node != NULL) {
-    op(cur_node, args);
-    if (cur_node->left == NULL)
-      cur_node = cur_node->right;
-    else
-      cur_node = cur_node->left;
-  }
-
-  cur_node = origin->right;
-  while (cur_node != NULL) {
-    op(cur_node, args);
-    if (cur_node->left == NULL)
-      cur_node = cur_node->right;
-    else
-      cur_node = cur_node->left;
-  }
-}
-
+/* REWRITE TO USE TRAVERSE_DESCENDANTS() */
 size_t left_branch_depth(const node_bt *const origin) {
   size_t depth = 0;
   for (node_bt *cur_node = origin->left; cur_node != NULL; depth++) {
@@ -109,6 +89,7 @@ size_t left_branch_depth(const node_bt *const origin) {
   return depth;
 }
 
+/* REWRITE TO USE TRAVERSE_DESCENDANTS() */
 size_t right_branch_depth(const node_bt *const origin) {
   size_t depth = 0;
   for (node_bt *cur_node = origin->right; cur_node != NULL; depth++) {
@@ -144,7 +125,7 @@ size_t count_descendant_nodes(node_bt *const origin) {
   return count;
 }
 
-/* NEEDS REDESIGN/REWRITE */
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void delete_node_and_lineage(binary_tree *const tree, node_bt *target) {
   {
     node_bt *parent = target->parent;
@@ -159,15 +140,6 @@ void delete_node_and_lineage(binary_tree *const tree, node_bt *target) {
   tree->used_allocation -= DELETED_NODES * tree->value_size;
 }
 
-/*
- * Searches along the ancestry of `origin` until a node is found whose `left`
- * and `right` pointers are not `NULL`. Such a node is considered divergent
- * since, during tree traversal, a search algorithm must choose either the
- * `left` or `right` branch of that node.
- *
- * \return A pointer to the first ancestral node of `origin` containing a branch
- * divergence or `NULL` if no suitable node is found.
- */
 node_bt *next_ancestral_divergence(const node_bt *const origin) {
   node_bt *cur_node = origin->parent;
   while (cur_node != NULL) {
@@ -261,6 +233,7 @@ void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
   return ret_val;
 }
 
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
   if (target != NULL) {
     node_bt *const parent = target->parent;
@@ -297,6 +270,7 @@ binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
   return tree;
 }
 
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
   binary_tree *const new_tree = realloc(tree, new_size);
   if (new_tree == NULL) return NULL;
@@ -309,6 +283,7 @@ binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
   return new_tree;
 }
 
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
   if (new_size < tree->used_allocation) {
     const size_t NODES_AFFECTED =
@@ -409,7 +384,7 @@ node_bt **find_open_descendant(node_bt *const origin) {
   return traverse_descendants(origin, ret_open_child, node_has_open_child);
 }
 
-/* NEEDS REDESIGN/REWRITE */
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void make_node_child_of(node_bt *const src, node_bt *const dst) {
   if (dst->left == NULL) {
     dst->left = src;
@@ -421,7 +396,7 @@ void make_node_child_of(node_bt *const src, node_bt *const dst) {
   }
 }
 
-/* NEEDS REDESIGN/REWRITE */
+/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
   make_node_child_of(src, dst);
   if (src->parent == dst) return;
