@@ -4,6 +4,14 @@
 #include <stddef.h>
 #include <vadefs.h>
 
+/*
+ * The stack `unallocated_nodes` used by binary trees to track unallocated nodes
+ * is managed by this library, not the stack library, so we need functions that
+ * guarantee not to modify the memory allocations made by this library while
+ * still maintaining the operability of a stack.
+ */
+#define STACK_INCL_HEAPLESS_STACK
+
 #include "../../stack/stack.h"
 #include "../trees.h"
 
@@ -13,20 +21,20 @@
  * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` must be made before shrinking the
  * internal stack's allocated memory.
  */
-static size_t TRAVERSAL_STACK_SHRINK_COUNTER = 3;
+static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 3;
 /*
  * If `traverse_descendants` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
  * and the `used_capacity` of the internal stack used by
  * `traverse_descendants()` is less than the product of this multiplier and the
  * stack's `capacity`, the internal stack will shrink its allocated memory.
  *
- * Expressed mathematically, this would be
+ * Expressed mathematically:
  *
  * c - The capacity of the stack.
  * u - The used capacity of the stack.
  * k - The value of `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`.
  *
- * If `u < kc` over three consecutive calls to `traverse_descendants()`, then
+ * If `u < kc` over three subsequent calls to `traverse_descendants()`, then
  * the internal stack of `traverse_descendants()` will shrink its allocation.
  */
 static double TRAVERSAL_STACK_MAJOR_USAGE_PERCENT = .8;
@@ -119,7 +127,7 @@ void delete_node_and_lineage(binary_tree *tree, node_bt *target);
  */
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *target);
 
-binary_tree *expand_tree(binary_tree *tree);
+binary_tree *expand_binary_tree(binary_tree *tree);
 
 /*
  * Finds the first open slot (that is, a `left` or `right` pointer whose value
@@ -157,19 +165,13 @@ node_bt *get_open_node(binary_tree *tree);
 size_t left_branch_depth(const node_bt *origin);
 
 /*
- * Initializes a rudimentary stack in `tree` which contains pointers to any
- * open blocks of memory left behind from removing or deleting nodes.
- *
- * This can also be used to reset a stack of open nodes, although if this
- * function is called with a binary tree whose `unallocated_nodes` is not yet
- * exhausted, memory leaks can occur as the pointers to any open blocks of
- * memory may be lost.
+ * Initializes a stack in `tree` which contains pointers to any open blocks of
+ * memory left behind from removing or deleting nodes.
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
  * \note The current implementation allocates this stack at the end of the
- * allocated memory for `tree`. Additionally, if this function returns `NULL`,
- * then no stack has been allocated.
+ * allocated memory for `tree`.
  */
 binary_tree *init_open_nodes(binary_tree *tree);
 
@@ -230,14 +232,13 @@ size_t right_branch_depth(const node_bt *origin);
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
- *
+ * 
  * \note Calling this function with `op` equal to `NULL` will always cause all
- * of descendant nodes of `origin` to be traversed. This can be useful for
- * allocating enough memory for the stack used during traversal for a particular
- * tree.
+ * descendant nodes of `origin` to be traversed. This can be used for
+ * pre-allocating memory for the internal stack.
  * \note If the internal stack used for traversal does not use most of its
  * capacity after a few calls, it will shrink itself to reduce memory footprint.
  */
-void traverse_descendants(node_bt *origin, byte (*op)(node_bt *),
-                          byte stop_value);
+void traverse_descendants(node_bt *origin, void *(*op)(node_bt *),
+                           const void *stop_value, size_t stop_value_len);
 #endif

@@ -4,21 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vadefs.h>
-
-/*
- * The stack `unallocated_nodes` used by binary trees to track unallocated nodes
- * is managed by this library, not the stack library, so we need functions that
- * guarantee not to modify the memory allocations made by this library while
- * still maintaining the operability of a stack.
- */
-#define STACK_INCL_HEAPLESS_STACK
 
 #include "../../stack/stack.h"
 #include "../trees.h"
 
 typedef unsigned char byte;
 
+/* Reallocation factor used by `expand_binary_tree()`. */
 #define BT_REALLOC_FACTOR (2)
 
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
@@ -181,8 +173,9 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-void traverse_descendants(node_bt *const origin, byte (*const op)(node_bt *),
-                          const byte stop_value) {
+void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
+                           const void *const stop_value,
+                           const size_t stop_value_len) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -209,8 +202,12 @@ void traverse_descendants(node_bt *const origin, byte (*const op)(node_bt *),
     clear_stack(divergent_nodes);
 
   /*
-   * These are stats used to determine whether or not the allocation of
-   * `divergent_nodes` should be shrunk or not.
+   * If this value reaches `TRAVERSAL_STACK_SHRINK_COUNTER_MAX`,
+   * `divergent_nodes` will have its allocation shrunk.
+   *
+   * This counter will reset if the `divergent_nodes->used_capacity` comes
+   * within `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` of
+   * `divergent_nodes->capacity`.
    */
   static byte stack_shrink_counter = 0;
 
@@ -219,8 +216,8 @@ void traverse_descendants(node_bt *const origin, byte (*const op)(node_bt *),
   size_t iter = 0;
   while (cur_node != NULL) {
     if (op != NULL) {
-      const byte RET_VAL = op(cur_node);
-      if (RET_VAL == stop_value) return;
+      const void *RET_VAL = op(cur_node);
+      if (memcmp(RET_VAL, stop_value, stop_value_len) == 0) return;
     }
     if (cur_node->left != NULL) {
       /*
@@ -241,14 +238,23 @@ void traverse_descendants(node_bt *const origin, byte (*const op)(node_bt *),
     } else {
       node_bt **const next_divergence = stack_pop(divergent_nodes);
       /* If there are no divergent nodes in the traversed path, we're done. */
-      if (next_divergence == NULL) return;
+      if (next_divergence == NULL) break;
       next_node = (*next_divergence)->right;
     }
     cur_node = next_node;
   }
-  if ()
-  if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
-  printf("iterations: %zu\n", iter);
+
+  {
+    if (divergent_nodes->used_capacity <
+        TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity)
+      stack_shrink_counter++;
+    /*
+     * We don't directly resize the stack to a smaller allocation since
+     * shrinking it to fit is likely good enough.
+     */
+    if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
+  }
+  return;
 }
 
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
@@ -272,7 +278,7 @@ binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
       /*
        * If the node has no parent, assume we are deleting the root node and
        * replace its position with whichever child node is present. Note that if
-       * neither are present, the value at `tree->root` will be NULL.
+       * neither are present, the value at `tree->root` will be `NULL`.
        */
       tree->root = (target->left != NULL ? target->left : target->right);
     }
@@ -319,35 +325,30 @@ binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
   return new_tree;
 }
 
-binary_tree *expand_tree(binary_tree *const tree) {
+binary_tree *expand_binary_tree(binary_tree *const tree) {
   return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
 }
 
 binary_tree *push_unalloc_node(binary_tree *tree, node_bt *const open_node) {
-  if (tree->unallocated_nodes == NULL) return NULL;
-  {
-    const size_t STK_AVAILABLE_ALLOC = tree->unallocated_nodes->capacity -
-                                       tree->unallocated_nodes->used_capacity;
-    if (STK_AVAILABLE_ALLOC < sizeof(node_bt **)) {
-      const size_t REQ_ALLOC = STK_AVAILABLE_ALLOC + sizeof(node_bt **);
-      const size_t TREE_AVAILABLE_ALLOC =
-          tree->allocation - tree->used_allocation;
-      if (TREE_AVAILABLE_ALLOC < REQ_ALLOC) {
-        tree = expand_tree(tree);
-        if (tree == NULL) return NULL;
-      }
-      tree.
+  stack *const unalloc_nodes_stk = tree->unallocated_nodes;
+  if (unalloc_nodes_stk == NULL) return NULL;
+  const size_t STK_AVAILABLE_ALLOC = unalloc_nodes_stk - unalloc_nodes_stk;
+  if (STK_AVAILABLE_ALLOC < sizeof(node_bt **)) {
+    const size_t REQ_ALLOC = STK_AVAILABLE_ALLOC + sizeof(node_bt **);
+    const size_t TREE_AVAILABLE_ALLOC =
+        tree->allocation - tree->used_allocation;
+    if (TREE_AVAILABLE_ALLOC < REQ_ALLOC) {
+      tree = expand_binary_tree(tree);
+      if (tree == NULL) return NULL;
     }
+    unalloc_nodes_stk->capacity = REQ_ALLOC;
   }
   /*
-   * This direct access of `tree->unallocated_nodes` exists for two reasons:
-   * 1. This gives the address of the terminating `NULL` pointer in
-   * `tree->open_node`.
-   * 2. This will not modify `tree->unallocated_nodes` and will therefore not
-   * interfere with any code reliant upon `tree->unallocated_nodes`, such as
-   * `get_open_node`.
+   * Using a heapless function guarantees that pushing a new element onto the
+   * stack will not incur modifications to the allocation of memory for
+   * `tree`.
    */
-  tree->used_allocation += sizeof(node_bt *);
+  heapless_stack_push(unalloc_nodes_stk, &open_node);
   return tree;
 }
 
@@ -359,21 +360,20 @@ binary_tree *init_open_nodes(binary_tree *tree) {
    */
   const size_t REQ_ALLOCATION = sizeof(stack) + sizeof(node_bt **);
   if (AVAILABLE_MEM < REQ_ALLOCATION) {
-    tree = expand_tree(tree);
+    tree = expand_binary_tree(tree);
     if (tree == NULL) return NULL;
   }
   tree->unallocated_nodes = (void *)((byte *)tree + tree->used_allocation);
 
-  *(tree->unallocated_nodes) =
-      (stack){/*
-               * Set the pointer to the stack's data to the
-               * memory just after the stack header.
-               */
-              .data = tree->unallocated_nodes + 1,
-              .capacity = REQ_ALLOCATION,
-              .used_capacity = 0,
-              .elem_size = sizeof(node_bt **),
-              .length = 0};
+  *(tree->unallocated_nodes) = (stack){
+      /*
+       * Sets the data pointer to the memory just after the stack header.
+       */
+      .data = tree->unallocated_nodes + 1,
+      .capacity = REQ_ALLOCATION,
+      .used_capacity = 0,
+      .elem_size = sizeof(node_bt **),
+      .length = 0};
 
   tree->used_allocation += REQ_ALLOCATION;
   return tree;
@@ -385,8 +385,13 @@ node_bt *get_open_node(binary_tree *const tree) {
   return stack_pop(tree->unallocated_nodes);
 }
 
+/* Helper function used by `find_open_descendant()`. */
+static byte node_has_null_children(node_bt *candidate) {
+  if (candidate->left == NULL || candidate->right == NULL) return 1;
+}
+
 node_bt **find_open_descendant(node_bt *const origin) {
-  return search_for_node(origin, NULL);
+  return traverse_descendants(origin, node_has_null_children, 1);
 }
 
 /* NEEDS REDESIGN/REWRITE */
