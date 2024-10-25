@@ -51,7 +51,7 @@ typedef struct {
   node_bt *root;
   stack *unallocated_nodes; /* Contains pointers to unused nodes. */
   size_t num_nodes;
-  size_t node_size;       /* Size of each node including stored data. */
+  size_t value_size;      /* Size (in bytes) of each node's stored values. */
   size_t allocation;      /* Total bytes allocated for the tree and nodes. */
   size_t used_allocation; /* Total bytes used from `allocation`. */
 } binary_tree;

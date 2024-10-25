@@ -17,37 +17,40 @@ typedef unsigned char byte;
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
                               const size_t length) {
   const size_t NODE_SIZE = sizeof(node_bt) + elem_size;
-  const size_t REQUIRED_MEM = length * NODE_SIZE + sizeof(binary_tree);
-  binary_tree *const tree_obj = malloc(REQUIRED_MEM);
-  /* Increment past the tree header. */
+  const size_t TOTAL_REQ_MEM = length * NODE_SIZE + sizeof(binary_tree);
+  binary_tree *const tree_obj = malloc(TOTAL_REQ_MEM);
+  /* The nodes will be stored directly after the tree header. */
   node_bt *const nodes_mem = (void *)(tree_obj + 1);
+  /* The values will be stored directly after the nodes. */
+  byte *const values_mem = (byte*)(nodes_mem + length);
   if (tree_obj == NULL) return NULL;
 
   tree_obj->num_nodes = length;
-  tree_obj->node_size = NODE_SIZE;
-  tree_obj->used_allocation = tree_obj->allocation = REQUIRED_MEM;
+  tree_obj->value_size = elem_size;
+  tree_obj->used_allocation = tree_obj->allocation = TOTAL_REQ_MEM;
   /* The tracking of unallocated nodes is an opt-in feature, hence why its
    * initial value is `NULL`. */
   tree_obj->unallocated_nodes = NULL;
 
   for (size_t i = 0; i < length; i++) {
-    node_bt *const cur_node = (void *)((byte *)nodes_mem + i * NODE_SIZE);
+    node_bt *const cur_node = nodes_mem + i;
+    byte *const cur_node_data = values_mem + i * elem_size;
     node_bt *parent_node;
     /* The root node has no parent. */
     if (i == 0)
       parent_node = NULL;
     else {
       /* Ensures each node receives at most 2 child nodes. */
-      parent_node = (void *)((byte *)cur_node - NODE_SIZE * (i / 2 + 1));
+      parent_node = cur_node - (i / 2 + 1);
       if (i & 1)
         parent_node->left = cur_node;
       else
         parent_node->right = cur_node;
     }
-    void *const cur_node_data = (byte *)cur_node + sizeof(node_bt);
-    memcpy(cur_node_data, (byte *)data + i * elem_size, elem_size);
+    memcpy(cur_node_data, (byte*)data + i * elem_size, elem_size);
     cur_node->value = cur_node_data;
     cur_node->parent = parent_node;
+    /* Each new node will have no children from the outset. */
     cur_node->left = cur_node->right = NULL;
   }
   tree_obj->root = nodes_mem; /* The first node is always the root node. */
@@ -65,9 +68,9 @@ void delete_binary_tree_s(binary_tree **const tree) {
 }
 
 node_bt *remove_node_from_tree(binary_tree *const tree, node_bt *const target) {
-  node_bt *const node_copy = malloc(tree->node_size);
+  node_bt *const node_copy = malloc(tree->value_size);
   if (node_copy == NULL) return NULL;
-  memcpy(node_copy, target, tree->node_size);
+  memcpy(node_copy, target, tree->value_size);
   delete_node_from_tree_s(tree, target);
   node_copy->parent = NULL;
   return node_copy;
@@ -153,7 +156,7 @@ void delete_node_and_lineage(binary_tree *const tree, node_bt *target) {
   /* Adding one to account for the deletion of `target. */
   const size_t DELETED_NODES = get_depth(target) + 1;
   tree->num_nodes -= DELETED_NODES;
-  tree->used_allocation -= DELETED_NODES * tree->node_size;
+  tree->used_allocation -= DELETED_NODES * tree->value_size;
 }
 
 /*
@@ -283,7 +286,7 @@ binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
        */
       tree->root = (target->left != NULL ? target->left : target->right);
     }
-    tree->used_allocation -= tree->node_size;
+    tree->used_allocation -= tree->value_size;
     /*
      * If the tree implements tracking of open blocks of memory, add the node
      * as an open block.
@@ -299,7 +302,7 @@ binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
   if (new_tree == NULL) return NULL;
   if (new_size < new_tree->used_allocation) {
     new_tree->used_allocation = new_size;
-    new_tree->num_nodes = (new_size - sizeof(*new_tree)) / new_tree->node_size;
+    new_tree->num_nodes = (new_size - sizeof(*new_tree)) / new_tree->value_size;
   }
   new_tree->allocation = new_size;
 
@@ -309,8 +312,8 @@ binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
 binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
   if (new_size < tree->used_allocation) {
     const size_t NODES_AFFECTED =
-        tree->num_nodes - (new_size - sizeof(*tree)) / tree->node_size;
-    const size_t NODE_SIZE = tree->node_size;
+        tree->num_nodes - (new_size - sizeof(*tree)) / tree->value_size;
+    const size_t NODE_SIZE = tree->value_size;
     const size_t NUM_NODES = tree->num_nodes;
     for (size_t i = 0; i < NODES_AFFECTED; i++) {
       node_bt *cur_node =
@@ -388,11 +391,10 @@ node_bt *get_open_node(binary_tree *const tree) {
 
 /* Helper function used by `find_open_descendant()`. */
 static bool node_has_open_child(node_bt *candidate) {
-  if (candidate->left == NULL || candidate->right == NULL) return true;
-  return false;
+  return candidate->left == NULL || candidate->right == NULL;
 }
 
-/* 
+/*
  * Helper function used by `find_open_descendant()`.
  *
  * \returns A pointer to a pointer to an open child node.
@@ -430,12 +432,25 @@ void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
 
 #include <time.h>
 
+static int target;
+
+static bool condition(node_bt *node) { return *(int *)node->value == target; }
+
+static void *ret_target_node(node_bt *candidate) {
+  if (condition(candidate)) return candidate;
+  return NULL;
+}
+
 int main(void) {
-  size_t data[0x10000];
+  static int data[0x1000];
   srand(time(NULL));
-  for (size_t i = 0; i < sizeof(data) / sizeof(*data); i++) data[i] = rand();
+  for (size_t i = 0; i < 0x2; i++) data[i] = rand();
+  target = data[rand() % 0x2];
+  printf("%d", target);
   binary_tree *tree = new_binary_tree(data);
-  printf("%p", (void*)find_open_descendant(tree->root));
+  printf("%d", *(int *)((node_bt *)traverse_descendants(
+                            tree->root, ret_target_node, condition))
+                    ->value);
   delete_tree(tree);
 
   return 0;
