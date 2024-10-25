@@ -385,6 +385,21 @@ node_bt **find_open_descendant(node_bt *const origin) {
   return traverse_descendants(origin, ret_open_child, node_has_open_child);
 }
 
+bool nodes_exist_in_same_tree(const node_bt *const node_1,
+                              const node_bt *const node_2) {
+  const node_bt *node_1_root_node = NULL;
+  for (const node_bt *cur_node = node_1->parent; cur_node->parent != NULL;
+       cur_node = cur_node->parent) {
+    node_1_root_node = cur_node;
+  }
+  const node_bt *node_2_root_node = NULL;
+  for (const node_bt *cur_node = node_2->parent; cur_node->parent != NULL;
+       cur_node = cur_node->parent) {
+    node_2_root_node = cur_node;
+  }
+  return node_1_root_node == node_2_root_node;
+}
+
 void make_node_child_of(node_bt *const src, node_bt *const dst) {
   if (dst->left == NULL) {
     dst->left = src;
@@ -399,7 +414,7 @@ void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
   make_node_child_of(src, dst);
   if (src->parent == dst) return;
   node_bt **const open_candidate = find_open_descendant(src);
-  /* 
+  /*
    * Move the child current at `dst->left` to the end of the lineage of `src`,
    * thereby freeing up a child slot at `dst` for `src`.
    */

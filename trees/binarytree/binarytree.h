@@ -82,7 +82,8 @@ typedef struct {
  * Shown linearly:
  * `()` - Denotes a node.
  * `{}` - Denotes a group of nodes.
- * `->` - Signifies that the left-hand node is the parent of the right-hand node.
+ * `->` - Signifies that the left-hand node is the parent of the right-hand
+ * node.
  * `,`  - Separator.
  *
  * `(7) -> {(4) -> {(3), (0)}}`,
@@ -136,6 +137,8 @@ void delete_node_and_lineage(binary_tree *tree, node_bt *target);
  * parent will be somewhere in the lineage of `tree->parent`.
  */
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *target);
+
+bool nodes_exist_in_same_tree(const node_bt *node_1, const node_bt *node_2);
 
 binary_tree *expand_binary_tree(binary_tree *tree);
 
