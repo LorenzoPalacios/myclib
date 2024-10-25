@@ -1,8 +1,8 @@
 #ifndef BINARYTREE_H
 #define BINARYTREE_H
 
+#include <stdbool.h>
 #include <stddef.h>
-#include <vadefs.h>
 
 /*
  * The stack `unallocated_nodes` used by binary trees to track unallocated nodes
@@ -61,7 +61,7 @@ typedef struct {
  * Use caution if the arguments to this macro have side effects.
  */
 #define new_binary_tree(arr) \
-  _new_binary_tree(arr, sizeof(data), sizeof(data) / sizeof(*data))
+  _new_binary_tree(arr, sizeof(*data), sizeof(data) / sizeof(*data))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -227,18 +227,22 @@ binary_tree *resize_tree_s(binary_tree *tree, size_t new_size);
 size_t right_branch_depth(const node_bt *origin);
 /*
  * Traverses all descendant nodes from `origin`, passing each encountered node
- * as a pointer to `op` until `op` returns `stop_value` or all the nodes in the
- * lineage of `origin` are contacted.
+ * as a pointer to `op` until `stop_condition` returns `true` or all the nodes
+ * in the lineage of `origin` are contacted.
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
- * 
- * \note Calling this function with `op` equal to `NULL` will always cause all
- * descendant nodes of `origin` to be traversed. This can be used for
+ *
+ * \return The returned value of `op` performed on the last traversed node or
+ * `NULL` if `op` is `NULL`.
+ * \note Calling this function with `stop_condition` equal to `NULL` will always
+ * cause all descendant nodes of `origin` to be traversed. This can be used for
  * pre-allocating memory for the internal stack.
+ * \note If the given node meets the criteria for `stop_condition`, `op` will
+ * still be run for that node.
  * \note If the internal stack used for traversal does not use most of its
  * capacity after a few calls, it will shrink itself to reduce memory footprint.
  */
-void traverse_descendants(node_bt *origin, void *(*op)(node_bt *),
-                           const void *stop_value, size_t stop_value_len);
+void *traverse_descendants(node_bt *origin, void *(*op)(node_bt *),
+                           bool (*stop_condition)(node_bt *));
 #endif

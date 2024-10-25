@@ -1,5 +1,6 @@
 #include "binarytree.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -173,9 +174,8 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
-                           const void *const stop_value,
-                           const size_t stop_value_len) {
+void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
+                           bool (*const stop_condition)(node_bt *)) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -197,7 +197,7 @@ void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
    * searches by clearing its contents.
    */
   if (divergent_nodes == NULL)
-    divergent_nodes = new_empty_stack(12, sizeof(node_bt *));
+    divergent_nodes = new_empty_stack(12, sizeof(node_bt **));
   else
     clear_stack(divergent_nodes);
 
@@ -211,14 +211,15 @@ void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
    */
   static byte stack_shrink_counter = 0;
 
+  size_t iter = 0;
+  void *ret_val = NULL;
   node_bt *cur_node = origin;
   node_bt *next_node = NULL;
-  size_t iter = 0;
   while (cur_node != NULL) {
-    if (op != NULL) {
-      const void *RET_VAL = op(cur_node);
-      if (memcmp(RET_VAL, stop_value, stop_value_len) == 0) return;
-    }
+    iter++;
+    if (op != NULL) ret_val = op(cur_node);
+    if (stop_condition != NULL)
+      if (stop_condition(cur_node)) break;
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
@@ -226,12 +227,11 @@ void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
        *
        * Taking the address of `cur_node` is necessary since `stack_push()`
        * expects the `elem` argument to be a pointer to data. Since `cur_node`
-       * is a pointer to a node, but we need to keep track of that pointer, we
+       * is a pointer to a node, and we need to keep track of that pointer, we
        * take the address of that pointer.
        */
-      if (cur_node->right != NULL) {
+      if (cur_node->right != NULL)
         divergent_nodes = stack_push(divergent_nodes, &cur_node);
-      }
       next_node = cur_node->left;
     } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
@@ -244,17 +244,18 @@ void traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
     cur_node = next_node;
   }
 
-  {
-    if (divergent_nodes->used_capacity <
-        TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity)
-      stack_shrink_counter++;
-    /*
-     * We don't directly resize the stack to a smaller allocation since
-     * shrinking it to fit is likely good enough.
-     */
-    if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
-  }
-  return;
+  if (divergent_nodes->used_capacity <
+      TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity)
+    stack_shrink_counter++;
+  else
+    stack_shrink_counter = 0;
+  /*
+   * We don't directly resize the stack to a smaller allocation since shrinking
+   * it to fit is likely good enough.
+   */
+  if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
+  printf("iterations: %zu\n", iter);
+  return ret_val;
 }
 
 binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
@@ -386,12 +387,24 @@ node_bt *get_open_node(binary_tree *const tree) {
 }
 
 /* Helper function used by `find_open_descendant()`. */
-static byte node_has_null_children(node_bt *candidate) {
-  if (candidate->left == NULL || candidate->right == NULL) return 1;
+static bool node_has_open_child(node_bt *candidate) {
+  if (candidate->left == NULL || candidate->right == NULL) return true;
+  return false;
+}
+
+/* 
+ * Helper function used by `find_open_descendant()`.
+ *
+ * \returns A pointer to a pointer to an open child node.
+ */
+static void *ret_open_child(node_bt *candidate) {
+  if (candidate->left == NULL) return &candidate->left;
+  if (candidate->right == NULL) return &candidate->right;
+  return NULL;
 }
 
 node_bt **find_open_descendant(node_bt *const origin) {
-  return traverse_descendants(origin, node_has_null_children, 1);
+  return traverse_descendants(origin, ret_open_child, node_has_open_child);
 }
 
 /* NEEDS REDESIGN/REWRITE */
@@ -422,6 +435,8 @@ int main(void) {
   srand(time(NULL));
   for (size_t i = 0; i < sizeof(data) / sizeof(*data); i++) data[i] = rand();
   binary_tree *tree = new_binary_tree(data);
+  printf("%p", (void*)find_open_descendant(tree->root));
+  delete_tree(tree);
 
   return 0;
 }
