@@ -429,29 +429,3 @@ void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
   *open_candidate = dst->left;
   dst->left = src;
 }
-
-#include <time.h>
-
-static int target;
-
-static bool condition(node_bt *node) { return *(int *)node->value == target; }
-
-static void *ret_target_node(node_bt *candidate) {
-  if (condition(candidate)) return candidate;
-  return NULL;
-}
-
-int main(void) {
-  static int data[0x1000];
-  srand(time(NULL));
-  for (size_t i = 0; i < 0x2; i++) data[i] = rand();
-  target = data[rand() % 0x2];
-  printf("%d", target);
-  binary_tree *tree = new_binary_tree(data);
-  printf("%d", *(int *)((node_bt *)traverse_descendants(
-                            tree->root, ret_target_node, condition))
-                    ->value);
-  delete_tree(tree);
-
-  return 0;
-}
