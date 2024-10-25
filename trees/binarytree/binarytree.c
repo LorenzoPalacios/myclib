@@ -22,7 +22,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   /* The nodes will be stored directly after the tree header. */
   node_bt *const nodes_mem = (void *)(tree_obj + 1);
   /* The values will be stored directly after the nodes. */
-  byte *const values_mem = (byte*)(nodes_mem + length);
+  byte *const values_mem = (byte *)(nodes_mem + length);
   if (tree_obj == NULL) return NULL;
 
   tree_obj->num_nodes = length;
@@ -47,7 +47,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
       else
         parent_node->right = cur_node;
     }
-    memcpy(cur_node_data, (byte*)data + i * elem_size, elem_size);
+    memcpy(cur_node_data, (byte *)data + i * elem_size, elem_size);
     cur_node->value = cur_node_data;
     cur_node->parent = parent_node;
     /* Each new node will have no children from the outset. */
@@ -228,7 +228,8 @@ void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
    * We don't directly resize the stack to a smaller allocation since shrinking
    * it to fit is likely good enough.
    */
-  if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
+  if (stack_shrink_counter == TRAVERSAL_STACK_SHRINK_COUNTER_MAX)
+    shrink_stack_to_fit(divergent_nodes);
   printf("iterations: %zu\n", iter);
   return ret_val;
 }
@@ -365,7 +366,7 @@ node_bt *get_open_node(binary_tree *const tree) {
 }
 
 /* Helper function used by `find_open_descendant()`. */
-static bool node_has_open_child(node_bt *candidate) {
+static bool node_has_open_child(node_bt *const candidate) {
   return candidate->left == NULL || candidate->right == NULL;
 }
 
@@ -374,7 +375,7 @@ static bool node_has_open_child(node_bt *candidate) {
  *
  * \returns A pointer to a pointer to an open child node.
  */
-static void *ret_open_child(node_bt *candidate) {
+static void *ret_open_child(node_bt *const candidate) {
   if (candidate->left == NULL) return &candidate->left;
   if (candidate->right == NULL) return &candidate->right;
   return NULL;
@@ -384,23 +385,24 @@ node_bt **find_open_descendant(node_bt *const origin) {
   return traverse_descendants(origin, ret_open_child, node_has_open_child);
 }
 
-/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void make_node_child_of(node_bt *const src, node_bt *const dst) {
   if (dst->left == NULL) {
     dst->left = src;
-    return;
-  }
-  if (dst->right == NULL) {
+    src->parent = dst;
+  } else if (dst->right == NULL) {
     dst->right = src;
-    return;
+    src->parent = dst;
   }
 }
 
-/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
   make_node_child_of(src, dst);
   if (src->parent == dst) return;
-  node_bt **open_candidate = find_open_descendant(src);
+  node_bt **const open_candidate = find_open_descendant(src);
+  /* 
+   * Move the child current at `dst->left` to the end of the lineage of `src`,
+   * thereby freeing up a child slot at `dst` for `src`.
+   */
   *open_candidate = dst->left;
   dst->left = src;
 }

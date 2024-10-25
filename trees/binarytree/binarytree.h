@@ -22,6 +22,7 @@
  * internal stack's allocated memory.
  */
 static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 3;
+
 /*
  * If `traverse_descendants` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
  * and the `used_capacity` of the internal stack used by
