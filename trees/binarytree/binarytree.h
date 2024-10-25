@@ -7,6 +7,30 @@
 #include "../../stack/stack.h"
 #include "../trees.h"
 
+/*
+ * Determines how many calls to `traverse_descendants()` where the internal
+ * stack's `used_capacity` never exceeds the product of its `capacity` and
+ * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` must be made before shrinking the
+ * internal stack's allocated memory.
+ */
+static size_t TRAVERSAL_STACK_SHRINK_COUNTER = 3;
+/*
+ * If `traverse_descendants` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
+ * and the `used_capacity` of the internal stack used by
+ * `traverse_descendants()` is less than the product of this multiplier and the
+ * stack's `capacity`, the internal stack will shrink its allocated memory.
+ *
+ * Expressed mathematically, this would be
+ *
+ * c - The capacity of the stack.
+ * u - The used capacity of the stack.
+ * k - The value of `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`.
+ *
+ * If `u < kc` over three consecutive calls to `traverse_descendants()`, then
+ * the internal stack of `traverse_descendants()` will shrink its allocation.
+ */
+static double TRAVERSAL_STACK_MAJOR_USAGE_PERCENT = .8;
+
 /* `node_bt` stands for node_binary_tree. */
 typedef struct node_bt {
   void *value;
@@ -19,8 +43,8 @@ typedef struct {
   node_bt *root;
   stack *unallocated_nodes; /* Contains pointers to unused nodes. */
   size_t num_nodes;
-  size_t node_size;  /* Size of each node including stored data. */
-  size_t allocation; /* Total bytes allocated for the tree and nodes. */
+  size_t node_size;       /* Size of each node including stored data. */
+  size_t allocation;      /* Total bytes allocated for the tree and nodes. */
   size_t used_allocation; /* Total bytes used from `allocation`. */
 } binary_tree;
 
@@ -29,7 +53,7 @@ typedef struct {
  * Use caution if the arguments to this macro have side effects.
  */
 #define new_binary_tree(arr) \
-  _new_binary_tree(arr, sizeof (data), sizeof(data) / sizeof(*data))
+  _new_binary_tree(arr, sizeof(data), sizeof(data) / sizeof(*data))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -61,18 +85,6 @@ binary_tree *_new_binary_tree(const void *data, size_t elem_size,
  * \return A pointer to the added node, or NULL upon failure.
  */
 node_bt *add_binary_node(binary_tree *tree, const void *elem);
-
-/*
- * Registers `open_node` as an open block of memory in `tree` for any new
- * incoming nodes to fill.
- *
- * \return A (potentially new) pointer associated with the contents of `tree`
- * or `NULL` upon failure.
- * \note If `init_open_nodes()` was not called prior to this function or
- * `tree->unallocated_nodes` is `NULL`, this function will fail and return
- * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
- */
-binary_tree *push_unalloc_node(binary_tree *tree, node_bt *open_node);
 
 /*
  * Calculates the number of descendant nodes linked to `origin`.
@@ -168,6 +180,18 @@ binary_tree *init_open_nodes(binary_tree *tree);
  */
 void make_node_child_of(node_bt *src, node_bt *dst);
 
+/*
+ * Registers `open_node` as an open block of memory in `tree` for any new
+ * incoming nodes to fill.
+ *
+ * \return A (potentially new) pointer associated with the contents of `tree`
+ * or `NULL` upon failure.
+ * \note If `init_open_nodes()` was not called prior to this function or
+ * `tree->unallocated_nodes` is `NULL`, this function will fail and return
+ * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
+ */
+binary_tree *push_unalloc_node(binary_tree *tree, node_bt *open_node);
+
 node_bt *next_ancestral_divergence(const node_bt *origin);
 
 node_bt *remove_node_from_tree(binary_tree *tree, node_bt *target);
@@ -199,4 +223,21 @@ binary_tree *resize_tree(binary_tree *tree, size_t new_size);
 binary_tree *resize_tree_s(binary_tree *tree, size_t new_size);
 
 size_t right_branch_depth(const node_bt *origin);
+/*
+ * Traverses all descendant nodes from `origin`, passing each encountered node
+ * as a pointer to `op` until `op` returns `stop_value` or all the nodes in the
+ * lineage of `origin` are contacted.
+ *
+ * This function is NOT recursive; it has a dependency on the `stack` data
+ * structure implemented elsewhere in this library.
+ *
+ * \note Calling this function with `op` equal to `NULL` will always cause all
+ * of descendant nodes of `origin` to be traversed. This can be useful for
+ * allocating enough memory for the stack used during traversal for a particular
+ * tree.
+ * \note If the internal stack used for traversal does not use most of its
+ * capacity after a few calls, it will shrink itself to reduce memory footprint.
+ */
+void traverse_descendants(node_bt *origin, byte (*op)(node_bt *),
+                          byte stop_value);
 #endif

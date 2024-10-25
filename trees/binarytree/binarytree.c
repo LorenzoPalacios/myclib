@@ -40,9 +40,11 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   for (size_t i = 0; i < length; i++) {
     node_bt *const cur_node = (void *)((byte *)nodes_mem + i * NODE_SIZE);
     node_bt *parent_node;
+    /* The root node has no parent. */
     if (i == 0)
       parent_node = NULL;
     else {
+      /* Ensures each node receives at most 2 child nodes. */
       parent_node = (void *)((byte *)cur_node - NODE_SIZE * (i / 2 + 1));
       if (i & 1)
         parent_node->left = cur_node;
@@ -179,8 +181,8 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-void traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
-                   const void *const stop_value) {
+void traverse_descendants(node_bt *const origin, byte (*const op)(node_bt *),
+                          const byte stop_value) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -194,6 +196,7 @@ void traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
    * Recursion is the natural solution to tree traversal, however it brings the
    * issue of stack overflow, which this implementation seeks to avoid.
    */
+
   static stack *divergent_nodes = NULL;
   /*
    * If the stack is uninitialized, initialize it.
@@ -205,13 +208,20 @@ void traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
   else
     clear_stack(divergent_nodes);
 
+  /*
+   * These are stats used to determine whether or not the allocation of
+   * `divergent_nodes` should be shrunk or not.
+   */
+  static byte stack_shrink_counter = 0;
+
   node_bt *cur_node = origin;
   node_bt *next_node = NULL;
   size_t iter = 0;
   while (cur_node != NULL) {
     if (op != NULL) {
-      void *ret_val = op(cur_node);
-      if () }
+      const byte RET_VAL = op(cur_node);
+      if (RET_VAL == stop_value) return;
+    }
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
@@ -222,19 +232,22 @@ void traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
        * is a pointer to a node, but we need to keep track of that pointer, we
        * take the address of that pointer.
        */
-      if (cur_node->right != NULL)
+      if (cur_node->right != NULL) {
         divergent_nodes = stack_push(divergent_nodes, &cur_node);
+      }
       next_node = cur_node->left;
     } else if (cur_node->right != NULL) {
       next_node = cur_node->right;
     } else {
       node_bt **const next_divergence = stack_pop(divergent_nodes);
       /* If there are no divergent nodes in the traversed path, we're done. */
-      if (next_divergence == NULL) break;
+      if (next_divergence == NULL) return;
       next_node = (*next_divergence)->right;
     }
     cur_node = next_node;
   }
+  if ()
+  if (stack_shrink_counter == 3) shrink_stack_to_fit(divergent_nodes);
   printf("iterations: %zu\n", iter);
 }
 
@@ -334,7 +347,7 @@ binary_tree *push_unalloc_node(binary_tree *tree, node_bt *const open_node) {
    * interfere with any code reliant upon `tree->unallocated_nodes`, such as
    * `get_open_node`.
    */
-  push tree->used_allocation += sizeof(node_bt *);
+  tree->used_allocation += sizeof(node_bt *);
   return tree;
 }
 
