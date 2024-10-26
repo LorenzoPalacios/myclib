@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -134,9 +133,10 @@ size_t count_descendant_nodes(node_bt *const origin) {
   /*
    * Since `traverse_from()` returns the last returned value of `op`,
    * which is `count_node()`, it will return a pointer to the number of
-   * traversed nodes.
+   * traversed nodes. Then, we subtract one, since `traverse_from()` will count
+   * `origin` when we only need to count the descendants of `origin`.
    */
-  const size_t count = *(size_t *)traverse_from(origin, count_node, NULL);
+  const size_t count = *(size_t *)traverse_from(origin, count_node, NULL) - 1;
   count_node(NULL); /* Tells `count_node()` to reset its counter. */
   return count;
 }
@@ -177,10 +177,10 @@ void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
    * traversed prior to any backtracking, hence why we can always select their
    * right branch.
    *
-   * Recursion is the natural solution to tree traversal, however it brings the
-   * issue of stack overflow, which this implementation seeks to avoid.
+   * Recursion is the natural solution to tree traversal, but recursion on a
+   * particularly large tree could blow up the stack, hence why it isn't used
+   * here.
    */
-
   static stack *divergent_nodes = NULL;
   /*
    * If the stack is uninitialized, initialize it.
@@ -201,7 +201,10 @@ void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
    * `divergent_nodes->capacity`.
    */
   static byte stack_shrink_counter = 0;
+  const size_t STK_CAP_SHRNK_THRES =
+      TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity;
 
+  bool low_stack_usage = true;
   void *ret_val = NULL;
   node_bt *cur_node = origin;
   node_bt *next_node = NULL;
@@ -230,20 +233,23 @@ void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
       if (next_divergence == NULL) break;
       next_node = (*next_divergence)->right;
     }
+    /* Checking if the stack is using a majority of its capacity. */
+    if (divergent_nodes->used_capacity > STK_CAP_SHRNK_THRES)
+      low_stack_usage = false;
+    /* Continuing to the next node. */
     cur_node = next_node;
   }
-
-  if (divergent_nodes->used_capacity <
-      TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity)
+  if (low_stack_usage)
     stack_shrink_counter++;
   else
     stack_shrink_counter = 0;
-  /*
-   * We don't directly resize the stack to a smaller allocation since shrinking
-   * it to fit is likely good enough.
-   */
-  if (stack_shrink_counter == TRAVERSAL_STACK_SHRINK_COUNTER_MAX)
-    shrink_stack_to_fit(divergent_nodes);
+
+  if (stack_shrink_counter == TRAVERSAL_STACK_SHRINK_COUNTER_MAX) {
+    if (divergent_nodes->capacity > divergent_nodes->elem_size)
+      divergent_nodes =
+          resize_stack(divergent_nodes, divergent_nodes->capacity / 2);
+    stack_shrink_counter = 0;
+  }
   return ret_val;
 }
 
@@ -445,10 +451,4 @@ void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
   dst->left = src;
 }
 
-int main(void) {
-  const int data[2];
-  binary_tree *a = new_binary_tree(data);
-  printf("%zu\n", a->num_nodes - count_descendant_nodes(a->root));
-  delete_tree(a);
-  return 0;
-}
+#include <stdio.h>
