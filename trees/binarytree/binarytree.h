@@ -62,7 +62,7 @@ typedef struct {
  * Use caution if the arguments to this macro have side effects.
  */
 #define new_binary_tree(arr) \
-  _new_binary_tree(arr, sizeof(*data), sizeof(data) / sizeof(*data))
+  _new_binary_tree(arr, sizeof(*arr), sizeof(arr) / sizeof(*arr))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -82,9 +82,9 @@ typedef struct {
  * Shown linearly:
  * `()` - Denotes a node.
  * `{}` - Denotes a group of nodes.
- * `->` - Signifies that the left-hand node is the parent of the right-hand
- * node.
- * `,`  - Separator.
+ * `->` - Signifies that the left-hand node is the parent of the right-hand node
+ *        or group.
+ * `,`  - Separator for nodes in a group.
  *
  * `(7) -> {(4) -> {(3), (0)}}`,
  * `(7) -> {(9) -> {(1), (0)}}`
@@ -267,10 +267,11 @@ size_t right_branch_depth(const node_bt *origin);
  * \note Calling this function with `stop_condition` equal to `NULL` will always
  * cause all descendant nodes of `origin` to be traversed. This can be used for
  * pre-allocating memory for the internal stack.
- * \note If the given node meets the criteria for `stop_condition`, `op` will
- * still be run for that node.
+ * \note If a traversed node meets the criteria for `stop_condition` to return
+ * `true`, `op` will still be run for that node.
  * \note If the internal stack used for traversal does not use most of its
- * capacity after a few calls, it will shrink itself to reduce memory footprint.
+ * capacity after a few calls to this function (internal library calls count
+ * towards this), it will shrink itself to reduce memory footprint.
  */
 void *traverse_from(node_bt *origin, void *(*op)(node_bt *),
                     bool (*stop_condition)(node_bt *));
