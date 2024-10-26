@@ -21,7 +21,7 @@
  * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` must be made before shrinking the
  * internal stack's allocated memory.
  */
-static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 3;
+static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 5;
 
 /*
  * If `traverse_from` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
@@ -93,18 +93,25 @@ typedef struct {
  * above example or `NULL` if the tree could not be created.
  * \note This function returns a `binary_tree` without any way of tracking
  * unused memory accrued after removing/deleting nodes.
- * See `init_open_nodes()` if you would like to enable a stack
+ * See `init_unalloc_nodes_stk()` if you would like to enable a stack
  * (`unallocated_nodes`) to track unused memory.
  */
 binary_tree *_new_binary_tree(const void *data, size_t elem_size,
                               size_t length);
 
 /*
- * Adds the specified element as a child node of `parent_node`.
+ * Adds the specified discrete node `node` to `tree`. On success, the pointer to
+ * `node` will be updated to its new position in `tree` and the original pointer
+ * to `node` invalidated.
+ *
+ * It is assumed that the data at `node->value` is of length equivalent to
+ * `tree->elem_size`. If this assumption is false, the behavior is undefined.
+ *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
+ * \note If `node` is a node within a binary tree, the behavior is undefined.
  */
-binary_tree *add_node_to_bt(binary_tree *tree, node_bt *node);
+binary_tree *add_node_to_bt(binary_tree *tree, node_bt **node);
 
 /*
  * Counts the number of descendant nodes linked to `origin`.
@@ -112,6 +119,14 @@ binary_tree *add_node_to_bt(binary_tree *tree, node_bt *node);
  * \return The total amount of descendant nodes connected to `origin`.
  */
 size_t count_descendant_nodes(node_bt *origin);
+
+/*
+ * Creates a discrete binary tree node with no ties to any trees, child nodes,
+ * or parent nodes.
+ *
+ * \return A pointer to a discrete binary tree node or `NULL` upon failure.
+ */
+node_bt *new_bt_node(const void *value, size_t value_size);
 
 /*
  * Same as `delete_binary_tree()`, except this function will write `0` across
@@ -188,7 +203,7 @@ size_t left_branch_depth(const node_bt *origin);
  * \note The current implementation allocates this stack at the end of the
  * allocated memory for `tree`.
  */
-binary_tree *init_open_nodes(binary_tree *tree);
+binary_tree *init_unalloc_nodes_stk(binary_tree *tree);
 
 /*
  * Finds the first open `left` or `right` pointer in `dst` and places `src`
@@ -207,7 +222,7 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
- * \note If `init_open_nodes()` was not called prior to this function or
+ * \note If `init_unalloc_nodes_stk()` was not called prior to this function or
  * `tree->unallocated_nodes` is `NULL`, this function will fail and return
  * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
  */

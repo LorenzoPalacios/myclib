@@ -351,7 +351,7 @@ binary_tree *push_unalloc_node(binary_tree *tree, node_bt *const open_node) {
   return tree;
 }
 
-binary_tree *init_open_nodes(binary_tree *tree) {
+binary_tree *init_unalloc_nodes_stk(binary_tree *tree) {
   const size_t AVAILABLE_MEM = tree->allocation - tree->used_allocation;
   /*
    * Allocate enough memory for a stack that can hold one pointer to an
@@ -451,4 +451,42 @@ void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
   dst->left = src;
 }
 
+binary_tree *add_node_to_bt(binary_tree *tree, node_bt **node) {
+  if (tree->unallocated_nodes != NULL) {
+    node_bt **open_node = heapless_stack_pop(tree->unallocated_nodes);
+    if (open_node != NULL) {
+      
+      *open_node = 
+    }
+  }
+}
+
+node_bt *new_bt_node(const void *value, size_t value_size) {
+  node_bt *const new_node = malloc(sizeof(node_bt) + value_size);
+  if (new_node == NULL) return NULL;
+  new_node->value = new_node + 1;
+  new_node->parent = new_node->left = new_node->right = NULL;
+  memcpy(new_node->value, value, value_size);
+  return new_node;
+}
+
+binary_tree *new_bt_node_in_bt(binary_tree *tree, const void *value);
+
 #include <stdio.h>
+static void *print_node(node_bt *node) {
+  static int bytes_written = 0;
+  bytes_written = printf("%d ", *(int *)node->value);
+  return &bytes_written;
+}
+
+int main(void) {
+  const int data[] = {1, 2, 3};
+  binary_tree *tree = new_binary_tree(data);
+  tree = init_unalloc_nodes_stk(tree);
+  node_bt *random_node = new_bt_node(data, sizeof(*data));
+  tree = add_node_to_bt(tree, &random_node);
+  traverse_from(random_node, print_node, NULL);
+  delete_tree(tree);
+
+  return 0;
+}
