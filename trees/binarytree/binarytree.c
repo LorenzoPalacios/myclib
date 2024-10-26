@@ -203,12 +203,10 @@ void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
    */
   static byte stack_shrink_counter = 0;
 
-  size_t iter = 0;
   void *ret_val = NULL;
   node_bt *cur_node = origin;
   node_bt *next_node = NULL;
   while (cur_node != NULL) {
-    iter++;
     if (op != NULL) ret_val = op(cur_node);
     if (stop_condition != NULL)
       if (stop_condition(cur_node)) break;
@@ -247,7 +245,6 @@ void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
    */
   if (stack_shrink_counter == TRAVERSAL_STACK_SHRINK_COUNTER_MAX)
     shrink_stack_to_fit(divergent_nodes);
-  printf("iterations: %zu\n", iter);
   return ret_val;
 }
 
@@ -421,7 +418,7 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
                                 binary_tree *src_tree, node_bt *src) {
   if (dst_tree != src_tree) {
     src = remove_node_from_tree(src_tree, src);
-    dst_tree = add_node_to_bt(dst_tree, src);
+    // dst_tree = add_node_to_bt(dst_tree, src);
     src_tree->num_nodes--;
     dst_tree->num_nodes++;
   }
@@ -441,9 +438,18 @@ void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
   if (src->parent == dst) return;
   node_bt **const open_candidate = find_open_descendant(src);
   /*
-   * Move the child current at `dst->left` to the end of the lineage of `src`,
-   * thereby freeing up a child slot at `dst` for `src`.
+   * Move the child node (and its lineage) currently at `dst->left` to the end
+   * of the lineage of `src`, thereby freeing up a child slot at `dst` for
+   * `src`.
    */
   *open_candidate = dst->left;
   dst->left = src;
+}
+
+int main(void) {
+  const int data[23];
+  binary_tree *a = new_binary_tree(data);
+  printf("%zu\n", a->num_nodes - count_descendant_nodes(a->root));
+  delete_tree(a);
+  return 0;
 }
