@@ -16,7 +16,7 @@
 #include "../trees.h"
 
 /*
- * Determines how many calls to `traverse_descendants()` where the internal
+ * Determines how many calls to `traverse_from()` where the internal
  * stack's `used_capacity` never exceeds the product of its `capacity` and
  * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` must be made before shrinking the
  * internal stack's allocated memory.
@@ -24,9 +24,9 @@
 static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 3;
 
 /*
- * If `traverse_descendants` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
+ * If `traverse_from` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
  * and the `used_capacity` of the internal stack used by
- * `traverse_descendants()` is less than the product of this multiplier and the
+ * `traverse_from()` is less than the product of this multiplier and the
  * stack's `capacity`, the internal stack will shrink its allocated memory.
  *
  * Expressed mathematically:
@@ -35,8 +35,8 @@ static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 3;
  * u - The used capacity of the stack.
  * k - The value of `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`.
  *
- * If `u < kc` over three subsequent calls to `traverse_descendants()`, then
- * the internal stack of `traverse_descendants()` will shrink its allocation.
+ * If `u < kc` over three subsequent calls to `traverse_from()`, then
+ * the internal stack of `traverse_from()` will shrink its allocation.
  */
 static double TRAVERSAL_STACK_MAJOR_USAGE_PERCENT = .8;
 
@@ -255,15 +255,15 @@ binary_tree *resize_tree_s(binary_tree *tree, size_t new_size);
 size_t right_branch_depth(const node_bt *origin);
 
 /*
- * Traverses all descendant nodes from `origin`, passing each encountered node
- * as a pointer to `op` until `stop_condition` returns `true` or all the nodes
- * in the lineage of `origin` are contacted.
+ * Traverses all of the descendant nodes of `origin`, including `origin` itself,
+ * amd passes each traversed node as a pointer to `op` and `stop_condition`
+ * until `stop_condition` returns `true` or all the nodes in the lineage of
+ * `origin` are contacted.
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
  *
- * \return The returned value of `op` performed on the last traversed node or
- * `NULL` if `op` is `NULL`.
+ * \return The last returned value from `op` or `NULL` if `op` is `NULL`.
  * \note Calling this function with `stop_condition` equal to `NULL` will always
  * cause all descendant nodes of `origin` to be traversed. This can be used for
  * pre-allocating memory for the internal stack.
@@ -272,6 +272,6 @@ size_t right_branch_depth(const node_bt *origin);
  * \note If the internal stack used for traversal does not use most of its
  * capacity after a few calls, it will shrink itself to reduce memory footprint.
  */
-void *traverse_descendants(node_bt *origin, void *(*op)(node_bt *),
-                           bool (*stop_condition)(node_bt *));
+void *traverse_from(node_bt *origin, void *(*op)(node_bt *),
+                    bool (*stop_condition)(node_bt *));
 #endif

@@ -113,7 +113,7 @@ size_t get_depth(const node_bt *const origin) {
 
 /*
  * Helper function for `count_descendant_nodes()` to be used as `op` for
- * `traverse_descendants()`.
+ * `traverse_from()`.
  *
  * \return A pointer to a `size_t` which describes the
  * number of nodes traversed.
@@ -122,7 +122,7 @@ static void *count_node(node_bt *const node) {
   static size_t count = 0;
   count++;
   /*
-   * `traverse_descendants()` will not pass a `NULL` pointer to this function,
+   * `traverse_from()` will not pass a `NULL` pointer to this function,
    * so we can pass `NULL` from `count_descendant_nodes()` to tell this function
    * to reset `count`.
    */
@@ -132,12 +132,11 @@ static void *count_node(node_bt *const node) {
 
 size_t count_descendant_nodes(node_bt *const origin) {
   /*
-   * Since `traverse_descendants()` returns the last returned value of `op`,
+   * Since `traverse_from()` returns the last returned value of `op`,
    * which is `count_node()`, it will return a pointer to the number of
    * traversed nodes.
    */
-  const size_t count =
-      *(size_t *)traverse_descendants(origin, count_node, NULL);
+  const size_t count = *(size_t *)traverse_from(origin, count_node, NULL);
   count_node(NULL); /* Tells `count_node()` to reset its counter. */
   return count;
 }
@@ -166,8 +165,8 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-void *traverse_descendants(node_bt *const origin, void *(*const op)(node_bt *),
-                           bool (*const stop_condition)(node_bt *)) {
+void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
+                    bool (*const stop_condition)(node_bt *)) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -396,7 +395,7 @@ static void *ret_open_child(node_bt *const candidate) {
 }
 
 node_bt **find_open_descendant(node_bt *const origin) {
-  return traverse_descendants(origin, ret_open_child, node_has_open_child);
+  return traverse_from(origin, ret_open_child, node_has_open_child);
 }
 
 bool nodes_exist_in_same_tree(const node_bt *const node_1,
@@ -447,7 +446,7 @@ void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
 }
 
 int main(void) {
-  const int data[23];
+  const int data[2];
   binary_tree *a = new_binary_tree(data);
   printf("%zu\n", a->num_nodes - count_descendant_nodes(a->root));
   delete_tree(a);
