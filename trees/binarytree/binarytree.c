@@ -21,7 +21,11 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   binary_tree *const tree_obj = malloc(TOTAL_REQ_MEM);
   /* The nodes will be stored directly after the tree header. */
   node_bt *const nodes_mem = (void *)(tree_obj + 1);
-  /* The values will be stored directly after the nodes. */
+  /*
+   * The values will be stored directly after the nodes.
+   * Originally, the value for each node was stored directly after their
+   * container node. This is done to avoid misalignment.
+   */
   byte *const values_mem = (byte *)(nodes_mem + length);
   if (tree_obj == NULL) return NULL;
 
@@ -107,21 +111,34 @@ size_t get_depth(const node_bt *const origin) {
   return (left_depth > right_depth ? left_depth : right_depth);
 }
 
-size_t count_descendant_nodes(node_bt *const origin) {
-  size_t count = 0;
-  for (node_bt *cur_node = origin->left; cur_node != NULL; count++) {
-    if (cur_node->left == NULL)
-      cur_node = cur_node->right;
-    else
-      cur_node = cur_node->left;
-  }
+/*
+ * Helper function for `count_descendant_nodes()` to be used as `op` for
+ * `traverse_descendants()`.
+ *
+ * \return A pointer to a `size_t` which describes the
+ * number of nodes traversed.
+ */
+static void *count_node(node_bt *const node) {
+  static size_t count = 0;
+  count++;
+  /*
+   * `traverse_descendants()` will not pass a `NULL` pointer to this function,
+   * so we can pass `NULL` from `count_descendant_nodes()` to tell this function
+   * to reset `count`.
+   */
+  if (node == NULL) count = 0;
+  return &count;
+}
 
-  for (node_bt *cur_node = origin->right; cur_node != NULL; count++) {
-    if (cur_node->left == NULL)
-      cur_node = cur_node->right;
-    else
-      cur_node = cur_node->left;
-  }
+size_t count_descendant_nodes(node_bt *const origin) {
+  /*
+   * Since `traverse_descendants()` returns the last returned value of `op`,
+   * which is `count_node()`, it will return a pointer to the number of
+   * traversed nodes.
+   */
+  const size_t count =
+      *(size_t *)traverse_descendants(origin, count_node, NULL);
+  count_node(NULL); /* Tells `count_node()` to reset its counter. */
   return count;
 }
 
@@ -400,7 +417,14 @@ bool nodes_exist_in_same_tree(const node_bt *const node_1,
   return node_1_root_node == node_2_root_node;
 }
 
-void make_node_child_of(node_bt *const src, node_bt *const dst) {
+binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
+                                binary_tree *src_tree, node_bt *src) {
+  if (dst_tree != src_tree) {
+    src = remove_node_from_tree(src_tree, src);
+    dst_tree = add_node_to_bt(dst_tree, src);
+    src_tree->num_nodes--;
+    dst_tree->num_nodes++;
+  }
   if (dst->left == NULL) {
     dst->left = src;
     src->parent = dst;
@@ -408,10 +432,12 @@ void make_node_child_of(node_bt *const src, node_bt *const dst) {
     dst->right = src;
     src->parent = dst;
   }
+  return dst_tree;
 }
 
-void force_make_node_child_of(node_bt *const src, node_bt *const dst) {
-  make_node_child_of(src, dst);
+void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
+                              binary_tree *src_tree, node_bt *const src) {
+  make_node_child_of(dst_tree, dst, src_tree, src);
   if (src->parent == dst) return;
   node_bt **const open_candidate = find_open_descendant(src);
   /*

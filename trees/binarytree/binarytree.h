@@ -101,12 +101,13 @@ binary_tree *_new_binary_tree(const void *data, size_t elem_size,
 
 /*
  * Adds the specified element as a child node of `parent_node`.
- * \return A pointer to the added node, or NULL upon failure.
+ * \return A (potentially new) pointer associated with the contents of `tree`
+ * or `NULL` upon failure.
  */
-node_bt *add_binary_node(binary_tree *tree, const void *elem);
+binary_tree *add_node_to_bt(binary_tree *tree, node_bt *node);
 
 /*
- * Calculates the number of descendant nodes linked to `origin`.
+ * Counts the number of descendant nodes linked to `origin`.
  *
  * \return The total amount of descendant nodes connected to `origin`.
  */
@@ -159,11 +160,12 @@ node_bt **find_open_descendant(node_bt *origin);
  * and `src` will overwrite `dst->left`.
  *
  * \note If `dst->left` must be appended to the lineage of `src` and a candidate
- * node in the descendants of `src` is found whose `left` and `right` pointer
+ * node in the descendants of `src` is found whose `left` or `right` pointer
  * values are `NULL`, the function will append the descendants of `dst` to the
- * `left` pointer of that candidate node.
+ * availble pointer of that candidate node.
  */
-void force_make_node_child_of(node_bt *const src, node_bt *const dst);
+void force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
+                              binary_tree *src_tree, node_bt *src);
 
 /*
  * Finds the longest lineage of `origin`. This function searches both the
@@ -192,8 +194,12 @@ binary_tree *init_open_nodes(binary_tree *tree);
  * Finds the first open `left` or `right` pointer in `dst` and places `src`
  * there. If neither `left` or `right` are open, both `dst` and `src` will be
  * unmodified.
+ *
+ * \return A (potentially new) pointer associated with the contents of `dst`
+ * or `NULL` upon failure.
  */
-void make_node_child_of(node_bt *src, node_bt *dst);
+binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
+                                binary_tree *src_tree, node_bt *src);
 
 /*
  * Registers `open_node` as an open block of memory in `tree` for any new
