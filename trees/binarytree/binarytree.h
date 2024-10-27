@@ -104,14 +104,14 @@ binary_tree *_new_binary_tree(const void *data, size_t elem_size,
  * `node` will be updated to its new position in `tree` and the original pointer
  * to `node` invalidated.
  *
- * It is assumed that the data at `node->value` is of length equivalent to
- * `tree->elem_size`. If this assumption is false, the behavior is undefined.
+ * It is assumed that the data at `node->value` is of size equivalent to
+ * `tree->value_size`. If this assumption is false, the behavior is undefined.
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
  * \note If `node` is a node within a binary tree, the behavior is undefined.
  */
-binary_tree *add_node_to_bt(binary_tree *tree, node_bt **node);
+binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node);
 
 /*
  * Counts the number of descendant nodes linked to `origin`.
@@ -159,14 +159,14 @@ bool nodes_exist_in_same_tree(const node_bt *node_1, const node_bt *node_2);
 binary_tree *expand_binary_tree(binary_tree *tree);
 
 /*
- * Finds the first open slot (that is, a `left` or `right` pointer whose value
- * is `NULL`) in a branch of nodes.
+ * Finds the closest descendant node of `origin` (if not `origin` itself) whose
+ * `left` or `right` pointer is `NULL`.
  *
- * \return A pointer to an open slot.
- * \note If this function encounters a node whose `left` and `right` pointers
- * are both `NULL`, this function will return a pointer to the `left` pointer.
+ * \return If `origin` has an either a `left` or `right` pointer, `origin` is
+ * returned. Otherwise, a descendant node of `origin` meeting the same criteria
+ * is returned.
  */
-node_bt **find_open_descendant(node_bt *origin);
+node_bt *find_open_descendant(node_bt *origin);
 
 /*
  * Finds the first open `left` or `right` pointer in `dst` and places `src`
@@ -179,8 +179,8 @@ node_bt **find_open_descendant(node_bt *origin);
  * values are `NULL`, the function will append the descendants of `dst` to the
  * availble pointer of that candidate node.
  */
-void force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
-                              binary_tree *src_tree, node_bt *src);
+binary_tree *force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
+                                      binary_tree *src_tree, node_bt *src);
 
 /*
  * Finds the longest lineage of `origin`. This function searches both the
@@ -190,7 +190,7 @@ void force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  */
 size_t get_depth(const node_bt *origin);
 
-node_bt *get_open_node(binary_tree *tree);
+node_bt *get_unalloc_node(binary_tree *tree);
 
 size_t left_branch_depth(const node_bt *origin);
 

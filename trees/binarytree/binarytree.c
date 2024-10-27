@@ -379,7 +379,7 @@ binary_tree *init_unalloc_nodes_stk(binary_tree *tree) {
 }
 
 /* write documentation */
-node_bt *get_open_node(binary_tree *const tree) {
+node_bt *get_unalloc_node(binary_tree *const tree) {
   if (tree->unallocated_nodes == NULL) return NULL;
   return stack_pop(tree->unallocated_nodes);
 }
@@ -395,12 +395,11 @@ static bool node_has_open_child(node_bt *const candidate) {
  * \returns A pointer to a pointer to an open child node.
  */
 static void *ret_open_child(node_bt *const candidate) {
-  if (candidate->left == NULL) return &candidate->left;
-  if (candidate->right == NULL) return &candidate->right;
+  if (node_has_open_child(candidate)) return candidate;
   return NULL;
 }
 
-node_bt **find_open_descendant(node_bt *const origin) {
+node_bt *find_open_descendant(node_bt *const origin) {
   return traverse_from(origin, ret_open_child, node_has_open_child);
 }
 
@@ -419,11 +418,15 @@ bool nodes_exist_in_same_tree(const node_bt *const node_1,
   return node_1_root_node == node_2_root_node;
 }
 
+binary_tree *move_node_from_tree(binary_tree *dst_tree, binary_tree *src_tree, node_bt *src) {
+
+}
+
 binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
                                 binary_tree *src_tree, node_bt *src) {
   if (dst_tree != src_tree) {
     src = remove_node_from_tree(src_tree, src);
-    // dst_tree = add_node_to_bt(dst_tree, src);
+    dst_tree = move_node_from_tree(dst_tree, src_tree, src);
     src_tree->num_nodes--;
     dst_tree->num_nodes++;
   }
@@ -437,27 +440,31 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
   return dst_tree;
 }
 
-void force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
-                              binary_tree *src_tree, node_bt *const src) {
-  make_node_child_of(dst_tree, dst, src_tree, src);
-  if (src->parent == dst) return;
-  node_bt **const open_candidate = find_open_descendant(src);
+binary_tree *force_make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
+                                      binary_tree *src_tree,
+                                      node_bt *const src) {
+  dst_tree = make_node_child_of(dst_tree, dst, src_tree, src);
+  if (src->parent == dst) return dst_tree;
+  node_bt *open_candidate = find_open_descendant(src);
   /*
    * Move the child node (and its lineage) currently at `dst->left` to the end
    * of the lineage of `src`, thereby freeing up a child slot at `dst` for
    * `src`.
    */
-  *open_candidate = dst->left;
+  open_candidate = dst->left;
   dst->left = src;
 }
 
-binary_tree *add_node_to_bt(binary_tree *tree, node_bt **node) {
-  if (tree->unallocated_nodes != NULL) {
-    node_bt **open_node = heapless_stack_pop(tree->unallocated_nodes);
-    if (open_node != NULL) {
-      
-      *open_node = 
-    }
+binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
+  const node_bt *node_actual = *node;
+  if (node_actual == NULL) return tree;
+  /* Use any unallocated nodes in `tree`. */
+  node_bt **const open_node_candidate = get_unalloc_node(tree);
+  if (open_node_candidate != NULL) {
+    node_bt *open_node = *open_node_candidate;
+    node_bt *const parent = find_open_descendant(tree->root);
+    tree = make_node_child_of(tree, parent, tree, open_node);
+    memcpy(open_node->value, node_actual->value, tree->value_size);
   }
 }
 
@@ -484,7 +491,7 @@ int main(void) {
   binary_tree *tree = new_binary_tree(data);
   tree = init_unalloc_nodes_stk(tree);
   node_bt *random_node = new_bt_node(data, sizeof(*data));
-  tree = add_node_to_bt(tree, &random_node);
+  tree = add_freestanding_node(tree, &random_node);
   traverse_from(random_node, print_node, NULL);
   delete_tree(tree);
 
