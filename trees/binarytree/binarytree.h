@@ -140,7 +140,8 @@ void delete_binary_tree(binary_tree **tree);
  */
 void delete_binary_tree_s(binary_tree **tree);
 
-void delete_node_and_lineage(binary_tree *tree, node_bt *target);
+/* Removes `target` and all its descendant nodes from `tree`. */
+void delete_node(binary_tree *tree, node_bt *target);
 
 /*
  * Removes `target` from the hierarchy of `tree`, adding it to

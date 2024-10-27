@@ -141,17 +141,26 @@ size_t count_descendant_nodes(node_bt *const origin) {
   return count;
 }
 
+static void *mark_node_as_unalloc(node_bt *node) {
+
+}
+
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
-void delete_node_and_lineage(binary_tree *const tree, node_bt *target) {
-  {
-    node_bt *parent = target->parent;
-    if (parent->left == target)
-      parent->left = NULL;
-    else
-      parent->right = NULL;
+void delete_node(binary_tree *const tree, node_bt *target) {
+  const size_t TOTAL_NODE_SIZE = sizeof(node_bt) + tree->value_size;
+  if (target == tree->root) {
+    tree->used_allocation -= tree->num_nodes * TOTAL_NODE_SIZE;
+    tree->num_nodes = 0;
+    tree->root = NULL;
+    return;
   }
-  /* Adding one to account for the deletion of `target. */
-  const size_t DELETED_NODES = get_depth(target) + 1;
+  if (target->parent->left == target)
+    target->parent->left = NULL;
+  else
+    target->parent->right = NULL;
+
+  /* Adding one to account for the deletion of `target` itself. */
+  const size_t DELETED_NODES = count_descendant_nodes(target) + 1;
   tree->num_nodes -= DELETED_NODES;
   tree->used_allocation -= DELETED_NODES * tree->value_size;
 }
@@ -274,7 +283,8 @@ binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *const target) {
        * If the node has no parent, assume we are deleting the root node of
        * `tree`, so replace it with whichever child node is present (if both are
        * present, select the `left` and make `right` a child of `left`.).
-       * Note that if neither are present, the value at `tree->root` will be `NULL`.
+       * Note that if neither are present, the value at `tree->root` will be
+       * `NULL`.
        */
       if (tree->root->left != NULL) {
         tree->root->left = target->left;
@@ -408,40 +418,76 @@ node_bt *find_open_descendant(node_bt *const origin) {
   return traverse_from(origin, ret_node_with_open_child, node_has_open_child);
 }
 
+/*
+ * There's likely a better implementation to check whether or not two nodes
+ * exist within the same tree. For now, this will do.
+ */
 bool nodes_coexist_in_tree(const node_bt *const node_1,
                            const node_bt *const node_2) {
+  if (node_1 == node_2) return true;
+  if (node_1->parent == node_2->parent) return true;
+
   const node_bt *node_1_root_node = NULL;
-  for (const node_bt *cur_node = node_1->parent; cur_node->parent != NULL;
-       cur_node = cur_node->parent) {
-    node_1_root_node = cur_node;
+  {
+    const node_bt *ancestor = node_1->parent;
+    while (ancestor != NULL) {
+      /*
+       * If `node_2` is encountered while traversing the ancestry of `node_1`,
+       * then we know they coexist in a tree.
+       */
+      if (ancestor == node_2) return true;
+      ancestor = ancestor->parent;
+    }
   }
+
   const node_bt *node_2_root_node = NULL;
-  for (const node_bt *cur_node = node_2->parent; cur_node->parent != NULL;
-       cur_node = cur_node->parent) {
-    node_2_root_node = cur_node;
+  {
+    const node_bt *ancestor = node_2->parent;
+    while (ancestor != NULL) {
+      /*
+       * If `node_1` is encountered while traversing the ancestry of `node_2`,
+       * then we know they coexist in a tree.
+       */
+      if (ancestor == node_1) return true;
+      ancestor = ancestor->parent;
+    }
   }
+  /*
+   * If both `node_1` and `node_2` have no root node and are not equivalent to
+   * one another, then either one or both nodes are a root node for a tree or
+   * a freestanding node.
+   */
+  if (node_1_root_node == NULL && node_2_root_node == NULL) return false;
+  /*
+   * Otherwise, if the nodes share a common root node, then it is assured that
+   * they are within the same tree.
+   */
   return node_1_root_node == node_2_root_node;
 }
 
 binary_tree *move_node_from_tree(binary_tree *dst_tree, binary_tree *src_tree,
                                  node_bt **src) {
   if (dst_tree == src_tree) return dst_tree;
+  if (dst_tree->value_size != src_tree->value_size) return dst_tree;
+  node_bt *open_node = find_open_descendant(dst_tree->root);
+
+  delete_node(src_tree, src);
 }
 
-binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,
-                                binary_tree *src_tree, node_bt *src) {
+binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const parent,
+                                binary_tree *src_tree, node_bt *child) {
   if (dst_tree != src_tree) {
-    src = remove_node_from_tree(src_tree, src);
-    dst_tree = move_node_from_tree(dst_tree, src_tree, src);
+    child = remove_node_from_tree(src_tree, child);
+    dst_tree = move_node_from_tree(dst_tree, src_tree, &child);
     src_tree->num_nodes--;
     dst_tree->num_nodes++;
   }
-  if (dst->left == NULL) {
-    dst->left = src;
-    src->parent = dst;
-  } else if (dst->right == NULL) {
-    dst->right = src;
-    src->parent = dst;
+  if (parent->left == NULL) {
+    parent->left = child;
+    child->parent = parent;
+  } else if (parent->right == NULL) {
+    parent->right = child;
+    child->parent = parent;
   }
   return dst_tree;
 }
@@ -465,9 +511,8 @@ binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
   const node_bt *node_actual = *node;
   if (node_actual == NULL) return tree;
   /* Use any unallocated nodes in `tree`. */
-  node_bt **const open_node_candidate = get_unalloc_node(tree);
-  if (open_node_candidate != NULL) {
-    node_bt *open_node = *open_node_candidate;
+  node_bt *const open_node = get_unalloc_node(tree);
+  if (open_node != NULL) {
     node_bt *const parent = find_open_descendant(tree->root);
     tree = make_node_child_of(tree, parent, tree, open_node);
     memcpy(open_node->value, node_actual->value, tree->value_size);
@@ -477,6 +522,7 @@ binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
 node_bt *new_bt_node(const void *value, size_t value_size) {
   node_bt *const new_node = malloc(sizeof(node_bt) + value_size);
   if (new_node == NULL) return NULL;
+  
   new_node->value = new_node + 1;
   new_node->parent = new_node->left = new_node->right = NULL;
   memcpy(new_node->value, value, value_size);
@@ -497,7 +543,7 @@ int main(void) {
   binary_tree *tree = new_binary_tree(data);
   tree = init_unalloc_nodes_stk(tree);
   node_bt *random_node = new_bt_node(data, sizeof(*data));
-  tree = add_freestanding_node(tree, &random_node);
+  delete_node_from_tree(tree, tree->root);
   traverse_from(random_node, print_node, NULL);
   delete_tree(tree);
 
