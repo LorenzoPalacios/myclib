@@ -75,7 +75,7 @@ node_bt *remove_node_from_tree(binary_tree *const tree, node_bt *const target) {
   node_bt *const node_copy = malloc(tree->value_size);
   if (node_copy == NULL) return NULL;
   memcpy(node_copy, target, tree->value_size);
-  delete_node_from_tree_s(tree, target);
+  delete_node_from_tree(tree, target);
   node_copy->parent = NULL;
   return node_copy;
 }
@@ -253,33 +253,38 @@ void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
   return ret_val;
 }
 
-/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
-binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *const target) {
+binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *const target) {
   if (target != NULL) {
-    node_bt *const parent = target->parent;
-    if (parent != NULL) {
+    if (target->parent != NULL) {
       /*
        * Overwrite the parent's pointer to `target` with the child nodes of
        * `target` to ensure the child nodes of `target` are not lost.
        */
-      if (parent->left == target) {
-        parent->left = target->left;
-        if (target->right != NULL)
-          *find_open_descendant(parent->right) = target->right;
+      node_bt *remaining_branch;
+      if (target->parent->left == target) {
+        target->parent->left = target->left;
+        remaining_branch = target->right;
       } else {
-        parent->right = target->right;
-        if (target->left != NULL)
-          *find_open_descendant(parent->left) = target->left;
+        target->parent->right = target->right;
+        remaining_branch = target->left;
       }
+      force_make_node_child_of(tree, target->parent, tree, remaining_branch);
     } else {
       /*
-       * If the node has no parent, assume we are deleting the root node and
-       * replace its position with whichever child node is present. Note that if
-       * neither are present, the value at `tree->root` will be `NULL`.
+       * If the node has no parent, assume we are deleting the root node of
+       * `tree`, so replace it with whichever child node is present (if both are
+       * present, select the `left` and make `right` a child of `left`.).
+       * Note that if neither are present, the value at `tree->root` will be `NULL`.
        */
-      tree->root = (target->left != NULL ? target->left : target->right);
+      if (tree->root->left != NULL) {
+        tree->root->left = target->left;
+        force_make_node_child_of(tree, tree->root->left, tree,
+                                 tree->root->right);
+      } else {
+        tree->root = tree->root->right;
+      }
     }
-    tree->used_allocation -= tree->value_size;
+    tree->used_allocation -= sizeof(node_bt) + tree->value_size;
     /*
      * If the tree implements tracking of open blocks of memory, add the node
      * as an open block.
@@ -313,7 +318,7 @@ binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
     for (size_t i = 0; i < NODES_AFFECTED; i++) {
       node_bt *cur_node =
           (void *)((byte *)tree->root + (NUM_NODES - i - 1) * NODE_SIZE);
-      tree = delete_node_from_tree_s(tree, cur_node);
+      tree = delete_node_from_tree(tree, cur_node);
       if (tree == NULL) return NULL;
     }
   }
@@ -394,17 +399,17 @@ static bool node_has_open_child(node_bt *const candidate) {
  *
  * \returns A pointer to a pointer to an open child node.
  */
-static void *ret_open_child(node_bt *const candidate) {
+static void *ret_node_with_open_child(node_bt *const candidate) {
   if (node_has_open_child(candidate)) return candidate;
   return NULL;
 }
 
 node_bt *find_open_descendant(node_bt *const origin) {
-  return traverse_from(origin, ret_open_child, node_has_open_child);
+  return traverse_from(origin, ret_node_with_open_child, node_has_open_child);
 }
 
-bool nodes_exist_in_same_tree(const node_bt *const node_1,
-                              const node_bt *const node_2) {
+bool nodes_coexist_in_tree(const node_bt *const node_1,
+                           const node_bt *const node_2) {
   const node_bt *node_1_root_node = NULL;
   for (const node_bt *cur_node = node_1->parent; cur_node->parent != NULL;
        cur_node = cur_node->parent) {
@@ -418,8 +423,9 @@ bool nodes_exist_in_same_tree(const node_bt *const node_1,
   return node_1_root_node == node_2_root_node;
 }
 
-binary_tree *move_node_from_tree(binary_tree *dst_tree, binary_tree *src_tree, node_bt *src) {
-
+binary_tree *move_node_from_tree(binary_tree *dst_tree, binary_tree *src_tree,
+                                 node_bt **src) {
+  if (dst_tree == src_tree) return dst_tree;
 }
 
 binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *const dst,

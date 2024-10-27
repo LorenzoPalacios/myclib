@@ -152,9 +152,9 @@ void delete_node_and_lineage(binary_tree *tree, node_bt *target);
  * \note Any child nodes of `target` will not be deleted. Instead, their new
  * parent will be somewhere in the lineage of `tree->parent`.
  */
-binary_tree *delete_node_from_tree_s(binary_tree *tree, node_bt *target);
+binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *target);
 
-bool nodes_exist_in_same_tree(const node_bt *node_1, const node_bt *node_2);
+bool nodes_coexist_in_tree(const node_bt *node_1, const node_bt *node_2);
 
 binary_tree *expand_binary_tree(binary_tree *tree);
 
