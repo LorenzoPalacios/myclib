@@ -114,10 +114,12 @@ size_t get_depth(const node_bt *const origin) {
  * Helper function for `count_descendant_nodes()` to be used as `op` for
  * `traverse_from()`.
  *
- * \return A pointer to a `size_t` which describes the
- * number of nodes traversed.
+ * \return A pointer to a `size_t` which describes the number of nodes
+ * traversed.
  */
-static void *count_node(node_bt *const node) {
+static void *count_node(void *tree_and_cur_node) {
+  const node_bt *const cur_node =
+      (void *)((binary_tree *)tree_and_cur_node + 1);
   static size_t count = 0;
   count++;
   /*
@@ -125,7 +127,7 @@ static void *count_node(node_bt *const node) {
    * so we can pass `NULL` from `count_descendant_nodes()` to tell this function
    * to reset `count`.
    */
-  if (node == NULL) count = 0;
+  if (cur_node == NULL) count = 0;
   return &count;
 }
 
@@ -136,14 +138,13 @@ size_t count_descendant_nodes(node_bt *const origin) {
    * traversed nodes. Then, we subtract one, since `traverse_from()` will count
    * `origin` when we only need to count the descendants of `origin`.
    */
-  const size_t count = *(size_t *)traverse_from(origin, count_node, NULL) - 1;
+  const size_t count =
+      *(size_t *)traverse_from(NULL, origin, count_node, NULL) - 1;
   count_node(NULL); /* Tells `count_node()` to reset its counter. */
   return count;
 }
 
-static void *mark_node_as_unalloc(node_bt *node) {
-
-}
+static void *mark_node_as_unalloc(node_bt *node) {}
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void delete_node(binary_tree *const tree, node_bt *target) {
@@ -174,8 +175,9 @@ node_bt *next_ancestral_divergence(const node_bt *const origin) {
   return NULL;
 }
 
-void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
-                    bool (*const stop_condition)(node_bt *)) {
+void *traverse_from(binary_tree *tree, node_bt *const origin,
+                    void *(*const op)(void *tree_and_cur_node),
+                    bool (*const stop_condition)(void *tree_and_cur_node)) {
   /*
    * The function will search along the left branch of `origin` and will deviate
    * to a right branch if and only if the `left` pointer of a traversed node is
@@ -213,14 +215,25 @@ void *traverse_from(node_bt *const origin, void *(*const op)(node_bt *),
   const size_t STK_CAP_SHRNK_THRES =
       TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity;
 
+  byte arg_buf[sizeof(binary_tree *) + sizeof(node_bt *)];
+  /* Denotes the position in `arg_buf` where `tree` will be written. */
+  binary_tree **const arg_buf_pos_tree = (void *)arg_buf;
+  /* Denotes the position in `arg_buf` where `cur_node` will be written. */
+  node_bt **const arg_buf_pos_cur_node =
+      (void *)(arg_buf + sizeof(binary_tree *));
+  /* `tree` should be a constant value, so we assign it here. */
+  *arg_buf_pos_tree = tree;
+
   bool low_stack_usage = true;
   void *ret_val = NULL;
   node_bt *cur_node = origin;
   node_bt *next_node = NULL;
   while (cur_node != NULL) {
-    if (op != NULL) ret_val = op(cur_node);
+    /* Write the pointer that is `cur_node` to the argument buffer. */
+    *arg_buf_pos_cur_node = cur_node;
+    if (op != NULL) ret_val = op(arg_buf);
     if (stop_condition != NULL)
-      if (stop_condition(cur_node)) break;
+      if (stop_condition(arg_buf)) break;
     if (cur_node->left != NULL) {
       /*
        * If both `left` and `right` are valid, continue down the left branch and
@@ -522,7 +535,7 @@ binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
 node_bt *new_bt_node(const void *value, size_t value_size) {
   node_bt *const new_node = malloc(sizeof(node_bt) + value_size);
   if (new_node == NULL) return NULL;
-  
+
   new_node->value = new_node + 1;
   new_node->parent = new_node->left = new_node->right = NULL;
   memcpy(new_node->value, value, value_size);

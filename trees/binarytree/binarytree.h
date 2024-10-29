@@ -279,16 +279,29 @@ size_t right_branch_depth(const node_bt *origin);
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
  *
+ * The arguments for both `op` and `stop_condition` will be a pocket of memory
+ * containing the pointers `tree` and `origin`, respectively. This pocket of
+ * memory will be of size `sizeof(binary_tree *) + sizeof(node_bt *)`.
+ *
  * \return The last returned value from `op` or `NULL` if `op` is `NULL`.
  * \note Calling this function with `stop_condition` equal to `NULL` will always
  * cause all descendant nodes of `origin` to be traversed. This can be used for
  * pre-allocating memory for the internal stack.
+ *
  * \note If a traversed node meets the criteria for `stop_condition` to return
  * `true`, `op` will still be run for that node.
+ *
  * \note If the internal stack used for traversal does not use most of its
  * capacity after a few calls to this function (internal library calls count
  * towards this), it will shrink itself to reduce memory footprint.
+ *
+ * \note `tree` is present only to permit tree-level operations or checks that
+ * might be required of `op` and `stop_condition`. It is not used in the actual
+ * traversal and can be `NULL` if neither `op` nor `stop_condition` will make
+ * use of it.
  */
-void *traverse_from(node_bt *origin, void *(*op)(node_bt *),
-                    bool (*stop_condition)(node_bt *));
+void *traverse_from(binary_tree *tree, node_bt *origin,
+                    void *(*op)(void *tree_and_cur_node),
+                    bool (*stop_condition)(void *tree_and_cur_node));
+
 #endif
