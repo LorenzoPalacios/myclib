@@ -28,7 +28,6 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   byte *const values_mem = (byte *)(nodes_mem + length);
   if (tree_obj == NULL) return NULL;
 
-  tree_obj->num_nodes = length;
   tree_obj->value_size = elem_size;
   tree_obj->used_allocation = tree_obj->allocation = TOTAL_REQ_MEM;
   /* The tracking of unallocated nodes is an opt-in feature, hence why its
@@ -144,14 +143,44 @@ size_t count_descendant_nodes(node_bt *const origin) {
   return count;
 }
 
-static void *mark_node_as_unalloc(node_bt *node) {}
+/*
+ * Helper function for `delete_node()` to be used as `op` for `traverse_from()`.
+ * Returns the current number of deleted nodes, which can be reset by passing
+ * `NULL` as `tree_and_cur_node`.
+ *
+ * \return A pointer to a `size_t` which describes the number of nodes
+ * traversed.
+ */
+static void *mark_node_as_unalloc(void *tree_and_cur_node) {
+  static size_t unalloc_count = 0;
+
+  binary_tree *tree = tree_and_cur_node;
+  node_bt *target_node = (void *)((binary_tree *)tree_and_cur_node + 1);
+  /*
+   * Like with `count_node()`, since `traverse_from()` will not return `NULL`
+   * (`delete_node()` passes a tree and an origin node to `traverse_from()`), we
+   * can call this function from `delete_node()` or similar and pass `NULL` as
+   * its argument to signal that the counter should be reset.
+   */
+  if (tree == NULL || target_node == NULL) {
+    unalloc_count = 0;
+  } else {
+    register_unalloc_node(tree, target_node);
+    unalloc_count++;
+  }
+  return &unalloc_count;
+}
+
+size_t get_num_nodes_in_tree(const binary_tree *const tree) {
+  return (tree->used_allocation - sizeof(binary_tree) -
+         tree->unallocated_nodes->capacity) / tree->value_size;
+}
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 void delete_node(binary_tree *const tree, node_bt *target) {
   const size_t TOTAL_NODE_SIZE = sizeof(node_bt) + tree->value_size;
   if (target == tree->root) {
-    tree->used_allocation -= tree->num_nodes * TOTAL_NODE_SIZE;
-    tree->num_nodes = 0;
+    tree->used_allocation -= get_num_nodes_in_tree(tree) * TOTAL_NODE_SIZE;
     tree->root = NULL;
     return;
   }
@@ -160,9 +189,13 @@ void delete_node(binary_tree *const tree, node_bt *target) {
   else
     target->parent->right = NULL;
 
-  /* Adding one to account for the deletion of `target` itself. */
-  const size_t DELETED_NODES = count_descendant_nodes(target) + 1;
-  tree->num_nodes -= DELETED_NODES;
+  /*
+   * `mark_node_as_unalloc()` returns a pointer to `size_t` which describes the
+   * number of nodes that have been marked unallocated.
+   */
+  const size_t DELETED_NODES = *(size_t *)mark_node_as_unalloc(target);
+  /* Signaling `mark_node_as_unalloc()` to */
+  mark_node_as_unalloc(NULL);
   tree->used_allocation -= DELETED_NODES * tree->value_size;
 }
 
@@ -324,7 +357,6 @@ binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
   if (new_tree == NULL) return NULL;
   if (new_size < new_tree->used_allocation) {
     new_tree->used_allocation = new_size;
-    new_tree->num_nodes = (new_size - sizeof(*new_tree)) / new_tree->value_size;
   }
   new_tree->allocation = new_size;
 
@@ -334,10 +366,10 @@ binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
 binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
   if (new_size < tree->used_allocation) {
+    const size_t NUM_NODES = get_num_nodes_in_tree(tree);
     const size_t NODES_AFFECTED =
-        tree->num_nodes - (new_size - sizeof(*tree)) / tree->value_size;
+        NUM_NODES - (new_size - sizeof(*tree)) / tree->value_size;
     const size_t NODE_SIZE = tree->value_size;
-    const size_t NUM_NODES = tree->num_nodes;
     for (size_t i = 0; i < NODES_AFFECTED; i++) {
       node_bt *cur_node =
           (void *)((byte *)tree->root + (NUM_NODES - i - 1) * NODE_SIZE);
@@ -356,7 +388,7 @@ binary_tree *expand_binary_tree(binary_tree *const tree) {
   return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
 }
 
-binary_tree *push_unalloc_node(binary_tree *tree, node_bt *const open_node) {
+binary_tree *register_unalloc_node(binary_tree *tree, node_bt *const open_node) {
   stack *const unalloc_nodes_stk = tree->unallocated_nodes;
   if (unalloc_nodes_stk == NULL) return NULL;
   const size_t STK_AVAILABLE_ALLOC = unalloc_nodes_stk - unalloc_nodes_stk;

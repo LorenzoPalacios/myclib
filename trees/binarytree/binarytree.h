@@ -51,10 +51,9 @@ typedef struct node_bt {
 typedef struct {
   node_bt *root;
   stack *unallocated_nodes; /* Contains pointers to unused nodes. */
-  size_t num_nodes;
-  size_t value_size;      /* Size (in bytes) of each node's stored values. */
-  size_t allocation;      /* Total bytes allocated for the tree and nodes. */
-  size_t used_allocation; /* Total bytes used from `allocation`. */
+  size_t value_size;        /* Size (in bytes) of each node's stored values. */
+  size_t allocation;        /* Total bytes allocated for the tree and nodes. */
+  size_t used_allocation;   /* Total bytes used from `allocation`. */
 } binary_tree;
 
 /*
@@ -227,7 +226,7 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  * `tree->unallocated_nodes` is `NULL`, this function will fail and return
  * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
  */
-binary_tree *push_unalloc_node(binary_tree *tree, node_bt *open_node);
+binary_tree *register_unalloc_node(binary_tree *tree, node_bt *open_node);
 
 /*
  * Searches along the ancestry of `origin` until a node is found whose `left`
