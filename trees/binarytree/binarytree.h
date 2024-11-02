@@ -154,8 +154,6 @@ void delete_node(binary_tree *tree, node_bt *target);
  */
 binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *target);
 
-bool nodes_coexist_in_tree(const node_bt *node_1, const node_bt *node_2);
-
 binary_tree *expand_binary_tree(binary_tree *tree);
 
 /*
@@ -189,6 +187,8 @@ binary_tree *force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  * \return The maximum depth of `origin`.
  */
 size_t get_depth(const node_bt *origin);
+
+node_bt **get_open_child_in_node(node_bt *const node);
 
 node_bt *get_unalloc_node(binary_tree *tree);
 
@@ -238,6 +238,8 @@ binary_tree *register_unalloc_node(binary_tree *tree, node_bt *open_node);
  * divergence or `NULL` if no suitable node is found.
  */
 node_bt *next_ancestral_divergence(const node_bt *origin);
+
+bool do_nodes_coexist_in_tree(const node_bt *node_1, const node_bt *node_2);
 
 node_bt *remove_node_from_tree(binary_tree *tree, node_bt *target);
 
