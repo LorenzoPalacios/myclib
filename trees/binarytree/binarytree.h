@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 /*
- * The stack `unallocated_nodes` used by binary trees to track unallocated nodes
+ * The stack `unused_nodes` used by binary trees to track unallocated nodes
  * is managed by this library, not the stack library, so we need functions that
  * guarantee not to modify the memory allocations made by this library while
  * still maintaining the operability of a stack.
@@ -50,10 +50,10 @@ typedef struct node_bt {
 /* Container structure for a binary tree data structure. */
 typedef struct {
   node_bt *root;
-  stack *unallocated_nodes; /* Contains pointers to unused nodes. */
-  size_t value_size;        /* Size (in bytes) of each node's stored values. */
-  size_t allocation;        /* Total bytes allocated for the tree and nodes. */
-  size_t used_allocation;   /* Total bytes used from `allocation`. */
+  stack *unused_nodes;    /* Contains pointers to unused nodes. */
+  size_t value_size;      /* Size (in bytes) of each node's stored values. */
+  size_t allocation;      /* Total bytes allocated for the tree and nodes. */
+  size_t used_allocation; /* Total bytes used from `allocation`. */
 } binary_tree;
 
 /*
@@ -90,10 +90,6 @@ typedef struct {
  *
  * \return A balanced binary tree whose structure is in accordance with the
  * above example or `NULL` if the tree could not be created.
- * \note This function returns a `binary_tree` without any way of tracking
- * unused memory accrued after removing/deleting nodes.
- * See `init_unalloc_nodes_stk()` if you would like to enable a stack
- * (`unallocated_nodes`) to track unused memory.
  */
 binary_tree *_new_binary_tree(const void *data, size_t elem_size,
                               size_t length);
@@ -124,6 +120,8 @@ size_t count_descendant_nodes(node_bt *origin);
  * or parent nodes.
  *
  * \return A pointer to a discrete binary tree node or `NULL` upon failure.
+ * \note The `value` associated with the returned node will be stored in memory
+ * directly after the node itself.
  */
 node_bt *new_bt_node(const void *value, size_t value_size);
 
@@ -144,7 +142,7 @@ void delete_node(binary_tree *tree, node_bt *target);
 
 /*
  * Removes `target` from the hierarchy of `tree`, adding it to
- * `tree->unallocated_nodes` if `tree` accepts tracking of open blocks of
+ * `tree->unused_nodes` if `tree` accepts tracking of open blocks of
  * memory.
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
@@ -195,17 +193,6 @@ node_bt *get_unalloc_node(binary_tree *tree);
 size_t left_branch_depth(const node_bt *origin);
 
 /*
- * Initializes a stack in `tree` which contains pointers to any open blocks of
- * memory left behind from removing or deleting nodes.
- *
- * \return A (potentially new) pointer associated with the contents of `tree`
- * or `NULL` upon failure.
- * \note The current implementation allocates this stack at the end of the
- * allocated memory for `tree`.
- */
-binary_tree *init_unalloc_nodes_stk(binary_tree *tree);
-
-/*
  * Finds the first open `left` or `right` pointer in `dst` and places `src`
  * there. If neither `left` or `right` are open, both `dst` and `src` will be
  * unmodified.
@@ -223,7 +210,7 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
  * \note If `init_unalloc_nodes_stk()` was not called prior to this function or
- * `tree->unallocated_nodes` is `NULL`, this function will fail and return
+ * `tree->unused_nodes` is `NULL`, this function will fail and return
  * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
  */
 binary_tree *register_unalloc_node(binary_tree *tree, node_bt *open_node);

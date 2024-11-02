@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Stacks are used to track unallocated nodes in trees and in
+ * `traverse_from()` to avoid the usage of recursion.
+ */
 #include "../../stack/stack.h"
 #include "../trees.h"
 
@@ -16,7 +20,7 @@ typedef unsigned char byte;
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
                               const size_t num_elems) {
   binary_tree *tree;
-  /* 
+  /*
    * This region is enclosed in its own block to avoid autocomplete pollution
    * later during tree construction.
    */
@@ -34,14 +38,14 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
      * The stack used for tracking unallocated nodes should exist as the last
      * object in the allocated region for the overall tree.
      */
-    tree->unallocated_nodes =
+    tree->unused_nodes =
         (void *)((byte *)tree + TOTAL_REQ_MEM - UNALLOC_NODES_STK_SIZE);
-    stack *const unalloc_nodes = tree->unallocated_nodes;
-    unalloc_nodes->data = unalloc_nodes + 1;
-    unalloc_nodes->capacity = UNALLOC_NODES_STK_SIZE - sizeof(stack);
-    unalloc_nodes->used_capacity = 0;
-    unalloc_nodes->elem_size = sizeof(node_bt **);
-    unalloc_nodes->length = 0;
+    stack *const unused_nodes = tree->unused_nodes;
+    unused_nodes->data = unused_nodes + 1;
+    unused_nodes->capacity = UNALLOC_NODES_STK_SIZE - sizeof(stack);
+    unused_nodes->used_capacity = 0;
+    unused_nodes->elem_size = sizeof(node_bt **);
+    unused_nodes->length = 0;
   }
 
   /* The nodes will be stored directly after the tree header. */
@@ -55,7 +59,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
   byte *const values_region_start = (byte *)(nodes_region_start + num_elems);
   for (size_t i = 0; i < num_elems; i++) {
     node_bt *const cur_node = nodes_region_start + i;
-    byte *const cur_node_data = values_region_start + i * elem_size;
+    byte *const cur_node_value = values_region_start + i * elem_size;
     node_bt *parent_node;
     /* The root node has no parent. */
     if (i == 0)
@@ -68,10 +72,10 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
       else
         parent_node->right = cur_node;
     }
-    memcpy(cur_node_data, (byte *)data + i * elem_size, elem_size);
-    cur_node->value = cur_node_data;
+    memcpy(cur_node_value, (byte *)data + i * elem_size, elem_size);
+    cur_node->value = cur_node_value;
     cur_node->parent = parent_node;
-    /* Each new node will have no children from the outset. */
+    /* Each new node should have no children from the outset. */
     cur_node->left = cur_node->right = NULL;
   }
   tree->root = nodes_region_start; /* The first node is always the root node. */
@@ -191,9 +195,31 @@ static void *mark_node_as_unalloc(void *tree_and_cur_node) {
 }
 
 size_t get_num_nodes_in_tree(const binary_tree *const tree) {
-  return (tree->used_allocation - sizeof(binary_tree) -
-          tree->unallocated_nodes->capacity) /
-         tree->value_size;
+  const size_t TREE_HEADER_SIZE = sizeof(binary_tree);
+  const size_t UNUSED_TRCKR_SIZE = tree->unused_nodes->capacity + sizeof(stack);
+  const size_t NON_NODES_ALLOCATION = TREE_HEADER_SIZE + UNUSED_TRCKR_SIZE;
+
+  const size_t NODES_ALLOCATION = tree->used_allocation - NON_NODES_ALLOCATION;
+  const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
+  
+  return NODES_ALLOCATION / NODE_SIZE;
+}
+
+void fill_unallocated_gaps(binary_tree *const tree) {
+  const size_t used_allocation = tree->used_allocation;
+  node_bt *const nodes_region_start = tree + 1;
+  byte_t *const values_region_start =
+      nodes_region_start + get_num_nodes_in_tree(tree);
+  stack *const unused_nodes = tree->unused_nodes;
+  while (unused_nodes->length != 0) {
+    node_bt *const node_1 = get_unalloc_node(tree);
+    node_bt *const node_2 = get_unalloc_node(tree);
+    if (node_1 == NULL) break;
+    void *node_1_value = node_1->value;
+    if (node_2 == NULL) {
+      memmove(node_1, node_1 + 1, used_allocation);
+    }
+  }
 }
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
@@ -214,7 +240,7 @@ void delete_node(binary_tree *const tree, node_bt *target) {
    * number of nodes that have been marked unallocated.
    */
   const size_t DELETED_NODES = *(size_t *)mark_node_as_unalloc(target);
-  /* Signaling `mark_node_as_unalloc()` to */
+  /* Signaling `mark_node_as_unalloc()` to reset its counter. */
   mark_node_as_unalloc(NULL);
   tree->used_allocation -= DELETED_NODES * tree->value_size;
 }
@@ -365,8 +391,8 @@ binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *const target) {
      * If the tree implements tracking of open blocks of memory, add the node
      * as an open block.
      */
-    if (tree->unallocated_nodes != NULL)
-      stack_push(tree->unallocated_nodes, target);
+    if (tree->unused_nodes != NULL)
+      stack_push(tree->unused_nodes, target);
   }
   return tree;
 }
@@ -410,7 +436,7 @@ binary_tree *expand_binary_tree(binary_tree *const tree) {
 
 binary_tree *register_unalloc_node(binary_tree *tree,
                                    node_bt *const open_node) {
-  stack *const unalloc_nodes_stk = tree->unallocated_nodes;
+  stack *const unalloc_nodes_stk = tree->unused_nodes;
   if (unalloc_nodes_stk == NULL) return NULL;
   const size_t STK_AVAILABLE_ALLOC = unalloc_nodes_stk - unalloc_nodes_stk;
   if (STK_AVAILABLE_ALLOC < sizeof(node_bt **)) {
@@ -432,37 +458,10 @@ binary_tree *register_unalloc_node(binary_tree *tree,
   return tree;
 }
 
-binary_tree *init_unalloc_nodes_stk(binary_tree *tree) {
-  const size_t AVAILABLE_MEM = tree->allocation - tree->used_allocation;
-  /*
-   * Allocate enough memory for a stack that can hold one pointer to an
-   * unallocated node.
-   */
-  const size_t REQ_ALLOCATION = sizeof(stack) + sizeof(node_bt **);
-  if (AVAILABLE_MEM < REQ_ALLOCATION) {
-    tree = expand_binary_tree(tree);
-    if (tree == NULL) return NULL;
-  }
-  tree->unallocated_nodes = (void *)((byte *)tree + tree->used_allocation);
-
-  *(tree->unallocated_nodes) = (stack){
-      /*
-       * Sets the data pointer to the memory just after the stack header.
-       */
-      .data = tree->unallocated_nodes + 1,
-      .capacity = REQ_ALLOCATION,
-      .used_capacity = 0,
-      .elem_size = sizeof(node_bt **),
-      .length = 0};
-
-  tree->used_allocation += REQ_ALLOCATION;
-  return tree;
-}
-
 /* write documentation */
 node_bt *get_unalloc_node(binary_tree *const tree) {
-  if (tree->unallocated_nodes == NULL) return NULL;
-  return stack_pop(tree->unallocated_nodes);
+  node_bt **const unalloc_node = stack_pop(tree->unused_nodes);
+  return (unalloc_node == NULL) ? NULL : *unalloc_node;
 }
 
 /* Helper function used by `find_open_descendant()`. */
@@ -619,7 +618,6 @@ static void *print_node(void *tree_and_node) {
 int main(void) {
   const int data[] = {1, 2, 3};
   binary_tree *tree = new_binary_tree(data);
-  tree = init_unalloc_nodes_stk(tree);
   node_bt *random_node = new_bt_node(data, sizeof(*data));
   delete_node_from_tree(tree, tree->root);
   traverse_from(tree, random_node, print_node, NULL);
