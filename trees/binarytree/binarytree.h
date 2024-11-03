@@ -87,12 +87,19 @@ binary_tree *_new_binary_tree(const void *data, size_t elem_size,
                               size_t length);
 
 /*
- * Adds the specified discrete node `node` to `tree`. On success, the pointer to
+ * Adds the specified freestanding node to `tree`. On success, the pointer to
  * `node` will be updated to its new position in `tree` and the original pointer
  * to `node` invalidated.
  *
  * It is assumed that the data at `node->value` is of size equivalent to
- * `tree->value_size`. If this assumption is false, the behavior is undefined.
+ * `tree->value_size`. If this assumption is false, the behavior is determined
+ * by the size of the value stored at `node`:
+ *
+ * - If the value is larger than `tree->value_size`, then the value is truncated
+ * according to `tree->value_size`.
+ *
+ * - If the value is smaller than `tree->value_size`, then the behavior is
+ * undefined.
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
@@ -248,7 +255,7 @@ size_t right_branch_depth(const node_bt *origin);
 
 /*
  * Traverses all of the descendant nodes of `origin`, including `origin` itself,
- * amd passes each traversed node as a pointer to `op` and `stop_condition`
+ * and passes each traversed node as a pointer to `op` and `stop_condition`
  * until `stop_condition` returns `true` or all the nodes in the lineage of
  * `origin` are contacted.
  *

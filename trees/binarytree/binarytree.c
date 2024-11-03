@@ -506,62 +506,20 @@ node_bt **get_open_child_in_node(node_bt *const node) {
   return NULL;
 }
 
-binary_tree *move_tree_node(binary_tree *dst_tree, binary_tree *src_tree,
-                            node_bt **const src) {
-  if (dst_tree == src_tree) return dst_tree;
-  if (dst_tree->value_size != src_tree->value_size) return dst_tree;
-  /* A tree is guaranteed to have leaf nodes, hence neither
-   * `find_open_descendant()` nor `get_open_child_in_node()` can return
-   * `NULL`.*/
-  node_bt **const open_node =
-      get_open_child_in_node(find_open_descendant(dst_tree->root));
-
-  delete_node(src_tree, *src);
-}
-
-binary_tree *make_tree_node_child_of(binary_tree *dst_tree,
-                                     node_bt *const dst_node,
-                                     binary_tree *src_tree, node_bt *src_node) {
-  if (dst_tree != src_tree) {
-    src_node = remove_node_from_tree(src_tree, src_node);
-    dst_tree = move_tree_node(dst_tree, src_tree, &src_node);
-  }
-  if (dst_node->left == NULL) {
-    dst_node->left = src_node;
-    src_node->parent = dst_node;
-  } else if (dst_node->right == NULL) {
-    dst_node->right = src_node;
-    src_node->parent = dst_node;
-  }
-  return dst_tree;
-}
-
-binary_tree *force_make_tree_node_child_of(binary_tree *dst_tree,
-                                           node_bt *dst_node,
-                                           binary_tree *src_tree,
-                                           node_bt *src_node) {
-  dst_tree = make_node_child_of(dst_tree, dst_node, src_tree, src_node);
-  if (src_node->parent == dst_node) return dst_tree;
-  node_bt *open_candidate = find_open_descendant(src_node);
-  /*
-   * Move the child node (and its lineage) currently at `dst_node->left` to the
-   * end of the lineage of `src_node`, thereby freeing up a child slot at
-   * `dst_node` for `src_node`.
-   */
-  open_candidate = dst_node->left;
-  dst_node->left = src_node;
-}
-
 binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
   const node_bt *node_actual = *node;
   if (node_actual == NULL) return tree;
-  /* Use any unallocated nodes in `tree`. */
-  node_bt *const open_node = get_unalloc_node(tree);
-  if (open_node != NULL) {
-    node_bt *const parent = find_open_descendant(tree->root);
-    tree = make_node_child_of(tree, parent, tree, open_node);
-    memcpy(open_node->value, node_actual->value, tree->value_size);
+  node_bt *open_node = get_unalloc_node(tree);
+  /* Use any unallocated nodes in `tree` before reallocating. */
+  if (tree->unused_nodes->length != 0)
+    open_node = get_unalloc_node(tree);
+  else {
+    tree = expand_binary_tree(tree);
   }
+  node_bt *const node_parent = find_open_descendant(tree->root);
+  tree = make_node_child_of(tree, node_parent, tree, open_node);
+  memcpy(open_node->value, node_actual->value, tree->value_size);
+  return tree;
 }
 
 node_bt *new_bt_node(const void *value, size_t value_size) {
