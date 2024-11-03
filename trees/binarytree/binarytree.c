@@ -26,37 +26,25 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
    */
   {
     const size_t NODE_SIZE = sizeof(node_bt) + elem_size;
-    const size_t UNALLOC_NODES_STK_SIZE = sizeof(stack) + sizeof(node_bt **);
-    const size_t TOTAL_REQ_MEM =
-        num_elems * NODE_SIZE + UNALLOC_NODES_STK_SIZE + sizeof(binary_tree);
+    const size_t TOTAL_REQ_MEM = num_elems * NODE_SIZE + sizeof(binary_tree);
     tree = malloc(TOTAL_REQ_MEM); /* TREE ALLOCATED HERE */
     if (tree == NULL) return NULL;
 
     tree->value_size = elem_size;
     tree->used_allocation = tree->allocation = TOTAL_REQ_MEM;
-    /*
-     * The stack used for tracking unallocated nodes should exist as the last
-     * object in the allocated region for the overall tree.
-     */
-    tree->unused_nodes =
-        (void *)((byte *)tree + TOTAL_REQ_MEM - UNALLOC_NODES_STK_SIZE);
-    stack *const unused_nodes = tree->unused_nodes;
-    unused_nodes->data = unused_nodes + 1;
-    unused_nodes->capacity = UNALLOC_NODES_STK_SIZE - sizeof(stack);
-    unused_nodes->used_capacity = 0;
-    unused_nodes->elem_size = sizeof(node_bt **);
-    unused_nodes->length = 0;
+    tree->unused_nodes = new_empty_stack(1, sizeof(node_bt **));
   }
-
-  /* The nodes will be stored directly after the tree header. */
-  node_bt *const nodes_region_start = (void *)(tree + 1);
+  /* The values will be stored directly after the tree header. */
+  byte *const values_region_start = (void *)(tree + 1);
   /*
-   * The values will be stored directly after the region of memory allocated for
-   * the nodes.
-   * Originally, the value for each node was stored in the memory directly after
-   * their associated node. This was changed to avoid alignment issues.
+   * The nodes will be stored directly after the region of memory dedictaed to
+   * storing each node's values.
+   * Originally, the nodes were stored after the tree header and the values
+   * stored after the nodes, but it is actually easier to have the values stored
+   * before the nodes when adding nodes to a tree.
    */
-  byte *const values_region_start = (byte *)(nodes_region_start + num_elems);
+  node_bt *const nodes_region_start =
+      (void *)(values_region_start + num_elems * elem_size);
   for (size_t i = 0; i < num_elems; i++) {
     node_bt *const cur_node = nodes_region_start + i;
     byte *const cur_node_value = values_region_start + i * elem_size;
@@ -195,13 +183,8 @@ static void *mark_node_as_unalloc(void *tree_and_cur_node) {
 }
 
 size_t get_num_nodes_in_tree(const binary_tree *const tree) {
-  const size_t TREE_HEADER_SIZE = sizeof(binary_tree);
-  const size_t UNUSED_NODES_SIZE = tree->unused_nodes->capacity + sizeof(stack);
-  const size_t NON_NODES_ALLOCATION = TREE_HEADER_SIZE + UNUSED_NODES_SIZE;
-
-  const size_t NODES_ALLOCATION = tree->used_allocation - NON_NODES_ALLOCATION;
+  const size_t NODES_ALLOCATION = tree->used_allocation - sizeof(binary_tree);
   const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
-
   return NODES_ALLOCATION / NODE_SIZE;
 }
 
@@ -506,6 +489,30 @@ node_bt **get_open_child_in_node(node_bt *const node) {
   return NULL;
 }
 
+/*
+ * Helper function used by functions whose purpose is to add nodes to a tree,
+ * such as `add_freestanding_node()`.
+ *
+ * If possible, this function shifts the memory region dedicated to nodes to
+ * the right by `tree->value_size` bytes.
+ *
+ * \return A pointer to a slot of unused memory in `tree` whose capacity is equal to `tree->value_size`.
+ * \note `tree` must have enough space to accomodate a new value. If this
+ * condition is not met, the behavior is undefined.
+ */
+static node_bt *make_room_for_new_value(binary_tree *const tree) {
+  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
+  /* Increment past the tree header, then increment past the nodes. */
+  node_bt *const NODES_BEGIN = (node_bt *)(tree + 1);
+  node_bt *const NEW_NODES_BEGIN = NODES_BEGIN + 1;
+  /*
+   * The number of values should correspond to the number of nodes, hence why
+   * the length argument is `NUM_NODES`.
+   */
+  memmove(NEW_NODES_BEGIN, NODES_BEGIN, NUM_NODES);
+  return VALUES_BEGIN;
+}
+
 binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
   const node_bt *node_actual = *node;
   if (node_actual == NULL) return tree;
@@ -515,7 +522,9 @@ binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
     open_node = get_unalloc_node(tree);
   else {
     tree = expand_binary_tree(tree);
+    make_room_for_new_node(tree);
   }
+
   node_bt *const node_parent = find_open_descendant(tree->root);
   tree = make_node_child_of(tree, node_parent, tree, open_node);
   memcpy(open_node->value, node_actual->value, tree->value_size);
