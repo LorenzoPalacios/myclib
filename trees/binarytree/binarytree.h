@@ -4,14 +4,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/*
- * The stack `unused_nodes` used by binary trees to track unallocated nodes
- * is managed by this library, not the stack library, so we need functions that
- * guarantee not to modify the memory allocations made by this library while
- * still maintaining the operability of a stack.
- */
-#define STACK_INCL_HEAPLESS_STACK
-
 #include "../../stack/stack.h"
 #include "../trees.h"
 
@@ -141,9 +133,8 @@ void delete_binary_tree_s(binary_tree **tree);
 void delete_node(binary_tree *tree, node_bt *target);
 
 /*
- * Removes `target` from the hierarchy of `tree`, adding it to
- * `tree->unused_nodes` if `tree` accepts tracking of open blocks of
- * memory.
+ * Removes `target` from the hierarchy of `tree` and adds it to
+ * `tree->unused_nodes`.
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
@@ -209,11 +200,8 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  *
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
- * \note If `init_unalloc_nodes_stk()` was not called prior to this function or
- * `tree->unused_nodes` is `NULL`, this function will fail and return
- * `NULL`. If this occurs, `tree` and `open_node` will be unchanged.
  */
-binary_tree *register_unalloc_node(binary_tree *tree, node_bt *open_node);
+void register_unalloc_node(binary_tree *tree, node_bt *open_node);
 
 /*
  * Searches along the ancestry of `origin` until a node is found whose `left`

@@ -188,7 +188,7 @@ static void *mark_node_as_unalloc(void *tree_and_cur_node) {
   if (tree == NULL || target_node == NULL) {
     unalloc_count = 0;
   } else {
-    tree = register_unalloc_node(tree, target_node);
+    register_unalloc_node(tree, target_node);
     unalloc_count++;
   }
   return &unalloc_count;
@@ -196,30 +196,13 @@ static void *mark_node_as_unalloc(void *tree_and_cur_node) {
 
 size_t get_num_nodes_in_tree(const binary_tree *const tree) {
   const size_t TREE_HEADER_SIZE = sizeof(binary_tree);
-  const size_t UNUSED_TRCKR_SIZE = tree->unused_nodes->capacity + sizeof(stack);
-  const size_t NON_NODES_ALLOCATION = TREE_HEADER_SIZE + UNUSED_TRCKR_SIZE;
+  const size_t UNUSED_NODES_SIZE = tree->unused_nodes->capacity + sizeof(stack);
+  const size_t NON_NODES_ALLOCATION = TREE_HEADER_SIZE + UNUSED_NODES_SIZE;
 
   const size_t NODES_ALLOCATION = tree->used_allocation - NON_NODES_ALLOCATION;
   const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
-  
-  return NODES_ALLOCATION / NODE_SIZE;
-}
 
-void fill_unallocated_gaps(binary_tree *const tree) {
-  const size_t used_allocation = tree->used_allocation;
-  node_bt *const nodes_region_start = tree + 1;
-  byte_t *const values_region_start =
-      nodes_region_start + get_num_nodes_in_tree(tree);
-  stack *const unused_nodes = tree->unused_nodes;
-  while (unused_nodes->length != 0) {
-    node_bt *const node_1 = get_unalloc_node(tree);
-    node_bt *const node_2 = get_unalloc_node(tree);
-    if (node_1 == NULL) break;
-    void *node_1_value = node_1->value;
-    if (node_2 == NULL) {
-      memmove(node_1, node_1 + 1, used_allocation);
-    }
-  }
+  return NODES_ALLOCATION / NODE_SIZE;
 }
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
@@ -230,6 +213,11 @@ void delete_node(binary_tree *const tree, node_bt *target) {
     tree->root = NULL;
     return;
   }
+  /*
+   * Remove any linkage from the parent of `target` and `target`. We can leave
+   * `target` itself unmodified since any access to it after this function is
+   * completed technically invokes undefined behavior.
+   */
   if (target->parent->left == target)
     target->parent->left = NULL;
   else
@@ -391,8 +379,7 @@ binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *const target) {
      * If the tree implements tracking of open blocks of memory, add the node
      * as an open block.
      */
-    if (tree->unused_nodes != NULL)
-      stack_push(tree->unused_nodes, target);
+    if (tree->unused_nodes != NULL) stack_push(tree->unused_nodes, target);
   }
   return tree;
 }
@@ -434,28 +421,8 @@ binary_tree *expand_binary_tree(binary_tree *const tree) {
   return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
 }
 
-binary_tree *register_unalloc_node(binary_tree *tree,
-                                   node_bt *const open_node) {
-  stack *const unalloc_nodes_stk = tree->unused_nodes;
-  if (unalloc_nodes_stk == NULL) return NULL;
-  const size_t STK_AVAILABLE_ALLOC = unalloc_nodes_stk - unalloc_nodes_stk;
-  if (STK_AVAILABLE_ALLOC < sizeof(node_bt **)) {
-    const size_t REQ_ALLOC = STK_AVAILABLE_ALLOC + sizeof(node_bt **);
-    const size_t TREE_AVAILABLE_ALLOC =
-        tree->allocation - tree->used_allocation;
-    if (TREE_AVAILABLE_ALLOC < REQ_ALLOC) {
-      tree = expand_binary_tree(tree);
-      if (tree == NULL) return NULL;
-    }
-    unalloc_nodes_stk->capacity = REQ_ALLOC;
-  }
-  /*
-   * Using a heapless function guarantees that pushing a new element onto the
-   * stack will not incur modifications to the allocation of memory for
-   * `tree`.
-   */
-  heapless_stack_push(unalloc_nodes_stk, &open_node);
-  return tree;
+void register_unalloc_node(binary_tree *const tree, node_bt *const open_node) {
+  tree->unused_nodes = stack_push(tree->unused_nodes, &open_node);
 }
 
 /* write documentation */
