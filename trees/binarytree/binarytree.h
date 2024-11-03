@@ -46,7 +46,44 @@ typedef struct {
   size_t value_size;      /* Size (in bytes) of each node's stored values. */
   size_t allocation;      /* Total bytes allocated for the tree and nodes. */
   size_t used_allocation; /* Total bytes used from `allocation`. */
+  size_t misc_unused_alloc;
 } binary_tree;
+/*
+ * A note regarding the `misc_unused_alloc` data member.
+ *
+ * If there are no unused nodes to be overwritten when adding a node to a tree,
+ * new memory must be allocated to accomodate that new node.
+ *
+ * Unfortunately, with the current memory model, adding a node requires a shift
+ * to the right of the nodes in that tree. The magnitude of this shift is equal
+ * to the closest multiple of `8` greater than the tree's `value_size`. This is
+ * to preserve the alignment of the nodes in memory.
+ *
+ * Examples of the aforementioned behavior:
+ *
+ * - If `value_size` is `3`, the shift magnitude will be `8`, since the closest
+ * multiple of `8` with regards to `3` is `8`.
+ * - If `value_size` is `29`, the shift magnitude will be `32`, since the
+ * closest multiple of `8` with regards to `31` is `32`.
+ *
+ * This is done to create a gap of unused memory to contain that new node's
+ * associated value. However, the amount of memory actually used for the value
+ * is dictated by `value_size`, which is not guaranteed to align with the nodes.
+ * Therefore, the nodes themselves will not fill in whatever gap remains.
+ *
+ * Examples of this behavior:
+ * - If `value_size` is `3`, the nodes will be shifted to the right by `8`
+ * bytes. However, only `3` bytes out of the `8`-byte gap were used for the
+ * value, leaving `5` unused bytes.
+ * - If `value_size` is `29`, the nodes will be shifted to the right by `32`
+ * bytes. However, only `29` bytes out of the `32`-byte gap were used for the
+ * value, leaving `3` unused bytes.
+ *
+ * TL;DR:
+ * This value keeps track of the size of an unallocated region within the tree
+ * that could be used for future node additions. If all you need is a binary
+ * tree, don't worry about this.
+ */
 
 /*
  * This is a convenience macro for generating a `binary_tree` from an array.
