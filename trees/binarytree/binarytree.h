@@ -46,10 +46,10 @@ typedef struct {
   size_t value_size;      /* Size (in bytes) of each node's stored values. */
   size_t allocation;      /* Total bytes allocated for the tree and nodes. */
   size_t used_allocation; /* Total bytes used from `allocation`. */
-  size_t shift_alloc;
+  size_t align_size;
 } binary_tree;
 /*
- * A note regarding the `shift_alloc` data member.
+ * A note regarding the `align_size` data member.
  *
  * If there are no unused nodes to be overwritten when adding a node to a tree,
  * new memory must be allocated to accomodate that new node.

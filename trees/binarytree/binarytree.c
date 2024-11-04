@@ -3,8 +3,8 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*
@@ -22,7 +22,8 @@ typedef unsigned char byte;
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
                               const size_t num_elems) {
   binary_tree *tree;
-  const size_t NODE_ALIGNMENT_OVERHEAD = (elem_size * num_elems) % alignof(node_bt);
+  const size_t NODE_ALIGNMENT_OVERHEAD =
+      (elem_size * num_elems) % alignof(node_bt);
   /*
    * This region is enclosed in its own block to avoid autocomplete pollution
    * later during tree construction.
@@ -37,7 +38,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
     tree->value_size = elem_size;
     tree->used_allocation = tree->allocation = TOTAL_REQ_MEM;
     tree->unused_nodes = new_empty_stack(1, sizeof(node_bt **));
-    tree->shift_alloc = NODE_ALIGNMENT_OVERHEAD;
+    tree->align_size = NODE_ALIGNMENT_OVERHEAD;
   }
   /* The values will be stored directly after the tree header. */
   byte *const values_region_start = (void *)(tree + 1);
@@ -279,7 +280,7 @@ void *traverse_from(binary_tree *tree, node_bt *const origin,
    */
   node_bt **const arg_buf_pos_cur_node = (void *)(arg_buf);
 
-  /* 
+  /*
    * Denotes the position in `arg_buf` where the pointer, `tree`, will be
    * written. This will be the second value in the passed array.
    */
@@ -461,10 +462,10 @@ static void *make_room_for_new_value(binary_tree *const tree) {
   /* Increment past the tree header, then increment past the nodes. */
   void *const NODES_BEGIN = (byte_t *)(tree + 1) + NUM_NODES * tree->value_size;
   size_t SHIFT_MAGNITUDE = tree->value_size * alignof(node_bt) + 1;
-  if (tree->shift_alloc != 0) {
+  if (tree->align_size != 0) {
     const size_t diff = tree->value_size % alignof(node_bt);
     SHIFT_MAGNITUDE -=
-        (tree->shift_alloc + diff) / alignof(node_bt) * alignof(node_bt);
+        (tree->align_size + diff) / alignof(node_bt) * alignof(node_bt);
   }
 
   void *const NEW_NODES_BEGIN = (byte_t *)NODES_BEGIN + SHIFT_MAGNITUDE;
@@ -476,21 +477,40 @@ static void *make_room_for_new_value(binary_tree *const tree) {
   return NODES_BEGIN;
 }
 
-binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node) {
+static void *get_end_of_values_region(binary_tree *const tree) {
+  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
+  const size_t VALUES_ALLOC = tree->value_size * NUM_NODES;
+  return (byte_t *)(tree + 1) + VALUES_ALLOC;
+}
+
+static node_bt *get_end_of_nodes_region(binary_tree *const tree) {
+  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
+  const size_t NODES_ALLOC = sizeof(node_bt) * NUM_NODES;
+  const void *const VALUES_REGION_END = get_end_of_values_region(tree);
+  return (void *)((byte_t *)VALUES_REGION_END + tree->align_size + NODES_ALLOC);
+}
+
+static node_bt *incorporate_node(binary_tree *const tree, node_bt *const node) {
+
+}
+
+binary_tree *add_freestanding_node(binary_tree *tree, node_bt **const node) {
   const node_bt *node_actual = *node;
   if (node_actual == NULL) return tree;
-  node_bt *open_node = get_unalloc_node(tree);
-  /* Use any unallocated nodes in `tree` before reallocating. */
+
+  node_bt *open_node;
   if (tree->unused_nodes->length != 0)
+    /* Use any unallocated nodes in `tree` before reallocating. */
     open_node = get_unalloc_node(tree);
   else {
     tree = expand_binary_tree(tree);
-    make_room_for_new_value(tree);
+    void *const open_val = make_room_for_new_value(tree);
+    open_node = get_end_of_nodes_region(tree);
+    open_node->value = open_val;
   }
-
-  // node_bt *const node_parent = find_open_descendant(tree->root);
-  //  tree = make_node_child_of(tree, node_parent, tree, open_node);
+  incorporate_node(tree, open_node);
   memcpy(open_node->value, node_actual->value, tree->value_size);
+  *node = open_node;
   return tree;
 }
 
@@ -513,14 +533,15 @@ static void *print_node(void *const tree_and_node) {
 #include <time.h>
 
 int main(void) {
-  int data[0x10000];
+  int data[0x1000];
   srand(time(NULL));
-  for (size_t i = 0; i < 0x10000; i++) {
+  for (size_t i = 0; i < 0x1000; i++) {
     data[i] = i;
   }
   binary_tree *tree = new_binary_tree(data);
-  // node_bt *random_node = new_bt_node(data, sizeof(*data));
-  traverse_from(tree, tree->root, print_node, NULL);
+  node_bt *random_node = new_bt_node(data + 1, sizeof(*data));
+  tree = add_freestanding_node(tree, &random_node);
+  traverse_from(NULL, random_node, print_node, NULL);
   delete_tree(tree);
 
   return 0;
