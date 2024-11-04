@@ -490,8 +490,13 @@ static node_bt *get_end_of_nodes_region(binary_tree *const tree) {
   return (void *)((byte_t *)VALUES_REGION_END + tree->align_size + NODES_ALLOC);
 }
 
-static node_bt *incorporate_node(binary_tree *const tree, node_bt *const node) {
-
+static void incorporate_node(binary_tree *const tree, node_bt *const node) {
+  node_bt *const node_parent = find_open_descendant(tree->root);
+  if (node_parent->left == NULL)
+    node_parent->left = node;
+  else
+    node_parent->right = node;
+  node->parent = node_parent;
 }
 
 binary_tree *add_freestanding_node(binary_tree *tree, node_bt **const node) {
