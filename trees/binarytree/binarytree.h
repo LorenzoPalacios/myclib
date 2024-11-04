@@ -292,9 +292,9 @@ size_t right_branch_depth(const node_bt *origin);
 
 /*
  * Traverses all of the descendant nodes of `origin`, including `origin` itself,
- * and passes each traversed node as a pointer to `op` and `stop_condition`
- * until `stop_condition` returns `true` or all the nodes in the lineage of
- * `origin` are contacted.
+ * and passes `tree` and each traversed node as a pointer to `op` and
+ * `stop_condition` until `stop_condition` returns `true` or all the nodes in
+ * the lineage of `origin` are contacted.
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
