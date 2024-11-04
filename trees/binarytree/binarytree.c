@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 /*
@@ -21,7 +22,7 @@ typedef unsigned char byte;
 binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
                               const size_t num_elems) {
   binary_tree *tree;
-  const size_t NODE_ALIGNMENT_OVERHEAD = elem_size % alignof(node_bt);
+  const size_t NODE_ALIGNMENT_OVERHEAD = (elem_size * num_elems) % alignof(node_bt);
   /*
    * This region is enclosed in its own block to avoid autocomplete pollution
    * later during tree construction.
@@ -133,8 +134,7 @@ size_t get_depth(const node_bt *const origin) {
  * traversed.
  */
 static void *count_node(void *tree_and_cur_node) {
-  const node_bt *const cur_node =
-      (void *)((binary_tree *)tree_and_cur_node + 1);
+  const node_bt *const cur_node = *(node_bt **)tree_and_cur_node;
   static size_t count = 0;
   count++;
   /*
@@ -171,7 +171,7 @@ static void *mark_node_as_unalloc(void *tree_and_cur_node) {
   static size_t unalloc_count = 0;
 
   binary_tree *tree = tree_and_cur_node;
-  node_bt *target_node = (void *)((binary_tree *)tree_and_cur_node + 1);
+  node_bt *target_node = *(node_bt **)tree_and_cur_node;
   /*
    * Like with `count_node()`, since `traverse_from()` will not return `NULL`
    * (`delete_node()` passes a tree and an origin node to `traverse_from()`), we
@@ -273,11 +273,17 @@ void *traverse_from(binary_tree *tree, node_bt *const origin,
       TRAVERSAL_STACK_MAJOR_USAGE_PERCENT * divergent_nodes->capacity;
 
   byte arg_buf[sizeof(binary_tree *) + sizeof(node_bt *)];
-  /* Denotes the position in `arg_buf` where `tree` will be written. */
-  binary_tree **const arg_buf_pos_tree = (void *)arg_buf;
-  /* Denotes the position in `arg_buf` where `cur_node` will be written. */
-  node_bt **const arg_buf_pos_cur_node =
-      (void *)(arg_buf + sizeof(binary_tree *));
+  /*
+   * Denotes the position in `arg_buf` where the pointer, `cur_node`, will be
+   * written. This will be the first value in the passed array.
+   */
+  node_bt **const arg_buf_pos_cur_node = (void *)(arg_buf);
+
+  /* 
+   * Denotes the position in `arg_buf` where the pointer, `tree`, will be
+   * written. This will be the second value in the passed array.
+   */
+  binary_tree **const arg_buf_pos_tree = (void *)(arg_buf + sizeof(node_bt *));
   /* `tree` should be a constant value, so we assign it here. */
   *arg_buf_pos_tree = tree;
 
@@ -365,7 +371,7 @@ node_bt *get_unalloc_node(binary_tree *const tree) {
 
 /* Helper function used by `find_open_descendant()`. */
 static bool node_has_open_child(void *const tree_and_node) {
-  const node_bt *const node = *(node_bt **)((binary_tree *)tree_and_node + 1);
+  const node_bt *const node = *(node_bt **)tree_and_node;
   return node->left == NULL || node->right == NULL;
 }
 
@@ -375,7 +381,7 @@ static bool node_has_open_child(void *const tree_and_node) {
  * \returns A pointer to a pointer to an open child node.
  */
 static void *ret_node_with_open_child(void *const tree_and_node) {
-  node_bt *const candidate = *(node_bt **)((binary_tree *)tree_and_node + 1);
+  node_bt *const candidate = *(node_bt **)tree_and_node;
   if (node_has_open_child(candidate)) return candidate;
   return NULL;
 }
@@ -498,9 +504,8 @@ node_bt *new_bt_node(const void *value, size_t value_size) {
   return new_node;
 }
 
-#include <stdio.h>
-static void *print_node(void *tree_and_node) {
-  const node_bt *const node = *(node_bt **)((byte_t *)tree_and_node + sizeof(binary_tree *));
+static void *print_node(void *const tree_and_node) {
+  const node_bt *const node = *(node_bt **)tree_and_node;
   printf("%d\n", *(int *)node->value);
   return NULL;
 }
@@ -508,9 +513,9 @@ static void *print_node(void *tree_and_node) {
 #include <time.h>
 
 int main(void) {
-  int data[0xffff];
+  int data[0x10000];
   srand(time(NULL));
-  for (size_t i = 0; i < 0xffff; i++) {
+  for (size_t i = 0; i < 0x10000; i++) {
     data[i] = i;
   }
   binary_tree *tree = new_binary_tree(data);
