@@ -7,14 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef unsigned char byte;
+
 /*
  * Stacks are used to track unallocated nodes in trees and in
  * `traverse_from()` to avoid the usage of recursion.
  */
 #include "../../stack/stack.h"
 #include "../trees.h"
-
-typedef unsigned char byte;
 
 /* Reallocation factor used by `expand_binary_tree()`. */
 #define BT_REALLOC_FACTOR (2)
@@ -46,15 +46,16 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
    * The nodes will be stored directly after the region of memory dedictaed to
    * storing each node's values.
    * Originally, the nodes were stored after the tree header and the values
-   * stored after the nodes, but it is actually easier to have the values stored
-   * before the nodes when adding nodes to a tree.
+   * stored after the nodes, but it is actually easier to have the values
+   * stored before the nodes when adding nodes to a tree.
    */
   node_bt *const nodes_region_start =
       (void *)(values_region_start + num_elems * elem_size +
                NODE_ALIGNMENT_OVERHEAD);
   for (size_t i = 0; i < num_elems; i++) {
     node_bt *const cur_node = nodes_region_start + i;
-    byte *const cur_node_value = values_region_start + i * elem_size;
+    const size_t value_offset = i * elem_size;
+    byte *const cur_node_value = values_region_start + value_offset;
     node_bt *parent_node;
     /* The root node has no parent. */
     if (i == 0)
@@ -68,7 +69,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
         parent_node->right = cur_node;
     }
     memcpy(cur_node_value, (byte *)data + i * elem_size, elem_size);
-    cur_node->value = cur_node_value;
+    cur_node->value_offset = value_offset;
     cur_node->parent = parent_node;
     /* Each new node should have no children from the outset. */
     cur_node->left = cur_node->right = NULL;
@@ -340,15 +341,22 @@ void *traverse_from(binary_tree *tree, node_bt *const origin,
 }
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
-binary_tree *resize_tree(binary_tree *const tree, const size_t new_size) {
-  binary_tree *const new_tree = realloc(tree, new_size);
-  if (new_tree == NULL) return NULL;
-  if (new_size < new_tree->used_allocation) {
-    new_tree->used_allocation = new_size;
+binary_tree *resize_tree(binary_tree *tree, size_t new_size) {
+  {
+    const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
+    const size_t SIZE_DIFF = new_size % NODE_SIZE;
+    if (SIZE_DIFF != 0)
+      new_size += NODE_SIZE - SIZE_DIFF;
   }
-  new_tree->allocation = new_size;
+  if (new_size < tree->used_allocation) {
+    const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
+    tree->used_allocation = new_size;
+  }
+  tree = realloc(tree, new_size);
+  if (tree == NULL) return NULL;
+  tree->allocation = new_size;
 
-  return new_tree;
+  return tree;
 }
 
 /* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
@@ -390,6 +398,10 @@ static void *ret_node_with_open_child(void *const tree_and_node) {
 node_bt *find_open_descendant(node_bt *const origin) {
   return traverse_from(NULL, origin, ret_node_with_open_child,
                        node_has_open_child);
+}
+
+void *get_node_value(node_bt *const node) {
+  return 
 }
 
 /*
@@ -460,7 +472,7 @@ node_bt **get_open_child_in_node(node_bt *const node) {
 static void *make_room_for_new_value(binary_tree *const tree) {
   const size_t NUM_NODES = get_num_nodes_in_tree(tree);
   /* Increment past the tree header, then increment past the nodes. */
-  void *const NODES_BEGIN = (byte_t *)(tree + 1) + NUM_NODES * tree->value_size;
+  void *const NODES_BEGIN = (byte *)(tree + 1) + NUM_NODES * tree->value_size;
   size_t SHIFT_MAGNITUDE = tree->value_size * alignof(node_bt) + 1;
   if (tree->align_size != 0) {
     const size_t diff = tree->value_size % alignof(node_bt);
@@ -468,7 +480,7 @@ static void *make_room_for_new_value(binary_tree *const tree) {
         (tree->align_size + diff) / alignof(node_bt) * alignof(node_bt);
   }
 
-  void *const NEW_NODES_BEGIN = (byte_t *)NODES_BEGIN + SHIFT_MAGNITUDE;
+  void *const NEW_NODES_BEGIN = (byte *)NODES_BEGIN + SHIFT_MAGNITUDE;
   /*
    * The number of values should correspond to the number of nodes, hence why
    * the length argument is `NUM_NODES`.
@@ -480,14 +492,14 @@ static void *make_room_for_new_value(binary_tree *const tree) {
 static void *get_end_of_values_region(binary_tree *const tree) {
   const size_t NUM_NODES = get_num_nodes_in_tree(tree);
   const size_t VALUES_ALLOC = tree->value_size * NUM_NODES;
-  return (byte_t *)(tree + 1) + VALUES_ALLOC;
+  return (byte *)(tree + 1) + VALUES_ALLOC;
 }
 
 static node_bt *get_end_of_nodes_region(binary_tree *const tree) {
   const size_t NUM_NODES = get_num_nodes_in_tree(tree);
   const size_t NODES_ALLOC = sizeof(node_bt) * NUM_NODES;
   const void *const VALUES_REGION_END = get_end_of_values_region(tree);
-  return (void *)((byte_t *)VALUES_REGION_END + tree->align_size + NODES_ALLOC);
+  return (void *)((byte *)VALUES_REGION_END + tree->align_size + NODES_ALLOC);
 }
 
 static void incorporate_node(binary_tree *const tree, node_bt *const node) {
@@ -540,9 +552,8 @@ static void *print_node(void *const tree_and_node) {
 int main(void) {
   int data[0x1000];
   srand(time(NULL));
-  for (size_t i = 0; i < 0x1000; i++) {
-    data[i] = i;
-  }
+  for (size_t i = 0; i < 0x1000; i++) data[i] = i;
+
   binary_tree *tree = new_binary_tree(data);
   node_bt *random_node = new_bt_node(data + 1, sizeof(*data));
   tree = add_freestanding_node(tree, &random_node);

@@ -34,7 +34,7 @@ static double TRAVERSAL_STACK_MAJOR_USAGE_PERCENT = .8;
 
 /* `node_bt` stands for node_binary_tree. */
 typedef struct node_bt {
-  void *value;
+  size_t value_offset;
   struct node_bt *parent;
   struct node_bt *left, *right;
 } node_bt;
