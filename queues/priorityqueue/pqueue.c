@@ -9,38 +9,53 @@
 typedef unsigned char byte;
 
 /*
- * This defines what percentage of the queue's memory will be allocated as a
- * buffer to efficiently handle enqueued values with high priority.
+ * This defines a percentage of required queue members (from the total) to be
+ * added as extraneous members to facilitate the efficient enqueuing of members
+ * with high priority.
  */
-#define P_QUEUE_RESERVE_PERCENT (.2)
+#define PERCENT_RESERVED_MEMBERS (0)
 
-priority_queue *_new_p_queue(const void *const data, const size_t num_elems,
+static priority_queue *instantiate_p_queue(const size_t num_members,
+                                           const size_t value_size,
+                                           const size_t num_reserve_members) {
+  const size_t TOTAL_MEMBERS = num_members + num_reserve_members;
+
+  const size_t VALUES_ALLOC = TOTAL_MEMBERS * value_size;
+  const size_t MEMBERS_ALLOC = TOTAL_MEMBERS * sizeof(p_queue_member);
+  /* This is only used to calculate the used allocation. */
+  const size_t RESERVED_ALLOC = num_reserve_members * (sizeof(p_queue_member) + value_size);
+
+  const size_t ALIGNMENT_DIFF = VALUES_ALLOC % alignof(p_queue_member);
+  const size_t PADDING_BYTES =
+      (ALIGNMENT_DIFF != 0) ? (alignof(p_queue_member) - ALIGNMENT_DIFF) : (0);
+
+  const size_t TOTAL_ALLOC =
+      MEMBERS_ALLOC + VALUES_ALLOC + PADDING_BYTES + sizeof(priority_queue);
+  priority_queue *const queue = malloc(TOTAL_ALLOC);
+  if (queue == NULL) return NULL;
+
+  /* The values will be stored directly after the queue header. */
+  queue->values = queue + 1;
+  /*
+   * The members will be stored directly after the values, which may require
+   * padding to avoid misalignment.
+   */
+  queue->members =
+      (void *)((byte *)queue->values + VALUES_ALLOC + PADDING_BYTES);
+  queue->value_size = value_size;
+  queue->allocation = TOTAL_ALLOC;
+  queue->used_allocation =
+      TOTAL_ALLOC - RESERVED_ALLOC - PADDING_BYTES + sizeof(priority_queue);
+  queue->padding_bytes = PADDING_BYTES;
+
+  return queue;
+}
+
+priority_queue *_new_p_queue(const void *const data, const size_t num_values,
                              const size_t value_size) {
-  priority_queue *queue;
-  {
-    const size_t VALUES_ALLOC = num_elems * value_size;
-    const size_t MEMBERS_ALLOC = num_elems * sizeof(p_queue_member);
-    const size_t RESERVE_ALLOC = P_QUEUE_RESERVE_PERCENT * VALUES_ALLOC;
-    const size_t PADDING_BYTES =
-        alignof(p_queue_member) - ((VALUES_ALLOC) % alignof(p_queue_member));
-    const size_t TOTAL_ALLOC = MEMBERS_ALLOC + VALUES_ALLOC + RESERVE_ALLOC +
-                               PADDING_BYTES + sizeof(priority_queue);
-    queue = malloc(TOTAL_ALLOC);
-    if (queue == NULL) return NULL;
-
-    /* The values will be stored directly after the queue header. */
-    queue->values = queue + 1;
-    /*
-     * The members will be stored directly after the values, which may require
-     * padding to avoid memory alignment issues.
-     */
-    queue->members =
-        (void *)((byte *)queue->values + VALUES_ALLOC + PADDING_BYTES);
-    queue->value_size = value_size;
-    queue->allocation = TOTAL_ALLOC;
-    queue->used_allocation = queue->allocation;
-    queue->padding_bytes = PADDING_BYTES;
-  }
+  const size_t RESERVED_MEMBERS = PERCENT_RESERVED_MEMBERS * num_values;
+  priority_queue *queue =
+      instantiate_p_queue(num_values, value_size, RESERVED_MEMBERS);
 
   void *const values = queue->values;
   p_queue_member *const members = queue->members;
@@ -49,18 +64,22 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_elems,
 }
 
 size_t p_queue_get_length(const priority_queue *const queue) {
-  return (queue->used_allocation - sizeof(priority_queue)) / queue->value_size;
+  const size_t MEMBERS_ALLOC = queue->used_allocation - sizeof(priority_queue);
+  const size_t TOTAL_MEMBER_SIZE = queue->value_size + sizeof(p_queue_member);
+  return MEMBERS_ALLOC / TOTAL_MEMBER_SIZE;
 }
 
 size_t p_queue_get_capacity(const priority_queue *const queue) {
-  const size_t QUEUE_VALUE_ALLOC =
-      queue->allocation - queue->used_allocation - sizeof(priority_queue);
-  return QUEUE_VALUE_ALLOC / queue->value_size;
+  const size_t NOT_MEMBERS_ALLOC = queue->allocation - queue->used_allocation;
+  const size_t TOTAL_MEMBER_SIZE = queue->value_size + sizeof(p_queue_member);
+  return NOT_MEMBERS_ALLOC / TOTAL_MEMBER_SIZE;
 }
 
 int main(void) {
-  char data[] = {1, 2, 3};
+  int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   priority_queue *a = new_p_queue(data);
-  printf("%zu", p_queue_get_length(a));
+  printf("%zu %zu\n", a->allocation, a->used_allocation);
+  printf("%zu\n", p_queue_get_length(a));
+  printf("%zu", p_queue_get_capacity(a));
   return 0;
 }
