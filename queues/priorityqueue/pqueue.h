@@ -10,7 +10,7 @@
 typedef enum {
   HIGH = 0,
   MEDIUM = 1,
-  LOW = 2
+  LOW = 2,
 } BASE_PRIORITY_LEVELS;
 
 typedef struct {
@@ -19,8 +19,8 @@ typedef struct {
 } p_queue_member;
 
 typedef struct {
-  void *values;
-  p_queue_member *members;
+  void *values_begin;
+  p_queue_member *members_begin;
   size_t value_size;
   size_t allocation;
   size_t used_allocation;
