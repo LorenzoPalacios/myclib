@@ -14,13 +14,11 @@ typedef enum {
 } BASE_PRIORITY_LEVELS;
 
 typedef struct {
-  size_t value_access_offset;
+  size_t values_offset;
   size_t priority;
 } p_queue_member;
 
 typedef struct {
-  void *begin_values;
-  p_queue_member *begin_members;
   size_t member_front_index;
   size_t member_back_index;
   size_t value_size;

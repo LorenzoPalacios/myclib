@@ -33,28 +33,28 @@ static inline size_t get_member_value_pair_size(const priority_queue *queue) {
   return queue->value_size + sizeof(p_queue_member);
 }
 
-/*
- * This function structures the memory of `queue` according to its allocation.
- */
-static void configure_queue_mem(priority_queue *const queue) {
+static inline byte *get_values_region(priority_queue *const queue) {
+  return (void *)(queue + 1);
+}
+
+static inline size_t current_padding_bytes(priority_queue *const queue) {
+  const size_t MEMBER_AND_VALUE_SIZE = get_member_value_pair_size(queue);
+  const size_t NUM_MEMBERS = queue->allocation / MEMBER_AND_VALUE_SIZE;
+  const size_t VALUES_ALLOC = NUM_MEMBERS * queue->value_size;
+  return calc_padding_bytes(VALUES_ALLOC);
+}
+
+static inline p_queue_member *get_members_region(priority_queue *const queue) {
   const size_t ALLOC = queue->allocation;
   const size_t VALUE_SIZE = queue->value_size;
-  const size_t MEMBER_VALUE_SIZE = get_member_value_pair_size(queue);
-  const size_t NUM_MEMBERS = ALLOC / MEMBER_VALUE_SIZE;
+  const size_t MEMBER_AND_VALUE_SIZE = get_member_value_pair_size(queue);
+  const size_t NUM_MEMBERS = ALLOC / MEMBER_AND_VALUE_SIZE;
 
-  const size_t VALUE_ALLOC = NUM_MEMBERS * VALUE_SIZE;
-  const size_t PADDING_BYTES = calc_padding_bytes(VALUE_ALLOC);
-
-  /* The values will be stored directly after the queue header. */
-  queue->begin_values = queue + 1;
-  const byte *const end_values =
-      (byte *)queue->begin_values + NUM_MEMBERS * VALUE_SIZE;
-
-  /*
-   * The members will be stored directly after the values, which may require
-   * padding to avoid misalignment.
-   */
-  queue->begin_members = (void *)(end_values + PADDING_BYTES);
+  const size_t VALUES_ALLOC = NUM_MEMBERS * VALUE_SIZE;
+  byte *const values_end = get_values_region(queue) + NUM_MEMBERS * VALUE_SIZE;
+  printf("%lld", values_end - get_values_region(queue));
+  exit(0);
+  return (void *)(values_end + calc_padding_bytes(VALUES_ALLOC));
 }
 
 static priority_queue *instantiate_p_queue(const size_t num_members,
@@ -64,10 +64,6 @@ static priority_queue *instantiate_p_queue(const size_t num_members,
 
   const size_t VALUES_ALLOC = TOTAL_MEMBERS * value_size;
   const size_t MEMBERS_ALLOC = TOTAL_MEMBERS * sizeof(p_queue_member);
-  /* This is only used to calculate the used allocation. */
-  const size_t RESERVED_ALLOC =
-      num_reserve_members * (sizeof(p_queue_member) + value_size);
-
   const size_t PADDING_BYTES = calc_padding_bytes(VALUES_ALLOC);
 
   const size_t TOTAL_ALLOC =
@@ -77,16 +73,19 @@ static priority_queue *instantiate_p_queue(const size_t num_members,
   queue->member_front_index = 0;
   queue->member_back_index = 0;
   queue->value_size = value_size;
-  queue->allocation = TOTAL_ALLOC;
-
-  configure_queue_mem(queue);
+  /*
+   * It's generally more helpful to keep track of the memory used by queue
+   * values and members than it is to keep track of the memory every component
+   * (such as the queue header) uses.
+   */
+  queue->allocation = VALUES_ALLOC + MEMBERS_ALLOC;
 
   return queue;
 }
 
 static inline void *get_member_value(priority_queue *const queue,
                                      const p_queue_member *const member) {
-  return (byte *)queue->begin_values + member->value_access_offset;
+  return get_values_region(queue) + member->values_offset;
 }
 
 priority_queue *_new_p_queue(const void *const data, const size_t num_values,
@@ -95,24 +94,25 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
   priority_queue *const queue =
       instantiate_p_queue(num_values, value_size, RESERVED_MEMBERS);
 
+  p_queue_member *const members = get_members_region(queue);
   /*
    * Reserved members should not be written to during initialization, so we skip
    * over them.
    */
-  p_queue_member *const non_reserve_members =
-      queue->begin_members + RESERVED_MEMBERS;
+  p_queue_member *const non_reserve_members = members + RESERVED_MEMBERS;
 
   for (size_t i = 0; i < num_values; i++) {
     p_queue_member *const cur_member = non_reserve_members + i;
     const size_t val_offset = i * value_size;
     cur_member->priority = MEDIUM;
-    cur_member->value_access_offset = val_offset;
+    cur_member->values_offset = val_offset;
 
     void *const cur_member_val = get_member_value(queue, cur_member);
     memcpy(cur_member_val, (byte *)data + i * value_size, value_size);
   }
-  queue->member_front_index = non_reserve_members - queue->begin_members;
-  queue->member_back_index = queue->member_front_index + num_values;
+  queue->member_front_index = non_reserve_members - members;
+  /* Subtract `1` since `num_values` is the length of an array. */
+  queue->member_back_index = queue->member_front_index + num_values - 1;
 
   return queue;
 }
@@ -136,20 +136,22 @@ size_t p_queue_get_capacity(const priority_queue *const queue) {
 
 void *p_queue_front(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
-  return get_member_value(queue,
-                          queue->begin_members + queue->member_front_index);
+  p_queue_member *const members = get_members_region(queue);
+  p_queue_member *const front = members + queue->member_front_index;
+  return get_member_value(queue, front);
 }
 
 void *p_queue_back(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
-  return get_member_value(queue,
-                          queue->begin_members + queue->member_back_index);
+  p_queue_member *const members = get_members_region(queue);
+  return get_member_value(queue, members + queue->member_back_index);
 }
 
 void *p_queue_dequeue(priority_queue *const queue) {
+  printf("len: %zu\n", p_queue_get_length(queue));
+
   if (p_queue_get_length(queue) == 0) return NULL;
   void *const value = p_queue_front(queue);
-  printf("front: %zu\n", queue->member_front_index);
   queue->member_front_index++;
   return value;
 }
@@ -169,8 +171,6 @@ priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
 
   queue->allocation = new_size;
 
-  configure_queue_mem(queue);
-
   return queue;
 }
 
@@ -178,9 +178,9 @@ int main(void) {
   const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   priority_queue *a = new_p_queue(data);
   a = p_queue_resize(a, a->allocation * 1.5);
-  void *item = p_queue_dequeue(a);
+  const void *item = p_queue_dequeue(a);
   while (item) {
-    printf("%d ", *(int *)item);
+    printf("value: %d\n", *(int *)item);
     item = p_queue_dequeue(a);
   }
 
