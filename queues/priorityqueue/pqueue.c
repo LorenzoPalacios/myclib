@@ -46,8 +46,8 @@ static priority_queue *instantiate_p_queue(const size_t num_members,
    */
   queue->begin_members =
       (void *)((byte *)queue->begin_values + VALUES_ALLOC + PADDING_BYTES);
-  queue->front_offset = 0;
-  queue->back_offset = 0;
+  queue->front_index = 0;
+  queue->back_index = 0;
   queue->value_size = value_size;
   queue->allocation = TOTAL_ALLOC;
   queue->used_allocation = TOTAL_ALLOC - RESERVED_ALLOC - PADDING_BYTES;
@@ -58,6 +58,8 @@ static priority_queue *instantiate_p_queue(const size_t num_members,
 
 static inline void *get_member_value(priority_queue *const queue,
                                      const p_queue_member *const member) {
+  printf("alloc: %zu | begin_values: %lld | offset: %zu\n", queue->allocation,
+         queue->begin_values, member->value_access_offset);
   return (byte *)queue->begin_values + member->value_access_offset;
 }
 
@@ -80,19 +82,20 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
    * Reserved members should not be written to during initialization, so we skip
    * over them.
    */
-  p_queue_member *const non_reserve_members = queue->begin_members + RESERVED_MEMBERS;
+  p_queue_member *const non_reserve_members =
+      queue->begin_members + RESERVED_MEMBERS;
 
   for (size_t i = 0; i < num_values; i++) {
     p_queue_member *const cur_member = non_reserve_members + i;
-    const size_t offset = i * value_size;
+    const size_t val_offset = i * value_size;
     cur_member->priority = MEDIUM;
-    cur_member->value_access_offset = offset;
+    cur_member->value_access_offset = val_offset;
 
     void *const cur_member_val = get_member_value(queue, cur_member);
     memcpy(cur_member_val, (byte *)data + i * value_size, value_size);
   }
-  queue->front_offset = non_reserve_members - queue->begin_members;
-  queue->back_offset = queue->front_offset + num_values;
+  queue->front_index = non_reserve_members - queue->begin_members;
+  queue->back_index = queue->front_index + num_values;
 
   return queue;
 }
@@ -111,19 +114,20 @@ size_t p_queue_get_capacity(const priority_queue *const queue) {
 
 void *p_queue_front(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
-  return get_member_value(queue, queue->begin_members + queue->front_offset);
+  return get_member_value(queue, queue->begin_members + queue->front_index);
 }
 
 void *p_queue_back(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
-  return get_member_value(queue, queue->begin_members + queue->back_offset);
+  return get_member_value(queue, queue->begin_members + queue->back_index);
 }
 
 void *p_queue_dequeue(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
   void *const value = p_queue_front(queue);
   queue->used_allocation -= get_overall_member_size(queue);
-  queue->front_offset += sizeof(p_queue_member);
+  printf("front: %zu\n", queue->front_index);
+  queue->front_index++;
   return value;
 }
 
@@ -131,13 +135,24 @@ static inline size_t get_members_extent(priority_queue *queue) {
   return p_queue_get_length(queue) + p_queue_get_capacity(queue);
 }
 
-priority_queue *p_queue_resize(priority_queue *queue, const size_t new_size) {
-  size_t PADDING_BYTES = 0;
+priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
+  if (new_size == queue->allocation) return queue;
+  if (new_size < sizeof(priority_queue)) new_size = sizeof(priority_queue);
+
+  const long double size_ratio = (long double)new_size / queue->allocation;
+
+  const size_t NUM_MEMBERS = get_members_extent(queue) * size_ratio;
+
+  const size_t NEW_VALUES_ALLOC = NUM_MEMBERS * queue->value_size;
+  printf("%zu\n", NEW_VALUES_ALLOC);
+
+  printf("num members: %zu\n", NUM_MEMBERS);
+  size_t PADDING_BYTES = calc_member_padding(NEW_VALUES_ALLOC);
+  printf("%zu", PADDING_BYTES);
+  exit(0);
 
   if (queue->allocation < new_size) {
     PADDING_BYTES = calc_member_padding(new_size);
-    printf("%lld", (byte *)p_queue_back(queue) - (byte *)queue + new_size);
-    exit(0);
   }
 
   queue = realloc(queue, new_size + PADDING_BYTES);
@@ -149,19 +164,19 @@ priority_queue *p_queue_resize(priority_queue *queue, const size_t new_size) {
   queue->begin_members =
       (void *)((byte *)queue->begin_values +
                queue->value_size * get_members_extent(queue) + PADDING_BYTES);
-  
+
   return queue;
 }
 
 int main(void) {
   const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   priority_queue *a = new_p_queue(data);
-  a = p_queue_resize(a, a->allocation);
-
+  a = p_queue_resize(a, a->allocation * 1.414);
   void *item = p_queue_dequeue(a);
   while (item) {
     printf("%d ", *(int *)item);
     item = p_queue_dequeue(a);
   }
+
   return 0;
 }

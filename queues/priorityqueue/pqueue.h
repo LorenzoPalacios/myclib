@@ -5,7 +5,7 @@
 
 /*
  * Actual priority levels are not required to use these values, but should
- * be taken as a suggestion for what priority values should look like.
+ * be taken as a suggestion for how priorities are interpreted by the library.
  */
 typedef enum {
   HIGH = 0,
@@ -21,8 +21,8 @@ typedef struct {
 typedef struct {
   void *begin_values;
   p_queue_member *begin_members;
-  size_t front_offset;
-  size_t back_offset;
+  size_t front_index;
+  size_t back_index;
   size_t value_size;
   size_t allocation;
   size_t used_allocation;
