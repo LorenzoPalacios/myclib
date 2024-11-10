@@ -21,8 +21,8 @@ typedef struct {
 typedef struct {
   void *begin_values;
   p_queue_member *begin_members;
-  p_queue_member *front;
-  p_queue_member *back;
+  size_t front_offset;
+  size_t back_offset;
   size_t value_size;
   size_t allocation;
   size_t used_allocation;
