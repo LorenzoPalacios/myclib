@@ -21,12 +21,10 @@ typedef struct {
 typedef struct {
   void *begin_values;
   p_queue_member *begin_members;
-  size_t front_index;
-  size_t back_index;
+  size_t member_front_index;
+  size_t member_back_index;
   size_t value_size;
   size_t allocation;
-  size_t used_allocation;
-  size_t padding_bytes;
 } priority_queue;
 
 #define new_p_queue(data) \
