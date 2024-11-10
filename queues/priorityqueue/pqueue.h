@@ -19,8 +19,10 @@ typedef struct {
 } p_queue_member;
 
 typedef struct {
-  void *values_begin;
-  p_queue_member *members_begin;
+  void *begin_values;
+  p_queue_member *begin_members;
+  p_queue_member *front;
+  p_queue_member *back;
   size_t value_size;
   size_t allocation;
   size_t used_allocation;
