@@ -19,12 +19,11 @@ typedef struct {
 } p_queue_member;
 
 typedef struct {
-  size_t member_front_index;
-  size_t member_back_index;
+  size_t front_index;
+  size_t back_index;
   size_t value_size;
   size_t data_allocation;
 } priority_queue;
-
 
 /* - Queue Creation and Deletion - */
 

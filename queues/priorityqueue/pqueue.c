@@ -26,8 +26,8 @@ priority_queue *instantiate_p_queue(const size_t num_members,
       MEMBERS_ALLOC + VALUES_ALLOC + PADDING_BYTES + sizeof(priority_queue);
   priority_queue *const queue = malloc(TOTAL_ALLOC);
   if (queue == NULL) return NULL;
-  queue->member_front_index = 0;
-  queue->member_back_index = 0;
+  queue->front_index = 0;
+  queue->back_index = 0;
   queue->value_size = value_size;
   /*
    * It's generally more helpful to keep track of the memory used by queue
@@ -96,7 +96,7 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
    * This defines a percentage of extraneous members to be added to facilitate
    * the efficient enqueuing of members with high priority.
    */
-  static const double PERCENT_RESERVED_MEMBERS = (.25);
+  static const double PERCENT_RESERVED_MEMBERS = (0.25);
 
   const size_t RESERVED_MEMBERS = PERCENT_RESERVED_MEMBERS * num_values;
   priority_queue *const queue =
@@ -116,7 +116,7 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
    * should not be written to during initialization, so we skip over them.
    */
   size_t data_i = 0;
-  size_t members_i = RESERVED_MEMBERS / 2 + 1;
+  size_t members_i = queue->front_index = RESERVED_MEMBERS / 2;
   while (data_i < num_values) {
     p_queue_member *const cur_member = members + members_i;
     cur_member->priority = MEDIUM;
@@ -126,9 +126,7 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
     data_i++;
     members_i++;
   }
-  queue->member_front_index = RESERVED_MEMBERS;
-  /* Subtract `1` since `num_values` is the length of an array. */
-  queue->member_back_index = queue->member_front_index + num_values;
+  queue->back_index = queue->front_index + num_values;
 
   return queue;
 }
@@ -141,7 +139,7 @@ size_t p_queue_get_used_alloc(const priority_queue *const queue) {
 }
 
 size_t p_queue_get_length(const priority_queue *const queue) {
-  return queue->member_back_index - queue->member_front_index;
+  return queue->back_index - queue->front_index;
 }
 
 size_t p_queue_get_capacity(const priority_queue *const queue) {
@@ -154,20 +152,20 @@ size_t p_queue_get_capacity(const priority_queue *const queue) {
 void *p_queue_front(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
   p_queue_member *const members = get_members_region(queue);
-  p_queue_member *const front = members + queue->member_front_index;
+  p_queue_member *const front = members + queue->front_index;
   return get_member_value(queue, front);
 }
 
 void *p_queue_back(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
   p_queue_member *const members = get_members_region(queue);
-  return get_member_value(queue, members + queue->member_back_index);
+  return get_member_value(queue, members + queue->back_index);
 }
 
 void *p_queue_dequeue(priority_queue *const queue) {
   if (p_queue_get_length(queue) == 0) return NULL;
   void *const value = p_queue_front(queue);
-  queue->member_front_index++;
+  queue->front_index++;
   return value;
 }
 
@@ -175,16 +173,41 @@ priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
   if (new_size == queue->data_allocation) return queue;
   if (new_size < sizeof(priority_queue)) new_size += sizeof(priority_queue);
 
-  const double size_ratio = (double)new_size / queue->data_allocation;
+  const double SIZE_RATIO = (double)new_size / queue->data_allocation;
 
-  const size_t NEW_NUM_MEMBERS = size_ratio * get_num_members(queue);
-  const size_t NEW_VALUES_ALLOC = NEW_NUM_MEMBERS * queue->value_size;
+  const size_t VALUE_SIZE = queue->value_size;
+  const size_t LENGTH = p_queue_get_length(queue);
+  const size_t NEW_NUM_MEMBERS = SIZE_RATIO * get_num_members(queue);
+  const size_t NEW_VALUES_ALLOC = NEW_NUM_MEMBERS * VALUE_SIZE;
   const size_t NEW_PADDING_BYTES = calc_padding_bytes(NEW_VALUES_ALLOC);
 
   queue = realloc(queue, new_size + NEW_PADDING_BYTES);
   if (queue == NULL) return NULL;
 
+  if (new_size > queue->data_allocation) {
+    {
+      byte *const OLD_VALUES_START =
+          get_values_region(queue) + queue->front_index * VALUE_SIZE;
+      byte *const NEW_VALUES_START =
+          get_values_region(queue) +
+          (size_t)(SIZE_RATIO * queue->front_index * VALUE_SIZE);
+      memmove(NEW_VALUES_START, OLD_VALUES_START, LENGTH * VALUE_SIZE);
+    }
+
+    {
+      p_queue_member *const OLD_MEMBERS_START = get_members_region(queue) + queue->front_index;
+      p_queue_member *const NEW_MEMBERS_START = (OLD_MEMBERS_START - queue->front_index) + (size_t)(SIZE_RATIO * queue->front_index);
+      memmove(NEW_MEMBERS_START, OLD_MEMBERS_START,
+              LENGTH * sizeof(p_queue_member));
+    }
+  }
+
   queue->data_allocation = new_size;
+  queue->front_index *= SIZE_RATIO;
+  queue->back_index = queue->front_index + LENGTH;
+
+  printf("%zu", (get_members_region(queue) + queue->front_index)->values_offset);
+  exit(0);
 
   return queue;
 }
@@ -203,6 +226,7 @@ void _delete_p_queue_s(priority_queue **const queue) {
 int main(void) {
   const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   priority_queue *a = new_p_queue(data);
+  a = p_queue_resize(a, a->data_allocation * 2);
   const void *item = p_queue_dequeue(a);
   while (item) {
     printf("value: %d\n", *(int *)item);
