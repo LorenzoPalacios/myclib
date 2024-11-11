@@ -14,7 +14,6 @@ typedef enum {
 } BASE_PRIORITY_LEVELS;
 
 typedef struct {
-  size_t values_offset;
   size_t priority;
 } p_queue_member;
 
