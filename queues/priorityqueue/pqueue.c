@@ -13,7 +13,7 @@ static inline size_t calc_padding_bytes(const size_t alloc_size) {
   return (ALIGNMENT_DIFF != 0) ? (alignof(p_queue_member) - ALIGNMENT_DIFF) : 0;
 }
 
-priority_queue *instantiate_p_queue(const size_t num_members,
+static priority_queue *instantiate_p_queue(const size_t num_members,
                                     const size_t value_size,
                                     const size_t num_reserve_members) {
   const size_t TOTAL_MEMBERS = num_members + num_reserve_members;
@@ -103,13 +103,6 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
   priority_queue *const queue =
       instantiate_p_queue(num_values, value_size, RESERVED_MEMBERS);
 
-  printf("alloc: %zu\n", queue->data_allocation);
-  printf("padding: %zu\n", current_padding_bytes(queue));
-  printf("values alloc: %zu\n", get_values_alloc(queue));
-  printf("members alloc: %zu\n", get_members_alloc(queue));
-  printf("dist members to values: %lld\n",
-         (byte *)get_members_region(queue) - get_values_region(queue));
-
   p_queue_member *const members = get_members_region(queue);
 
   /*
@@ -132,10 +125,9 @@ priority_queue *_new_p_queue(const void *const data, const size_t num_values,
 }
 
 size_t p_queue_get_used_alloc(const priority_queue *const queue) {
-  const size_t ALLOC = queue->data_allocation;
-  const size_t MEMBER_SIZE = get_member_value_pair_size(queue);
+  const size_t MEMBER_VALUE_SIZE = get_member_value_pair_size(queue);
   const size_t LENGTH = p_queue_get_length(queue);
-  return ALLOC - LENGTH * MEMBER_SIZE;
+  return LENGTH * MEMBER_VALUE_SIZE;
 }
 
 size_t p_queue_get_length(const priority_queue *const queue) {
@@ -170,11 +162,26 @@ void *p_queue_dequeue(priority_queue *const queue) {
   return value;
 }
 
-priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
-  if (new_size == queue->data_allocation) return queue;
-  if (new_size < sizeof(priority_queue)) new_size += sizeof(priority_queue);
+/*
+ * Helper function used by `p_queue_resize()` to ensure all new sizes are
+ * efficient and comply with alignment.
+ */
+static inline size_t align_new_size(const priority_queue *const queue,
+                                    size_t new_size) {
+  const size_t MEMBER_VALUE_SIZE = get_member_value_pair_size(queue);
+  const size_t SIZE_DIFF = new_size % MEMBER_VALUE_SIZE;
+  if (SIZE_DIFF != 0) new_size += MEMBER_VALUE_SIZE - SIZE_DIFF;
+  return new_size;
+}
 
-  const double SIZE_RATIO = (double)new_size / queue->data_allocation;
+priority_queue *p_queue_resize(priority_queue *queue, const size_t new_size) {
+  if (new_size == queue->data_allocation) return queue;
+  if (new_size <= sizeof(priority_queue))
+    return realloc(queue, sizeof(priority_queue));
+
+  const size_t ALIGNED_SIZE = align_new_size(queue, new_size);
+
+  const double SIZE_RATIO = (double)ALIGNED_SIZE / queue->data_allocation;
 
   const size_t VALUE_SIZE = queue->value_size;
   const size_t OLD_NUM_MEMBERS = p_queue_get_length(queue);
@@ -182,10 +189,10 @@ priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
   const size_t NEW_VALUES_ALLOC = NEW_NUM_MEMBERS * VALUE_SIZE;
   const size_t NEW_PADDING_BYTES = calc_padding_bytes(NEW_VALUES_ALLOC);
 
-  queue = realloc(queue, new_size + NEW_PADDING_BYTES);
+  queue = realloc(queue, ALIGNED_SIZE + NEW_PADDING_BYTES);
   if (queue == NULL) return NULL;
 
-  if (new_size > queue->data_allocation) {
+  if (ALIGNED_SIZE > queue->data_allocation) {
     const size_t SHIFT_COUNT = (NEW_NUM_MEMBERS - OLD_NUM_MEMBERS) / 2;
     {
       byte *const OLD_VALUES_START =
@@ -199,7 +206,8 @@ priority_queue *p_queue_resize(priority_queue *queue, size_t new_size) {
       p_queue_member *const OLD_MEMBERS_START =
           get_members_region(queue) + queue->front_index;
       p_queue_member *const NEW_MEMBERS_START = OLD_MEMBERS_START + SHIFT_COUNT;
-      memmove(NEW_MEMBERS_START, OLD_MEMBERS_START, OLD_NUM_MEMBERS * sizeof(p_queue_member));
+      memmove(NEW_MEMBERS_START, OLD_MEMBERS_START,
+              OLD_NUM_MEMBERS * sizeof(p_queue_member));
     }
     queue->front_index += SHIFT_COUNT;
     queue->back_index += SHIFT_COUNT;
@@ -221,14 +229,27 @@ void _delete_p_queue_s(priority_queue **const queue) {
   _delete_p_queue(queue);
 }
 
+priority_queue *p_queue_expand(priority_queue *queue) {
+  queue = p_queue_resize(queue, queue->data_allocation * 2);
+  /* 
+   * If the first resize fails, assume it encountered an out-of-memory error, so
+   * instead request a smaller expansion for one extra member-value pair.
+   */
+  if (queue == NULL) {
+    const size_t MEMBER_VALUE_SIZE = get_member_value_pair_size(queue);
+    queue = p_queue_resize(queue, queue->data_allocation + MEMBER_VALUE_SIZE);
+  }
+  return queue;
+}
+
 int main(void) {
-  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
   priority_queue *a = new_p_queue(data);
-  a = p_queue_resize(a, a->data_allocation * 1.5);
-  const void *item = p_queue_dequeue(a);
-  while (item) {
+  a = p_queue_resize(a, a->data_allocation);
+  const size_t queue_length = p_queue_get_length(a);
+  for (size_t i = 0; i < queue_length; i++) {
+    const void *const item = p_queue_dequeue(a);
     printf("value: %d\n", *(int *)item);
-    item = p_queue_dequeue(a);
   }
   delete_p_queue(a);
 

@@ -36,9 +36,6 @@ typedef struct {
 priority_queue *_new_p_queue(const void *data, size_t num_elems,
                              size_t elem_size);
 
-priority_queue *instantiate_p_queue(size_t num_members, size_t value_size,
-                                    size_t num_reserve_members);
-
 void _delete_p_queue(priority_queue **queue);
 
 void _delete_p_queue_s(priority_queue **queue);
@@ -53,11 +50,11 @@ priority_queue *p_queue_enqueue(priority_queue *queue, const void *elem);
 
 void *p_queue_front(priority_queue *queue);
 
-/* \return the number of elements currently enqueued within `queue`. */
+/* \return The number of elements currently enqueued within `queue`. */
 size_t p_queue_get_length(const priority_queue *queue);
 
 /*
- * \return the maximum number of elements that can be held by `queue` before
+ * \return The maximum number of elements that can be held by `queue` before
  * expansion is necessary.
  */
 size_t p_queue_get_capacity(const priority_queue *queue);
@@ -68,6 +65,6 @@ priority_queue *p_queue_expand(priority_queue *queue);
 
 priority_queue *p_queue_resize(priority_queue *queue, size_t new_size);
 
-priority_queue *p_queue_shrink(priority_queue *queue);
+priority_queue *p_queue_shrink_to_fit(priority_queue *queue);
 
 #endif
