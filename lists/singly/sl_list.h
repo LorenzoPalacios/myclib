@@ -3,15 +3,18 @@
 
 #include <stddef.h>
 
-/* singly-linked list node (sll node) */
-typedef struct sll_node {
+
+
+/* singly-linked node (sl node) */
+typedef struct sl_node {
   size_t value_index;
   size_t next_node_index;
-} sll_node;
+} sl_node;
 
 /* singly-linked list (sl list) */
 typedef struct sl_list {
-  sll_node *start;
+  sl_node *start;
+  sl_node *end;
   size_t length;
   size_t data_allocation;
   size_t value_size;
@@ -43,6 +46,6 @@ sl_list *sll_add_value(sl_list *list, void *val);
  * \return A pointer to a singly linked list associated with the contents of
  * `list` or `NULL` upon failure.
  */
-sl_list *sll_add_node(sl_list list, sll_node *node);
+sl_list *sll_add_node(sl_list list, sl_node *node);
 
 #endif
