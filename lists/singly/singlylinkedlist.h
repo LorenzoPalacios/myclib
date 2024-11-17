@@ -3,20 +3,22 @@
 
 #include <stddef.h>
 
-typedef struct singly_linked_node {
-  void *value;
-  struct singly_linked_node *next;
-} s_linked_node;
+/* singly-linked list node (sll node) */
+typedef struct sll_node {
+  size_t value_index;
+  size_t next_node_index;
+} sll_node;
 
-typedef struct singly_linked_list {
-  s_linked_node *start_node;
-  s_linked_node *end_node;
-  size_t capacity;
-  size_t used_capacity;
-} s_linked_list;
+/* singly-linked list (sl list) */
+typedef struct sl_list {
+  sll_node *start;
+  sll_node *end;
+  size_t data_allocation;
+  size_t value_size;
+} sl_list;
 
-#define new_s_list(data) \
-  _new_s_list(data, sizeof(data) / sizeof *(data), sizeof *(data))
+#define new_sl_list(data) \
+  _new_sl_list(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
 /*
  * Creates a new singly linked list whose nodes contain values copied from the
@@ -25,15 +27,15 @@ typedef struct singly_linked_list {
  * \return A singly linked list whose nodes correspond to elements at `data` or
  * `NULL` upon failure.
  */
-s_linked_list *_new_s_list(const void *data, size_t num_elems,
-                           size_t elem_size);
+sl_list *_new_sl_list(const void *data, size_t num_elems, size_t elem_size);
 
-/* 
- * Appends `val` to `list` as a node, expanding `list` if necessary. 
- * 
- * \return A pointer to a singly linked list associated with the contents of `list` or `NULL` upon failure.
+/*
+ * Appends a new node containing `val` to `list`, expanding `list` if necessary.
+ *
+ * \return A pointer associated with the contents of `list` or `NULL` upon
+ * failure.
  */
-s_linked_list *add_val_as_node(s_linked_list *list, void *val);
+sl_list *sll_add_value(sl_list *list, void *val);
 
 /*
  * Appends `node` to `list`.
@@ -41,13 +43,13 @@ s_linked_list *add_val_as_node(s_linked_list *list, void *val);
  * \return A pointer to a singly linked list associated with the contents of
  * `list` or `NULL` upon failure.
  */
-s_linked_list *add_node(s_linked_list list, s_linked_node *node);
+sl_list *sll_add_node(sl_list list, sll_node *node);
 
 /*
  * Creates a new singly linked list with no nodes.
  *
  * \return An empty singly linked list or `NULL` upon failure.
  */
-s_linked_list *new_empty_s_list(size_t num_elems, size_t elem_size);
+sl_list *new_empty_sl_list(size_t num_nodes, size_t value_size);
 
 #endif
