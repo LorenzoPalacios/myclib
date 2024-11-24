@@ -184,26 +184,23 @@ sl_list *sl_list_resize(sl_list *list, const size_t new_size) {
   sl_node *const NEW_NODES_REGION = get_nodes(list);
   const size_t LENGTH = list->length;
   const size_t SHIFT_OFFSET = LENGTH * sizeof(sl_node);
-  memmove(OLD_NODES_REGION, NEW_NODES_REGION, SHIFT_OFFSET);
+  memmove(NEW_NODES_REGION, OLD_NODES_REGION, SHIFT_OFFSET);
 
   list->start = NEW_NODES_REGION;
   list->end = list->start + LENGTH;
   return list;
 }
 
-static void *print_index(sl_list *list, sl_node *cur_node) {
-  printf("(%d) index: %zu\n", *(int *)get_node_value(list, cur_node),
-         cur_node->next_node_index);
-  return NULL;
+static void *print_node(sl_list *list, sl_node *cur_node) {
+  printf("%zu\n", *(int *)get_node_value(list, cur_node));
+  return list;
 }
 
 int main(void) {
-  const int data[] = {1, 2};
+  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   sl_list *list = new_sl_list(data);
-  sl_list_traverse(list, print_index, NULL);
-  putchar('\n');
+  sl_list_traverse(list, print_node, NULL);
   list = sl_list_resize(list, list->data_allocation + 20);
-  printf("first node value: %d\n", *(int*)get_node_value(list, get_nodes(list)));
-  sl_list_traverse(list, print_index, NULL);
+  sl_list_traverse(list, print_node, NULL);
   return 0;
 }
