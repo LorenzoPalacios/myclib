@@ -2,7 +2,7 @@
 #define SINGLY_LINKED_LIST_H
 
 #include <stddef.h>
-
+#include "../../stack/stack.h"
 
 
 /* singly-linked node (sl node) */
@@ -15,6 +15,7 @@ typedef struct sl_node {
 typedef struct sl_list {
   sl_node *start;
   sl_node *end;
+  stack *deleted_nodes;
   size_t length;
   size_t data_allocation;
   size_t value_size;

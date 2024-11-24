@@ -134,80 +134,76 @@ sl_list *_new_sl_list(const void *const data, const size_t num_elems,
   return list;
 }
 
-static inline size_t bound_new_size(const sl_list *const list,
-                                    const size_t new_size) {
+static inline size_t sanitize_new_size(const sl_list *const list,
+                                       const size_t new_size) {
   const size_t PAIR_SIZE = node_value_pair_size(list);
   const size_t USED_LENGTH = list->length;
-  const size_t DATA_ALLOC_BOUND = PAIR_SIZE * USED_LENGTH;
-  if (new_size < DATA_ALLOC_BOUND) return DATA_ALLOC_BOUND;
-  return new_size;
+  const size_t SIZE_LOWER_BOUND = PAIR_SIZE * USED_LENGTH;
+  if (new_size < SIZE_LOWER_BOUND) return SIZE_LOWER_BOUND;
+  /*
+   * This ensures the new size will always be a multiple of `PAIR_SIZE`, which
+   * makes getting the padding byte allocation easier in later functions.
+   */
+  const size_t SANITIZED_NEW_SIZE = new_size / PAIR_SIZE * PAIR_SIZE;
+  return SANITIZED_NEW_SIZE;
 }
 
 static inline size_t align_new_size(const sl_list *const list,
                                     const size_t new_size) {
   const size_t PAIR_SIZE = node_value_pair_size(list);
   const size_t NEW_LIST_LENGTH = new_size / PAIR_SIZE;
-  const size_t EXTRANEOUS_MEM = new_size % PAIR_SIZE;
 
   const size_t VALUE_SIZE = list->value_size;
   const size_t NEW_VALUES_ALLOC = NEW_LIST_LENGTH * VALUE_SIZE;
 
   const size_t PADDING_BYTES = calc_padding_bytes(NEW_VALUES_ALLOC);
-  const size_t ALIGNED_SIZE = new_size + PADDING_BYTES - EXTRANEOUS_MEM;
+  const size_t ALIGNED_SIZE = NEW_LIST_LENGTH * PAIR_SIZE + PADDING_BYTES;
   return ALIGNED_SIZE;
 }
 
 sl_list *sl_list_resize(sl_list *list, const size_t new_size) {
-  const size_t BOUNDED_NEW_SIZE = bound_new_size(list, new_size);
-  const size_t ALIGNED_DATA_ALLOC = align_new_size(list, BOUNDED_NEW_SIZE);
-  const size_t PADDING_BYTES = ALIGNED_DATA_ALLOC - BOUNDED_NEW_SIZE;
+  const size_t BOUNDED_NEW_SIZE = sanitize_new_size(list, new_size);
+  const size_t ALIGNED_ALLOC = align_new_size(list, BOUNDED_NEW_SIZE);
+  const size_t PADDING_BYTES = ALIGNED_ALLOC - BOUNDED_NEW_SIZE;
+  const size_t DATA_ALLOC = ALIGNED_ALLOC - PADDING_BYTES;
   {
-    if (ALIGNED_DATA_ALLOC == list->data_allocation) return list;
+    if (DATA_ALLOC == list->data_allocation) return list;
     const size_t HEADER_SIZE = sizeof(sl_list);
-    const size_t TOTAL_NEW_ALLOC = HEADER_SIZE + ALIGNED_DATA_ALLOC;
+    const size_t TOTAL_NEW_ALLOC = HEADER_SIZE + ALIGNED_ALLOC;
     list = realloc(list, TOTAL_NEW_ALLOC);
     if (list == NULL) return NULL;
   }
-  const size_t OLD_LENGTH = sll_overall_length(list);
-  byte *const OLD_NODES_REGION = (byte *)get_nodes(list);
+  sl_node *const OLD_NODES_REGION = get_nodes(list);
 
-  /* 
+  /*
    * `data_allocation` should only track the amount of memory used by nodes and
    * values.
    */
-  list->data_allocation = ALIGNED_DATA_ALLOC - PADDING_BYTES;
+  list->data_allocation = DATA_ALLOC;
 
-  const size_t NEW_LENGTH = sll_overall_length(list);
-  byte *const NEW_NODES_REGION = (byte *)get_nodes(list);
+  sl_node *const NEW_NODES_REGION = get_nodes(list);
+  const size_t LENGTH = list->length;
+  const size_t SHIFT_OFFSET = LENGTH * sizeof(sl_node);
+  memmove(OLD_NODES_REGION, NEW_NODES_REGION, SHIFT_OFFSET);
 
-  const size_t VALUE_SIZE = list->value_size;
-  const size_t LEN_DIFF = (NEW_LENGTH > OLD_LENGTH) ? NEW_LENGTH - OLD_LENGTH
-                                                    : OLD_LENGTH - NEW_LENGTH;
-  const size_t SHIFT_OFFSET = LEN_DIFF * VALUE_SIZE + PADDING_BYTES;
-
-  const size_t SHIFT_OFFSET_2 = (NEW_NODES_REGION > OLD_NODES_REGION)
-                                    ? NEW_NODES_REGION - OLD_NODES_REGION
-                                    : OLD_NODES_REGION - NEW_NODES_REGION;
-  memmove(OLD_NODES_REGION, NEW_NODES_REGION, SHIFT_OFFSET_2);
-  printf("with length: %zu | with ptr: %zu\n", SHIFT_OFFSET, SHIFT_OFFSET_2);
-  //exit(0);
-
-  list->length = NEW_LENGTH;
-  list->start = (void *)NEW_NODES_REGION;
-  list->end = list->start + list->length;
+  list->start = NEW_NODES_REGION;
+  list->end = list->start + LENGTH;
   return list;
 }
 
-static void *print_node(sl_list *list, sl_node *cur_node) {
-  //const int *const val = get_node_value(list, cur_node);
-  printf("%zu ", cur_node->value_index);
+static void *print_index(sl_list *list, sl_node *cur_node) {
+  printf("(%d) index: %zu\n", *(int *)get_node_value(list, cur_node),
+         cur_node->next_node_index);
   return NULL;
 }
 
 int main(void) {
-  const int data[] = {1, 2, 3, 4, 5, 6, 7};
+  const int data[] = {1, 2};
   sl_list *list = new_sl_list(data);
-  list = sl_list_resize(list, list->data_allocation * 2);
-  sl_list_traverse(list, print_node, NULL);
+  sl_list_traverse(list, print_index, NULL);
+  putchar('\n');
+  list = sl_list_resize(list, list->data_allocation + 20);
+  printf("first node value: %d\n", *(int*)get_node_value(list, get_nodes(list)));
+  sl_list_traverse(list, print_index, NULL);
   return 0;
 }
