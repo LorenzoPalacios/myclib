@@ -78,6 +78,7 @@ sl_list *init_sl_list(const size_t num_nodes, const size_t value_size) {
   if (list == NULL) return NULL;
 
   list->start = list->end = NULL;
+  list->deleted_nodes = new_empty_stack(num_nodes / 4, sizeof(sl_node **));
   list->length = 0;
   list->data_allocation = VALUES_ALLOC + NODES_ALLOC;
   list->value_size = value_size;
@@ -85,13 +86,13 @@ sl_list *init_sl_list(const size_t num_nodes, const size_t value_size) {
 }
 
 static inline sl_node *get_next_node(sl_list *const list, sl_node *const node) {
-  if (node->next_node_index >= list->length) return NULL;
+  if (node == list->end || list->length == 0) return NULL;
   sl_node *const NODES = get_nodes(list);
   sl_node *const NEXT_NODE = NODES + node->next_node_index;
   return NEXT_NODE;
 }
 
-void *sl_list_traverse(sl_list *list,
+void *sl_list_traverse(sl_list *const list,
                        void *(*const op)(sl_list *list, sl_node *cur_node),
                        bool (*const condition)(sl_list *list,
                                                sl_node *cur_node)) {
@@ -191,16 +192,73 @@ sl_list *sl_list_resize(sl_list *list, const size_t new_size) {
   return list;
 }
 
-static void *print_node(sl_list *list, sl_node *cur_node) {
-  printf("%zu\n", *(int *)get_node_value(list, cur_node));
-  return list;
+/*
+ * Helper function for `delete_node()`.
+ *
+ * \note The target node can be set by passing `NULL` for `list` and the target
+ * node as `cur_node` from outside `sl_list_traverse()`, which cannot pass a
+ * `NULL` list to this function as `delete_node()` supplies a valid list
+ * argument.
+ */
+static bool end_reconnection(sl_list *list, sl_node *cur_node) {
+  static sl_node *target_node = NULL;
+  if (list == NULL) target_node = cur_node;
+  return cur_node != target_node;
+}
+
+/*
+ * Helper function for `delete_node()`.
+ *
+ * This function reassigns a list's `end` node to the node just before `end`.
+ * The return value of this function matters only to `sl_list_traverse()`.
+ *
+ * \note The target node can be set by passing `NULL` for `list` and the target
+ * node as `cur_node` from outside `sl_list_traverse()`, which cannot pass a
+ * `NULL` list to this function as `delete_node()` supplies a valid list
+ * argument.
+ */
+static void *reconnect_list(sl_list *list, sl_node *cur_node) {
+  static sl_node *prev_node = NULL;
+  static sl_node *target_node = NULL;
+
+  if (list == NULL) {
+    target_node = cur_node;
+    return NULL;
+  }
+
+  if (target_node != NULL && cur_node == target_node) {
+    if (prev_node == NULL)
+      list->start = get_next_node(list, list->start);
+    else
+      prev_node->next_node_index = cur_node->next_node_index;
+  }
+  prev_node = cur_node;
+
+  return NULL;
+}
+
+bool delete_node(sl_list *const list, sl_node *const node) {
+  if (node == NULL) return false;
+
+  stack *const deleted_nodes = stack_push(list->deleted_nodes, &node);
+  if (deleted_nodes == NULL) return false;
+  list->deleted_nodes = deleted_nodes;
+
+  /* Initialize the target nodes for the helper functions. */
+  reconnect_list(NULL, node);
+  end_reconnection(NULL, node);
+
+  sl_list_traverse(list, reconnect_list, end_reconnection);
+  if (list->length == 1) list->start = list->end = NULL;
+  list->length--;
+  return true;
 }
 
 int main(void) {
   const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   sl_list *list = new_sl_list(data);
-  sl_list_traverse(list, print_node, NULL);
-  list = sl_list_resize(list, list->data_allocation + 20);
-  sl_list_traverse(list, print_node, NULL);
+  printf("unused: %zu\n", sll_unused_length(list));
+  sl_list_traverse(list, NULL, delete_node);
+
   return 0;
 }
