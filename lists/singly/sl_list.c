@@ -254,6 +254,39 @@ bool delete_node(sl_list *const list, sl_node *const node) {
   return true;
 }
 
+static sl_node *get_unused_node(sl_list *const list) {
+  sl_node *unused_node = NULL;
+  if (unused_node == NULL) {
+    const size_t UNUSED_LENGTH = sll_unused_length(list);
+    if (UNUSED_LENGTH > 0) {
+      sl_node *const nodes = get_nodes(list);
+      const size_t num_used_nodes = list->length;
+      unused_node = nodes + num_used_nodes;
+    }
+  }
+  return unused_node;
+}
+
+sl_node *get_open_node(sl_list *const list) {
+  sl_node *unused_node = NULL;
+  stack *const deleted_nodes = list->deleted_nodes;
+  const size_t num_deleted_nodes = deleted_nodes->length;
+  if (num_deleted_nodes > 0)
+    unused_node = stack_pop(deleted_nodes);
+  else
+    unused_node = get_unused_node(list);
+  return unused_node;
+}
+
+sl_node *add_node(sl_list *const list, const void *const value) {
+  sl_node *const new_node = get_open_node(list);
+  if (new_node == NULL) return NULL;
+  const size_t VALUE_SIZE = list->value_size;
+  byte *const node_value = get_node_value(new_node);
+  memcpy(node_value, value, VALUE_SIZE);
+  return new_node;
+}
+
 int main(void) {
   const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
   sl_list *list = new_sl_list(data);
