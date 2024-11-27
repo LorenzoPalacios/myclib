@@ -13,12 +13,15 @@ typedef struct sl_node {
 
 /* singly-linked list (sl list) */
 typedef struct sl_list {
-  sl_node *start;
-  sl_node *end;
-  stack *deleted_nodes;
+  size_t start_index;
+  size_t end_index;
   size_t length;
+  /*
+   * `data_allocation` only tracks the amount of memory used by nodes and values.
+   */
   size_t data_allocation;
   size_t value_size;
+  stack *deleted_nodes;
 } sl_list;
 
 #define new_sl_list(data) \
