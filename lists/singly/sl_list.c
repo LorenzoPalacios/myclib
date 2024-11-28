@@ -143,7 +143,7 @@ sl_list *_new_sl_list(const void *const data, const size_t num_elems,
     cur_node++;
   }
   list->start_index = 0;
-  list->end_index = num_elems-1;
+  list->end_index = num_elems - 1;
   list->length = num_elems;
 
   return list;
@@ -218,7 +218,7 @@ sl_list *sl_list_expand(sl_list *const list) {
  * list argument.
  */
 static bool end_reconnection(sl_list *list, sl_node *cur_node) {
-  static sl_node *target_node = NULL;
+  static const sl_node *target_node = NULL;
   if (list == NULL) target_node = cur_node;
   return cur_node != target_node;
 }
@@ -250,15 +250,16 @@ static void *reconnect_list(sl_list *list, sl_node *cur_node) {
     } else {
       prev_node->next_node_index = cur_node->next_node_index;
     }
+  } else {
+    prev_node = cur_node;
   }
-  prev_node = cur_node;
 
   return NULL;
 }
 
 bool delete_node(sl_list *const list, sl_node *const node) {
   if (node == NULL) return false;
-  
+
   {
     const size_t NODE_INDEX = get_node_index(list, node);
     stack *const deleted_nodes = stack_push(list->deleted_nodes, &NODE_INDEX);
@@ -329,20 +330,23 @@ sl_list *sl_list_add_node(sl_list *list, const void *const value) {
 
 static void *print_node(sl_list *list, sl_node *node) {
   printf("value: %d | next node index: %zu | value index: %zu\n",
-         *(int *)get_node_value(list, node), node->next_node_index, node->value_index);
+         *(int *)get_node_value(list, node), node->next_node_index,
+         node->value_index);
   return NULL;
 }
 
 int main(void) {
-  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   sl_list *list = new_sl_list(data);
 
   puts("before -");
   sl_list_traverse(list, print_node, NULL);
-  for (size_t i = 0; i < 4; i++) {
-    delete_node(list, get_node_from_index(list, list->start_index));
-    for (size_t i = 0; i < sizeof(data) / sizeof *(data); i++)
+
+  for (size_t i = 0; i < 7; i++) {
+    for (size_t i = 0; i < sizeof(data) / sizeof *(data); i++) {
       list = sl_list_add_node(list, data + i);
+    }
+    delete_node(list, get_node_from_index(list, list->start_index));
   }
   puts("\nafter -");
   sl_list_traverse(list, print_node, NULL);
