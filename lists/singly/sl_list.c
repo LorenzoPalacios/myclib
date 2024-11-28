@@ -14,21 +14,21 @@ static inline size_t node_value_pair_size(const sl_list *const list) {
   return sizeof(sl_node) + VALUE_SIZE;
 }
 
-static inline size_t sll_overall_length(const sl_list *const list) {
+static inline size_t sl_list_overall_length(const sl_list *const list) {
   const size_t ALLOC = list->data_allocation;
   const size_t PAIR_SIZE = node_value_pair_size(list);
   return ALLOC / PAIR_SIZE;
 }
 
-static inline size_t sll_unused_length(const sl_list *const list) {
-  const size_t OVERALL_LENGTH = sll_overall_length(list);
+static inline size_t sl_list_unused_length(const sl_list *const list) {
+  const size_t OVERALL_LENGTH = sl_list_overall_length(list);
   const size_t USED_LENGTH = list->length;
   const size_t UNUSED_LENGTH = OVERALL_LENGTH - USED_LENGTH;
   return UNUSED_LENGTH;
 }
 
 static inline size_t get_values_alloc(const sl_list *const list) {
-  const size_t LENGTH = sll_overall_length(list);
+  const size_t LENGTH = sl_list_overall_length(list);
   const size_t VALUE_SIZE = list->value_size;
   const size_t VALUES_ALLOC = LENGTH * VALUE_SIZE;
   return VALUES_ALLOC;
@@ -58,7 +58,7 @@ static inline sl_node *get_nodes(sl_list *const list) {
   return NODES;
 }
 
-void *get_node_value(sl_list *const list, const sl_node *const node) {
+void *sl_list_get_node_value(sl_list *const list, const sl_node *const node) {
   const size_t VALUE_SIZE = list->value_size;
   const size_t NODE_VALUE_OFFSET = VALUE_SIZE * node->value_index;
   byte *const VALUES = get_values(list);
@@ -66,7 +66,7 @@ void *get_node_value(sl_list *const list, const sl_node *const node) {
   return NODE_VALUE;
 }
 
-sl_list *init_sl_list(const size_t num_nodes, const size_t value_size) {
+sl_list *sl_list_init(const size_t num_nodes, const size_t value_size) {
   const size_t VALUES_ALLOC = num_nodes * value_size;
   const size_t NODES_ALLOC = num_nodes * sizeof(sl_node);
   const size_t PADDING_BYTES = calc_padding_bytes(VALUES_ALLOC);
@@ -98,7 +98,8 @@ static inline size_t get_node_index(sl_list *const list,
   return NODE_INDEX;
 }
 
-static inline sl_node *get_next_node(sl_list *const list, sl_node *const node) {
+static inline sl_node *sl_list_get_next_node(sl_list *const list,
+                                             sl_node *const node) {
   const size_t NODE_INDEX = get_node_index(list, node);
   if (NODE_INDEX == list->end_index || list->length == 0) return NULL;
   sl_node *const NODES = get_nodes(list);
@@ -107,23 +108,22 @@ static inline sl_node *get_next_node(sl_list *const list, sl_node *const node) {
 }
 
 void *sl_list_traverse(sl_list *const list,
-                       void *(*const op)(sl_list *list, sl_node *cur_node),
-                       bool (*const condition)(sl_list *list,
-                                               sl_node *cur_node)) {
+                       void *(*const op)(sl_list *list, sl_node *node),
+                       bool (*const condition)(sl_list *list, sl_node *node)) {
   void *latest_op_value = NULL;
   sl_node *cur_node = get_node_from_index(list, list->start_index);
   while (cur_node != NULL) {
     if (op != NULL) latest_op_value = op(list, cur_node);
     if (condition != NULL)
       if (!condition(list, cur_node)) break;
-    cur_node = get_next_node(list, cur_node);
+    cur_node = sl_list_get_next_node(list, cur_node);
   }
   return latest_op_value;
 }
 
-sl_list *_new_sl_list(const void *const data, const size_t num_elems,
-                      const size_t elem_size) {
-  sl_list *const list = init_sl_list(num_elems, elem_size);
+sl_list *_sl_list_create(const void *const data, const size_t num_elems,
+                         const size_t elem_size) {
+  sl_list *const list = sl_list_init(num_elems, elem_size);
   if (list == NULL) return NULL;
 
   byte *const VALUES_MEM = get_values(list);
@@ -210,31 +210,31 @@ sl_list *sl_list_expand(sl_list *const list) {
   return new_list;
 }
 /*
- * Helper function for `delete_node()`.
+ * Helper function for `sl_list_delete_node()`.
  *
  * \note The target node can be set by passing `NULL` for `list` and the
  * target node as `cur_node` from outside `sl_list_traverse()`, which cannot
- * pass a `NULL` list to this function as `delete_node()` supplies a valid
- * list argument.
+ * pass a `NULL` list to this function as `sl_list_delete_node()` supplies a
+ * valid list argument.
  */
-static bool end_reconnection(sl_list *list, sl_node *cur_node) {
+static bool end_reconnection(sl_list *const list, sl_node *const cur_node) {
   static const sl_node *target_node = NULL;
   if (list == NULL) target_node = cur_node;
   return cur_node != target_node;
 }
 
 /*
- * Helper function for `delete_node()`.
+ * Helper function for `sl_list_delete_node()`.
  *
  * This function reassigns a list's `end` node to the node just before `end`.
  * The return value of this function matters only to `sl_list_traverse()`.
  *
  * \note The target node can be set by passing `NULL` for `list` and the
  * target node as `cur_node` from outside `sl_list_traverse()`, which cannot
- * pass a `NULL` list to this function as `delete_node()` supplies a valid
- * list argument.
+ * pass a `NULL` list to this function as `sl_list_delete_node()` supplies a
+ * valid list argument.
  */
-static void *reconnect_list(sl_list *list, sl_node *cur_node) {
+static void *reconnect_list(sl_list *const list, sl_node *const cur_node) {
   static sl_node *prev_node = NULL;
   static sl_node *target_node = NULL;
 
@@ -257,7 +257,7 @@ static void *reconnect_list(sl_list *list, sl_node *cur_node) {
   return NULL;
 }
 
-bool delete_node(sl_list *const list, sl_node *const node) {
+bool sl_list_delete_node(sl_list *const list, sl_node *const node) {
   if (node == NULL) return false;
 
   {
@@ -276,9 +276,9 @@ bool delete_node(sl_list *const list, sl_node *const node) {
   return true;
 }
 
-static sl_node *get_unused_node(sl_list *list) {
+static inline sl_node *get_unused_node(sl_list *const list) {
   sl_node *unused_node = NULL;
-  const size_t UNUSED_LENGTH = sll_unused_length(list);
+  const size_t UNUSED_LENGTH = sl_list_unused_length(list);
   if (UNUSED_LENGTH == 0) return NULL;
   sl_node *const nodes = get_nodes(list);
   const size_t num_used_nodes = list->length;
@@ -304,7 +304,7 @@ sl_list *sl_list_add_node(sl_list *list, const void *const value) {
   {
     const stack *const deleted_nodes = list->deleted_nodes;
     const size_t num_deleted_nodes = deleted_nodes->length;
-    const size_t num_unused_nodes = sll_unused_length(list);
+    const size_t num_unused_nodes = sl_list_unused_length(list);
     if (num_deleted_nodes == 0 && num_unused_nodes == 0)
       list = sl_list_expand(list);
     if (list == NULL) return NULL;
@@ -317,7 +317,7 @@ sl_list *sl_list_add_node(sl_list *list, const void *const value) {
   {
     const size_t VALUE_SIZE = list->value_size;
     new_node->value_index = NEW_NODE_INDEX;
-    byte *const node_value = get_node_value(list, new_node);
+    byte *const node_value = sl_list_get_node_value(list, new_node);
     memcpy(node_value, value, VALUE_SIZE);
   }
   sl_node *const former_end_node = get_node_from_index(list, list->end_index);
@@ -328,28 +328,54 @@ sl_list *sl_list_add_node(sl_list *list, const void *const value) {
   return list;
 }
 
+size_t sl_list_alloc_extent(const sl_list *const list) {
+  const size_t HEADER_SIZE = sizeof(sl_list);
+  const size_t PADDING_BYTES = get_padding_bytes(list);
+  const size_t DATA_ALLOC = list->data_allocation;
+  return HEADER_SIZE + PADDING_BYTES + DATA_ALLOC;
+}
+
+void sl_list_delete(sl_list **const list) {
+  sl_list *const actual_list = *list;
+  delete_stack(&actual_list->deleted_nodes);
+  free(actual_list);
+  *list = NULL;
+}
+
+void sl_list_delete_s(sl_list **const list) {
+  sl_list *const actual_list = *list;
+  const size_t LIST_ALLOC = sl_list_alloc_extent(actual_list);
+
+  memset(actual_list, 0, LIST_ALLOC);
+  delete_stack_s(&actual_list->deleted_nodes);
+  free(actual_list);
+  *list = NULL;
+}
+
 static void *print_node(sl_list *list, sl_node *node) {
-  printf("value: %d | next node index: %zu | value index: %zu\n",
-         *(int *)get_node_value(list, node), node->next_node_index,
-         node->value_index);
-  return NULL;
+  static size_t cnt = 0;
+  const int value = *(int *)sl_list_get_node_value(list, node);
+  if (value == 0) cnt++;
+  return &cnt;
 }
 
 int main(void) {
-  const int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  sl_list *list = new_sl_list(data);
+  srand(3009);
+
+  sl_list *list = sl_list_init(10000, sizeof(int));
+
+  int val;
+  for (size_t i = 0; i < 0x24000; i++) {
+    val = rand();
+    list = sl_list_add_node(list, &val);
+  }
 
   puts("before -");
-  sl_list_traverse(list, print_node, NULL);
-
-  for (size_t i = 0; i < 7; i++) {
-    for (size_t i = 0; i < sizeof(data) / sizeof *(data); i++) {
-      list = sl_list_add_node(list, data + i);
-    }
-    delete_node(list, get_node_from_index(list, list->start_index));
-  }
-  puts("\nafter -");
-  sl_list_traverse(list, print_node, NULL);
+  const size_t occurrences =
+      *(size_t *)sl_list_traverse(list, print_node, NULL);
+  printf("data_alloc: %zu\ntotal allocation: %zu\n", list->data_allocation,
+         sl_list_alloc_extent(list));
+  printf("occurrences: %zu\n", occurrences);
 
   return 0;
 }

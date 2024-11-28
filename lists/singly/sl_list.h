@@ -2,8 +2,8 @@
 #define SINGLY_LINKED_LIST_H
 
 #include <stddef.h>
-#include "../../stack/stack.h"
 
+#include "../../stack/stack.h"
 
 /* singly-linked node (sl node) */
 typedef struct sl_node {
@@ -16,16 +16,17 @@ typedef struct sl_list {
   size_t start_index;
   size_t end_index;
   size_t length;
+  size_t value_size;
   /*
-   * `data_allocation` only tracks the amount of memory used by nodes and values.
+   * `data_allocation` only tracks the amount of memory used by nodes and
+   * values.
    */
   size_t data_allocation;
-  size_t value_size;
   stack *deleted_nodes;
 } sl_list;
 
 #define new_sl_list(data) \
-  _new_sl_list(data, sizeof(data) / sizeof *(data), sizeof *(data))
+  _sl_list_create(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
 /*
  * Creates a new singly linked list whose nodes contain values copied from the
@@ -34,7 +35,7 @@ typedef struct sl_list {
  * \return A singly linked list whose nodes correspond to elements at `data` or
  * `NULL` upon failure.
  */
-sl_list *_new_sl_list(const void *data, size_t num_elems, size_t elem_size);
+sl_list *_sl_list_create(const void *data, size_t num_elems, size_t elem_size);
 
 /*
  * Appends a new node containing `val` to `list`, expanding `list` if necessary.
