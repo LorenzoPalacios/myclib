@@ -7,7 +7,6 @@
 
 /* singly-linked node (sl node) */
 typedef struct sl_node {
-  size_t value_index;
   size_t next_node_index;
 } sl_node;
 
