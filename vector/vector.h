@@ -32,5 +32,9 @@ size_t vector_get_data_alloc(const vector *vec);
 
 vector *vector_init(size_t elem_size, size_t length);
 
+vector *vector_insert_elem(vector *vec, const void *elem, size_t index);
+
 vector *vector_resize(vector *vec, size_t new_size);
+
+vector *vector_shrink_to_fit(vector *vec);
 #endif

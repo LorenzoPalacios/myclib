@@ -17,6 +17,17 @@ inline size_t vector_get_capacity(const vector *const vec) {
 
 static inline byte *get_data(vector *const vec) { return (byte *)(vec + 1); }
 
+vector *_vector_new(const void *const data, const size_t elem_size,
+                    const size_t length) {
+  vector *vec = vector_init(elem_size, length);
+  if (vec == NULL) return NULL;
+  vec->length = length;
+  const size_t DATA_ALLOC = vector_get_data_alloc(vec);
+  byte *const VECTOR_DATA = get_data(vec);
+  memcpy(VECTOR_DATA, data, DATA_ALLOC);
+  return vec;
+}
+
 vector *vector_add_elem(vector *vec, const void *const elem) {
   {
     const size_t CAPACITY = vector_get_capacity(vec);
@@ -82,10 +93,12 @@ vector *vector_insert_elem(vector *vec, const void *const elem,
 }
 
 vector *vector_resize(vector *vec, const size_t new_capacity) {
+  putchar('a');
   {
     const size_t CUR_CAPACITY = vector_get_capacity(vec);
     if (CUR_CAPACITY == new_capacity) return vec;
   }
+  putchar('b');
   const size_t NEW_SIZE = new_capacity * vec->elem_size + sizeof(vector);
   vec = realloc(vec, NEW_SIZE);
   if (vec == NULL) return NULL;
@@ -94,28 +107,6 @@ vector *vector_resize(vector *vec, const size_t new_capacity) {
   return vec;
 }
 
-vector *_vector_new(const void *const data, const size_t elem_size,
-                    const size_t length) {
-  vector *vec = vector_init(elem_size, length);
-  if (vec == NULL) return NULL;
-  vec->length = length;
-  const size_t DATA_ALLOC = vector_get_data_alloc(vec);
-  byte *const VECTOR_DATA = get_data(vec);
-  memcpy(VECTOR_DATA, data, DATA_ALLOC);
-  return vec;
-}
-
-static void print(void *elem) { printf("%d ", *(int *)elem); }
-
-int main(void) {
-  vector *v;
-  {
-    const int data[] = {1, 2, 3};
-    v = vector_new(data);
-    v = vector_insert_elem(v, data, 4);
-  }
-  vector_for_each(v, print);
-  vector_delete(&v);
-
-  return 0;
+vector *vector_shrink_to_fit(vector *const vec) {
+  return vector_resize(vec, vec->length);
 }
