@@ -66,6 +66,21 @@ vector *vector_init(const size_t elem_size, const size_t length) {
   return vec;
 }
 
+vector *vector_insert_elem(vector *vec, const void *const elem,
+                           const size_t index) {
+  if (index > vec->length) return vec;
+  if (index == vec->length) return vector_add_elem(vec, elem);
+  if (vec->length == vector_get_capacity(vec)) vec = vector_expand(vec);
+  const size_t ELEM_SIZE = vec->elem_size;
+  byte *const INSERTION_POS = get_data(vec) + index * ELEM_SIZE;
+  byte *const SHIFT_POS = INSERTION_POS + ELEM_SIZE;
+  const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index);
+  memmove(SHIFT_POS, INSERTION_POS, SHIFT_SIZE);
+  memcpy(INSERTION_POS, elem, ELEM_SIZE);
+  vec->length++;
+  return vec;
+}
+
 vector *vector_resize(vector *vec, const size_t new_capacity) {
   {
     const size_t CUR_CAPACITY = vector_get_capacity(vec);
@@ -88,4 +103,19 @@ vector *_vector_new(const void *const data, const size_t elem_size,
   byte *const VECTOR_DATA = get_data(vec);
   memcpy(VECTOR_DATA, data, DATA_ALLOC);
   return vec;
+}
+
+static void print(void *elem) { printf("%d ", *(int *)elem); }
+
+int main(void) {
+  vector *v;
+  {
+    const int data[] = {1, 2, 3};
+    v = vector_new(data);
+    v = vector_insert_elem(v, data, 4);
+  }
+  vector_for_each(v, print);
+  vector_delete(&v);
+
+  return 0;
 }
