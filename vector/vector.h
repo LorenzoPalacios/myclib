@@ -3,8 +3,6 @@
 
 #include <stddef.h>
 
-#define REALLOC_FACTOR (2)
-
 typedef unsigned char byte;
 
 #define vector_new(data) \
@@ -12,8 +10,8 @@ typedef unsigned char byte;
 
 typedef struct {
   size_t length;
-  size_t capacity;
   size_t elem_size;
+  size_t allocation;
 } vector;
 
 vector *_vector_new(const void *data, size_t elem_size, size_t length);
@@ -24,9 +22,13 @@ void vector_delete(vector **v);
 
 void vector_delete_s(vector **v);
 
+vector *vector_expand(vector *vec);
+
 void vector_for_each(vector *vec, void (*op)(void *elem));
 
-vector *vector_expand(vector *vec);
+size_t vector_get_capacity(const vector *vec);
+
+size_t vector_get_data_alloc(const vector *vec);
 
 vector *vector_init(size_t elem_size, size_t length);
 
