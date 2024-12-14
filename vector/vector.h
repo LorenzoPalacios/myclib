@@ -11,7 +11,6 @@ typedef unsigned char byte;
   _vector_new(data, sizeof *(data), sizeof(data) / sizeof *(data))
 
 typedef struct {
-  byte *data;
   size_t length;
   size_t capacity;
   size_t elem_size;
