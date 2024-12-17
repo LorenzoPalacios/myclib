@@ -1,13 +1,9 @@
-#ifndef _STR_EXT
-#define _STR_EXT
+#ifndef STR_EXT
+#define STR_EXT
 
 #include <stdio.h>
 
-/* Capacity size in bytes. Must be greater than 0. */
 #define BASE_STR_CAPACITY (8192)
-#if (BASE_STR_CAPACITY <= 0)
-#error "BASE_STR_CAPACITY must be greater than 0."
-#endif
 
 /*
  * The factor by which functions will expand a string's allocated memory by.
@@ -15,11 +11,11 @@
  */
 #define STR_EXPANSION_FACTOR (2)
 
-typedef struct string_t {
+typedef struct {
   char *data;
   size_t length;
-  size_t capacity;
-} string_t;
+  size_t allocation;
+} string;
 
 /* clang-format off */
 #define new_string(arg)                   \

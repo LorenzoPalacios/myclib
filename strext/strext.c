@@ -6,12 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-string_t *append_char(string_t *dst, const char appended) {
+static inline size_t get_capacity(const string *const str) {
+  return str->allocation - sizeof(string);
+}
+
+string *append_char(string *dst, const char appended) {
   if (dst->length == dst->capacity - 1) {
-    string_t *reallocated_mem = expand_string(dst);
-    if (reallocated_mem == NULL)
+    dst = expand_string(dst);
+    if (dst == NULL)
       return NULL;
-    dst = reallocated_mem;
   }
   dst->data[dst->length] = appended;
   dst->length++;
@@ -19,21 +22,28 @@ string_t *append_char(string_t *dst, const char appended) {
   return dst;
 }
 
-string_t *append_str(string_t *dst, const string_t *const src) {
+string *append_str(string *dst, const string *const src) {
   const size_t SRC_LEN = src->length;
-  size_t DST_CAPACITY_TEMP = dst->capacity;
+  const size_t DST_LEN = dst->length;
+  const size_t INITIAL_DST_CAP = get_capacity(dst);
 
-  while (DST_CAPACITY_TEMP - dst->length < SRC_LEN)
-    DST_CAPACITY_TEMP *= STR_EXPANSION_FACTOR;
-  if (DST_CAPACITY_TEMP != dst->capacity)
-    dst = resize_string(dst, DST_CAPACITY_TEMP);
-  if (dst == NULL) return NULL;
+  {
+    size_t REQ_CAPACITY = INITIAL_DST_CAP;
+    while (REQ_CAPACITY - DST_LEN < SRC_LEN)
+      REQ_CAPACITY *= STR_EXPANSION_FACTOR;
+    
+    if (REQ_CAPACITY != INITIAL_DST_CAP) {
+      dst = resize_string(dst, REQ_CAPACITY);
+      if (dst == NULL) return NULL;
+    }
+  }
+  
   strcat(dst->data + dst->length, src->data);
   dst->length += SRC_LEN;
   return dst;
 }
 
-string_t *append_raw_str(string_t *dst, const char *src, const size_t src_len) {
+string *append_raw_str(string *dst, const char *src, const size_t src_len) {
   const size_t SRC_LEN = src_len;
   size_t DST_CAPACITY_TEMP = dst->capacity;
 
@@ -47,28 +57,28 @@ string_t *append_raw_str(string_t *dst, const char *src, const size_t src_len) {
   return dst;
 }
 
-void _delete_string(string_t **str_obj) {
+void _delete_string(string **str_obj) {
   free(*str_obj);
   *str_obj = NULL;
 }
 
-void _delete_string_s(string_t **str_obj) {
-  memset(*str_obj, 0, (*str_obj)->capacity + sizeof(string_t));
+void _delete_string_s(string **str_obj) {
+  memset(*str_obj, 0, (*str_obj)->capacity + sizeof(string));
   _delete_string(str_obj);
 }
 
-string_t *erase_string_contents(string_t *const str) {
+string *erase_string_contents(string *const str) {
   str->length = 0;
   str->data[str->length] = '\0';
   return str;
 }
 
-string_t *expand_string(string_t *str_obj) {
+string *expand_string(string *str_obj) {
   return resize_string(str_obj, STR_EXPANSION_FACTOR * str_obj->capacity);
 }
 
-string_t *find_replace(string_t *haystack, const string_t *const needle,
-                       const string_t *const replacement) {
+string *find_replace(string *haystack, const string *const needle,
+                       const string *const replacement) {
   const char *const replacer = replacement->data;
   const char *const to_be_replaced = needle->data;
   const size_t REPLACER_LEN = replacement->length;
@@ -91,7 +101,7 @@ string_t *find_replace(string_t *haystack, const string_t *const needle,
     {
       const size_t BYTES_REQUIRED = REPLACER_LEN - NEEDLE_LEN;
       if (haystack->capacity < BYTES_REQUIRED) {
-        string_t *reallocated_mem = expand_string(haystack);
+        string *reallocated_mem = expand_string(haystack);
         if (reallocated_mem == NULL) return NULL;
         haystack = reallocated_mem;
       }
@@ -115,23 +125,23 @@ string_t *find_replace(string_t *haystack, const string_t *const needle,
  * no such character being present (because there isn't any space allocated for
  * one).
  */
-string_t *resize_string(string_t *str_obj, const size_t new_size) {
-  string_t *new_mem = realloc(str_obj, new_size + sizeof(string_t));
+string *resize_string(string *str_obj, const size_t new_size) {
+  string *new_mem = realloc(str_obj, new_size + sizeof(string));
   if (new_mem == NULL) return NULL;
   new_mem->capacity = new_size;
-  new_mem->data = (char *)new_mem + sizeof(string_t);
+  new_mem->data = (char *)new_mem + sizeof(string);
   return new_mem;
 }
 
-string_t *shrink_alloc_to_length(string_t *str_obj) {
+string *shrink_alloc_to_length(string *str_obj) {
   return resize_string(str_obj, str_obj->length);
 }
 
-string_t *string_from_chars(const char *const raw_text) {
-  string_t *str_obj = malloc(BASE_STR_CAPACITY + sizeof(string_t));
+string *string_from_chars(const char *const raw_text) {
+  string *str_obj = malloc(BASE_STR_CAPACITY + sizeof(string));
   if (str_obj == NULL) return NULL;
   str_obj->capacity = BASE_STR_CAPACITY;
-  str_obj->data = (char *)str_obj + sizeof(string_t);
+  str_obj->data = (char *)str_obj + sizeof(string);
 
   /*
    * `strncpy()` could simplify this loop, but it may introduce overhead as,
@@ -142,7 +152,7 @@ string_t *string_from_chars(const char *const raw_text) {
   size_t i = 0;
   for (; raw_text[i] != '\0'; i++) {
     if (i == str_obj->capacity) {
-      string_t *new_mem = expand_string(str_obj);
+      string *new_mem = expand_string(str_obj);
       if (new_mem == NULL) return NULL;
       str_obj = new_mem;
     }
@@ -153,19 +163,19 @@ string_t *string_from_chars(const char *const raw_text) {
   return str_obj;
 }
 
-string_t *string_from_line_stdin(void) {
+string *string_from_line_stdin(void) {
   return string_from_stream_given_delim(stdin, '\n');
 }
 
-string_t *string_from_stream(FILE *const stream) {
-  string_t *str_obj = new_string(BASE_STR_CAPACITY + sizeof(string_t));
+string *string_from_stream(FILE *const stream) {
+  string *str_obj = new_string(BASE_STR_CAPACITY + sizeof(string));
   char *str_actual = str_obj->data;
 
   char c = getc(stream);
   size_t i = 0;
   for (; c != EOF; i++) {
     if (i == str_obj->capacity) {
-      string_t *reallocated_mem =
+      string *reallocated_mem =
           resize_string(str_obj, STR_EXPANSION_FACTOR * str_obj->capacity);
       if (reallocated_mem == NULL) return NULL;
       str_obj = reallocated_mem;
@@ -177,8 +187,8 @@ string_t *string_from_stream(FILE *const stream) {
   return str_obj;
 }
 
-string_t *string_from_stream_given_delim(FILE *const stream, const char delim) {
-  string_t *const str_obj = new_string(BASE_STR_CAPACITY + sizeof(string_t));
+string *string_from_stream_given_delim(FILE *const stream, const char delim) {
+  string *const str_obj = new_string(BASE_STR_CAPACITY + sizeof(string));
   char *const str_actual = str_obj->data;
 
   size_t i = 0;
@@ -195,11 +205,13 @@ string_t *string_from_stream_given_delim(FILE *const stream, const char delim) {
   return str_obj;
 }
 
-string_t *string_of_capacity(const size_t capacity) {
-  string_t *str_obj = malloc(capacity + sizeof(string_t));
+string *string_of_capacity(const size_t capacity) {
+  string *str_obj = malloc(capacity + sizeof(string));
   if (str_obj == NULL) return NULL;
-  str_obj->data = (char *)str_obj + sizeof(string_t);
+  str_obj->data = (char *)str_obj + sizeof(string);
   str_obj->length = 0;
   str_obj->capacity = capacity;
   return str_obj;
 }
+
+int main(void) { return 0; }
