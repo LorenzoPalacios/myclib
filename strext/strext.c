@@ -77,12 +77,13 @@ void _delete_string_s(string **const str) {
 
 string *erase_string_contents(string *const str) {
   str->length = 0;
-  str->data[str->length] = '\0';
+  str->data[0] = '\0';
   return str;
 }
 
 string *expand_string(string *str) {
-  return resize_string(str, STR_EXPANSION_FACTOR * getchar(str));
+
+  return resize_string(str, STR_EXPANSION_FACTOR * get_capacity(str));
 }
 
 string *find_replace(string *haystack, const string *const needle,
@@ -213,13 +214,12 @@ string *string_from_stream_given_delim(FILE *const stream, const char delim) {
   return str;
 }
 
-string *string_of_capacity(const size_t capacity) {
-  string *str = malloc(capacity + sizeof(string));
+string *string_init(const size_t capacity) {
+  const size_t REQ_ALLOCATION = capacity + sizeof(string);
+  string *const str = malloc(REQ_ALLOCATION); 
   if (str == NULL) return NULL;
-  str->data = (char *)str + sizeof(string);
+  str->data = (char *)(str + 1);
   str->length = 0;
-  str->capacity = capacity;
+  str->allocation = REQ_ALLOCATION;
   return str;
 }
-
-int main(void) { return 0; }
