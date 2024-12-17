@@ -7,11 +7,12 @@
 #include <string.h>
 
 static inline size_t get_capacity(const string *const str) {
-  return str->allocation - sizeof(string);
+  /* The end of the string must always be a null terminator, hence the final subtraction by one. */
+  return str->allocation - sizeof(string) - 1;
 }
 
 string *append_char(string *dst, const char appended) {
-  if (dst->length == dst->capacity - 1) {
+  if (dst->length == get_capacity(dst)) {
     dst = expand_string(dst);
     if (dst == NULL)
       return NULL;
