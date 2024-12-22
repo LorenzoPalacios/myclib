@@ -1,5 +1,7 @@
 #include "strext.h"
 
+#include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -56,14 +58,14 @@ static inline string *expand_str_to_capacity(string *str,
 
 /* - LIBRARY FUNCTIONS - */
 
-string *string_append_char(string *dst, const char appended) {
+string *string_append_char(string *dst, const char chr) {
   if (get_unused_capacity(dst) == 0) {
     string *const realloc_str = string_expand(dst);
     if (realloc_str == NULL) return NULL;
     dst = realloc_str;
   }
   char *const str_contents = get_string_contents(dst);
-  str_contents[dst->length] = appended;
+  str_contents[dst->length] = chr;
   dst->length++;
   str_contents[dst->length] = '\0';
   return dst;
@@ -82,11 +84,32 @@ string *string_append_str(string *dst, string *const src) {
 }
 
 string *string_append_raw_str(string *dst, const char *src) {
-  while (*(src++) != '\0') {
+  while (*src != '\0') {
     dst = string_append_char(dst, *src);
     if (dst == NULL) return NULL;
+    src++;
   }
   return dst;
+}
+
+string *string_append_int(string *str, long long num) {
+  if (num < 0) {
+    str = string_append_char(str, '-');
+    num = -num;
+  }
+  return string_append_uint(str, (unsigned long long)num);
+}
+
+string *string_append_uint(string *str, const unsigned long long num) {
+  const size_t DIGIT_CNT = (size_t)log10l(num);
+  const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
+  if (str->capacity < REQ_CAPACITY) {
+    str = expand_str_to_capacity(str, REQ_CAPACITY);
+    if (str == NULL) return NULL;
+  }
+  sprintf(str->data + str->length, "%llu", num);
+  str->length += DIGIT_CNT;
+  return str;
 }
 
 void string_clear(string *const str) {
@@ -176,13 +199,14 @@ string *string_of_raw_str(const char *raw_str) {
   string *str = string_new_default();
   if (str == NULL) return NULL;
 
-  while (*(raw_str++) != '\0') {
+  while (*raw_str != '\0') {
     string *const realloc_str = string_append(str, *raw_str);
     if (realloc_str == NULL) {
       free(str);
       return NULL;
     }
     str = realloc_str;
+    raw_str++;
   }
   return str;
 }
@@ -239,7 +263,10 @@ string *string_shrink_alloc(string *const str_obj) {
 }
 
 int main(void) {
-  string *str = string_new("hey");
-  puts(str->data);
+  string *str = string_new("hejsdjnfkdasnvinjksfody");
+  str = string_append(str, '1');
+  printf("before: %s\n", str->data);
+  string_clear(str);
+  printf("after: %s\n", str->data);
   return 0;
 }
