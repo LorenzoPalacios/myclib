@@ -10,7 +10,7 @@ typedef struct {
   size_t allocation;
 } string;
 
-#define new_string(arg)                          \
+#define string_new(arg)                          \
   (_Generic((arg),                               \
        char: string_of_char,                     \
        signed char: string_of_char,              \
@@ -31,15 +31,16 @@ typedef struct {
        const unsigned char *: string_of_raw_str, \
        FILE *: string_of_stream)(arg))
 
-#define string_append(appended)             \
-  (_Generic((arg),                          \
+#define string_append(str, appended)        \
+  (_Generic((appended),                     \
        const char *: string_append_raw_str, \
        char *: string_append_raw_str,       \
+       char: string_append_char,            \
        signed char: string_append_char,     \
-       unsigned char: string_append_char)(arg))
+       unsigned char: string_append_char)(str, appended))
 
-#define delete_string(str) _delete_string(&(str))
-#define delete_string_s(str) _delete_string_s(&(str))
+#define string_delete(str) _delete_string(&(str))
+#define string_delete_s(str) _delete_string_s(&(str))
 
 /*
  * Appends `appended` to the end of `dst`, expanding if necessary.
@@ -65,13 +66,13 @@ string *string_append_str(string *dst, string *src);
  */
 string *append_raw_str(string *dst, const char *src, size_t src_len);
 
+void string_clear(string *str);
+
+void string_clear_s(string *str);
+
 void _string_delete(string **str_obj);
 
 void _string_delete_s(string **str_obj);
-
-string *string_clear(string *str);
-
-string *string_clear_s(string *str);
 
 /*
  * Expands the passed string's allocated boundaries by
@@ -114,31 +115,16 @@ string *string_find_replace(string *hay, const string *needle,
 string *string_find_replace_all(string *hay, const string *needle,
                                 const string *replace);
 
-/*
- * Reallocates the memory used for `str_obj` to fit `new_size` bytes,
- * updating the stats of `str_obj` as necessary.
- *
- * This function only modifies the memory allocated for characters,
- * meaning there will always be enough space for the data members of
- * `string` regardless of the value passed as `new_size`.
- *
- * \return A (possibly new) pointer associated with the data of
- * `str_obj`, or `NULL` if reallocation failed.
- *
- * \note If reallocation failed, `str_obj` will be unmodified.
- */
-string *string_resize(string *str_obj, size_t new_size);
+string *string_new_default(void);
 
 /*
- * Shrinks the memory used for `str_obj` to fit the number of characters
- * it contains.
+ * Creates a `string` object capable of storing `capacity` number of
+ * characters.
  *
- * \return A (possibly new) pointer associated with the data of
- * `str_obj`, or `NULL` if reallocation failed.
+ * \return A pointer to a `string` object of size
+ * `capacity + sizeof(string)`, or `NULL` upon failure.
  */
-string *string_shrink_alloc(string *str_obj);
-
-string *string_new(void);
+string *string_of_capacity(const size_t capacity);
 
 string *string_of_char(char chr);
 
@@ -180,12 +166,27 @@ string *string_of_stream(FILE *stream);
 string *string_of_stream_delim(FILE *stream, char delim);
 
 /*
- * Creates a `string` object capable of storing `capacity` number of
- * characters.
+ * Reallocates the memory used for `str_obj` to fit `new_size` bytes,
+ * updating the stats of `str_obj` as necessary.
  *
- * \return A pointer to a `string` object of size
- * `capacity + sizeof(string)`, or `NULL` upon failure.
+ * This function only modifies the memory allocated for characters,
+ * meaning there will always be enough space for the data members of
+ * `string` regardless of the value passed as `new_size`.
+ *
+ * \return A (possibly new) pointer associated with the data of
+ * `str_obj`, or `NULL` if reallocation failed.
+ *
+ * \note If reallocation failed, `str_obj` will be unmodified.
  */
-string *string_of_capacity(const size_t capacity);
+string *string_resize(string *str_obj, size_t new_size);
+
+/*
+ * Shrinks the memory used for `str_obj` to fit the number of characters
+ * it contains.
+ *
+ * \return A (possibly new) pointer associated with the data of
+ * `str_obj`, or `NULL` if reallocation failed.
+ */
+string *string_shrink_alloc(string *str_obj);
 
 #endif
