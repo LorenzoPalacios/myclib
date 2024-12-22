@@ -6,200 +6,240 @@
 #include <stdlib.h>
 #include <string.h>
 
-string_t *append_char(string_t *dst, const char appended) {
-  if (dst->length == dst->capacity - 1) {
-    string_t *reallocated_mem = expand_string(dst);
-    if (reallocated_mem == NULL)
-      return NULL;
-    dst = reallocated_mem;
+#define EXPANSION_FACTOR (2)
+#define BASE_STR_CAPACITY (4096 - sizeof(string) - 1)
+
+/* - INTERNAL UTILITY FUNCTIONS - */
+
+/*
+ * Used by constructors and reallocators to calculate how much memory should be
+ * allocated for a string.
+ */
+static inline size_t calc_allocation(const size_t requested_cap) {
+  return requested_cap + sizeof(string) + 1;
+}
+
+static inline size_t get_capacity(const string *const str) {
+  /* Subtracting one since a null terminator must be present in the string. */
+  return str->allocation - sizeof(string) - 1;
+}
+
+static inline char *get_string_contents(string *const str) {
+  return (char *)(str + 1);
+}
+
+static inline size_t get_unused_capacity(const string *const str) {
+  return get_capacity(str) - str->length;
+}
+
+/*
+ * Expands the capacity of `str` to at least `new_capacity` as if expanded by
+ * `string_expand()`.
+ *
+ * \note If the initial expansion fails, this function will expand `str` to
+ * `new_capacity` directly instead of emulating the behavior of
+ * `string_expand()`.
+ */
+static inline string *expand_str_to_capacity(string *str,
+                                             const size_t new_capacity) {
+  const size_t DST_CAPACITY = get_capacity(str);
+  const size_t EXPANSION_CNT = new_capacity / (DST_CAPACITY + 1);
+  if (EXPANSION_CNT != 0) {
+    const size_t EXPANDED_CAPACITY =
+        EXPANSION_FACTOR * EXPANSION_CNT * DST_CAPACITY;
+    string *expanded_str = string_resize(str, EXPANDED_CAPACITY);
+    if (expanded_str == NULL) expanded_str = string_resize(str, new_capacity);
+    str = expanded_str;
   }
-  dst->data[dst->length] = appended;
+  return str;
+}
+
+/* - LIBRARY FUNCTIONS - */
+
+string *string_append_char(string *dst, const char appended) {
+  if (get_unused_capacity(dst) == 0) {
+    string *const realloc_str = string_expand(dst);
+    if (realloc_str == NULL) return NULL;
+    dst = realloc_str;
+  }
+  char *const str_contents = get_string_contents(dst);
+  str_contents[dst->length] = appended;
   dst->length++;
-  dst->data[dst->length] = '\0';
+  str_contents[dst->length] = '\0';
   return dst;
 }
 
-string_t *append_str(string_t *dst, const string_t *const src) {
+string *string_append_str(string *dst, string *const src) {
   const size_t SRC_LEN = src->length;
-  size_t DST_CAPACITY_TEMP = dst->capacity;
-
-  while (DST_CAPACITY_TEMP - dst->length < SRC_LEN)
-    DST_CAPACITY_TEMP *= STR_EXPANSION_FACTOR;
-  if (DST_CAPACITY_TEMP != dst->capacity)
-    dst = resize_string(dst, DST_CAPACITY_TEMP);
-  if (dst == NULL) return NULL;
-  strcat(dst->data + dst->length, src->data);
+  {
+    const size_t REQ_DST_CAPACITY = dst->length + SRC_LEN;
+    dst = expand_str_to_capacity(dst, REQ_DST_CAPACITY);
+    if (dst == NULL) return NULL;
+  }
+  strcpy(dst->data + dst->length, src->data);
   dst->length += SRC_LEN;
   return dst;
 }
 
-string_t *append_raw_str(string_t *dst, const char *src, const size_t src_len) {
-  const size_t SRC_LEN = src_len;
-  size_t DST_CAPACITY_TEMP = dst->capacity;
-
-  while (DST_CAPACITY_TEMP - dst->length < SRC_LEN)
-    DST_CAPACITY_TEMP *= STR_EXPANSION_FACTOR;
-  if (DST_CAPACITY_TEMP != dst->capacity)
-    dst = resize_string(dst, DST_CAPACITY_TEMP);
-  if (dst == NULL) return NULL;
-  strcpy(dst->data + dst->length, src);
-  dst->length += SRC_LEN;
+string *string_append_raw_str(string *dst, const char *src) {
+  while (*(src++) != '\0') {
+    dst = string_append_char(dst, *src);
+    if (dst == NULL) return NULL;
+  }
   return dst;
 }
 
-void _delete_string(string_t **str_obj) {
+void string_clear(string *const str) {
+  str->length = 0;
+  str->data[str->length] = '\0';
+}
+
+void string_clear_s(string *const str) {
+  memset(str->data, '\0', str->capacity);
+  str->length = 0;
+}
+
+void _string_delete(string **const str_obj) {
   free(*str_obj);
   *str_obj = NULL;
 }
 
-void _delete_string_s(string_t **str_obj) {
-  memset(*str_obj, 0, (*str_obj)->capacity + sizeof(string_t));
-  _delete_string(str_obj);
+void _string_delete_s(string **const str_obj) {
+  memset(*str_obj, 0, (*str_obj)->allocation);
+  _string_delete(str_obj);
 }
 
-string_t *erase_string_contents(string_t *const str) {
+string *string_expand(string *const str_obj) {
+  const size_t NEW_CAP =
+      str_obj->capacity > 1 ? EXPANSION_FACTOR * str_obj->capacity : 1;
+  return string_resize(str_obj, NEW_CAP);
+}
+
+string *string_find_replace(string *hay, const string *const needle,
+                            const string *const replace) {
+  const size_t NEEDLE_LEN = needle->length;
+  const size_t REPLACER_LEN = replace->length;
+
+  /*
+   * There exists a bug where if `needle` is a zero-length string (that is, a
+   * string containing only a null terminator), `replace` will be prepended
+   * to `hay`.
+   * Beyond that, this statement only serves to terminate the function if any
+   * passed strings are of length 0, since no meaningful operation can be had.
+   */
+  // if (NEEDLE_LEN == 0) return hay;
+  char *const needle_pos = strstr(hay->data, needle->data);
+  if (needle_pos != NULL) {
+    {
+      const size_t BYTES_REQUIRED = REPLACER_LEN - NEEDLE_LEN;
+      if (hay->capacity < BYTES_REQUIRED) {
+        string *const realloc_str = string_expand(hay);
+        if (realloc_str == NULL) return NULL;
+        hay = realloc_str;
+      }
+    }
+    const size_t SHIFT_SIZE = hay->length - (needle_pos - hay->data);
+    memmove(needle_pos + NEEDLE_LEN, needle_pos, SHIFT_SIZE);
+    strcpy(needle_pos, replace->data);
+  }
+  return hay;
+}
+
+string *string_of_capacity(const size_t capacity) {
+  const size_t ALLOCATION = calc_allocation(capacity);
+  string *const str = malloc(ALLOCATION);
+  if (str == NULL) return NULL;
+  str->data = get_string_contents(str);
   str->length = 0;
+  str->capacity = capacity;
+  str->allocation = ALLOCATION;
   str->data[str->length] = '\0';
   return str;
 }
 
-string_t *expand_string(string_t *str_obj) {
-  return resize_string(str_obj, STR_EXPANSION_FACTOR * str_obj->capacity);
+string *string_of_char(const char chr) {
+  string *str = string_of_capacity(1);
+  if (str == NULL) return NULL;
+  str = string_append_char(str, chr);
+  return str;
 }
 
-string_t *find_replace(string_t *haystack, const string_t *const needle,
-                       const string_t *const replacement) {
-  const char *const replacer = replacement->data;
-  const char *const to_be_replaced = needle->data;
-  const size_t REPLACER_LEN = replacement->length;
-  const size_t NEEDLE_LEN = needle->length;
-  char *hay = haystack->data;
-  /* The value of `HAY_LEN` is subject to change during string replacement. */
-  const size_t HAY_LEN = haystack->length;
+string *string_of_line_stdin(void) {
+  return string_of_stream_delim(stdin, '\n');
+}
 
-  /*
-   * There exists a bug where if `needle` is a zero-length string (that is, a
-   * string containing only a null terminator), `replacement` will be prepended
-   * to `haystack`.
-   * Beyond that, this statement only serves to terminate the function if any
-   * passed strings are of length 0, since no meaningful operation can be had.
-   */
-  if (HAY_LEN == 0 || NEEDLE_LEN == 0 || REPLACER_LEN == 0) return haystack;
+string *string_new_default(void) {
+  return string_of_capacity(BASE_STR_CAPACITY);
+}
 
-  const ptrdiff_t needle_index = strstr(hay, to_be_replaced) - hay;
-  if (needle_index >= 0) {
-    {
-      const size_t BYTES_REQUIRED = REPLACER_LEN - NEEDLE_LEN;
-      if (haystack->capacity < BYTES_REQUIRED) {
-        string_t *reallocated_mem = expand_string(haystack);
-        if (reallocated_mem == NULL) return NULL;
-        haystack = reallocated_mem;
-      }
+string *string_of_raw_str(const char *raw_str) {
+  string *str = string_new_default();
+  if (str == NULL) return NULL;
+
+  while (*(raw_str++) != '\0') {
+    string *const realloc_str = string_append(str, *raw_str);
+    if (realloc_str == NULL) {
+      free(str);
+      return NULL;
     }
-    char suffixed_chars[HAY_LEN - needle_index - NEEDLE_LEN];
-    /* Copy chars up to the point of insertion. */
-    strcpy(suffixed_chars, haystack->data + needle_index + NEEDLE_LEN);
-    /* Insert the replacement string. */
-    strcpy(hay + needle_index, replacer);
-    /* Replace any chars after the point of insertion. */
-    strcpy(hay + needle_index + REPLACER_LEN, suffixed_chars);
-    haystack->length += REPLACER_LEN - NEEDLE_LEN;
-    haystack->data = hay;
+    str = realloc_str;
   }
-  return haystack;
+  return str;
 }
 
-/*
- * A fix is needed for when `new_size` is equal to zero. This often causes
- * segmentation faults with any functions reliant upon a null terminator due to
- * no such character being present (because there isn't any space allocated for
- * one).
- */
-string_t *resize_string(string_t *str_obj, const size_t new_size) {
-  string_t *new_mem = realloc(str_obj, new_size + sizeof(string_t));
-  if (new_mem == NULL) return NULL;
-  new_mem->capacity = new_size;
-  new_mem->data = (char *)new_mem + sizeof(string_t);
-  return new_mem;
-}
+string *string_of_stream(FILE *const stream) {
+  string *str = string_new_default();
 
-string_t *shrink_alloc_to_length(string_t *str_obj) {
-  return resize_string(str_obj, str_obj->length);
-}
-
-string_t *string_from_chars(const char *const raw_text) {
-  string_t *str_obj = malloc(BASE_STR_CAPACITY + sizeof(string_t));
-  if (str_obj == NULL) return NULL;
-  str_obj->capacity = BASE_STR_CAPACITY;
-  str_obj->data = (char *)str_obj + sizeof(string_t);
-
-  /*
-   * `strncpy()` could simplify this loop, but it may introduce overhead as,
-   * after a null terminator is reached, it will "fill in" any unused space
-   * within `str_obj` with null characters. Currently, this loop writes only
-   * what is necessary.
-   */
-  size_t i = 0;
-  for (; raw_text[i] != '\0'; i++) {
-    if (i == str_obj->capacity) {
-      string_t *new_mem = expand_string(str_obj);
-      if (new_mem == NULL) return NULL;
-      str_obj = new_mem;
+  int c = getc(stream);
+  while (c != EOF) {
+    string *const realloc_str = string_append(str, (char)c);
+    if (realloc_str == NULL) {
+      free(str);
+      return NULL;
     }
-    str_obj->data[i] = raw_text[i];
-  }
-  str_obj->data[i] = '\0';
-  str_obj->length = i;
-  return str_obj;
-}
-
-string_t *string_from_line_stdin(void) {
-  return string_from_stream_given_delim(stdin, '\n');
-}
-
-string_t *string_from_stream(FILE *const stream) {
-  string_t *str_obj = new_string(BASE_STR_CAPACITY + sizeof(string_t));
-  char *str_actual = str_obj->data;
-
-  char c = getc(stream);
-  size_t i = 0;
-  for (; c != EOF; i++) {
-    if (i == str_obj->capacity) {
-      string_t *reallocated_mem =
-          resize_string(str_obj, STR_EXPANSION_FACTOR * str_obj->capacity);
-      if (reallocated_mem == NULL) return NULL;
-      str_obj = reallocated_mem;
-    }
-    str_actual[i] = c;
+    str = realloc_str;
     c = getc(stream);
   }
-  str_obj->length = i;
-  return str_obj;
+  return str;
 }
 
-string_t *string_from_stream_given_delim(FILE *const stream, const char delim) {
-  string_t *const str_obj = new_string(BASE_STR_CAPACITY + sizeof(string_t));
-  char *const str_actual = str_obj->data;
+string *string_of_stream_delim(FILE *const stream, const char delim) {
+  string *str = string_new_default();
 
-  size_t i = 0;
-
-  while (true) {
-    const int c = getc(stream);
-    if (c == delim || c == EOF) break;
-    append_char(str_obj, c);
-    i++;
+  int c = getc(stream);
+  while (c != delim && c != EOF) {
+    string *const realloc_str = string_append(str, (char)c);
+    if (realloc_str == NULL) {
+      free(str);
+      return NULL;
+    }
+    str = realloc_str;
+    c = getc(stream);
   }
-  str_actual[i] = '\0';
-  str_obj->length = i;
-
-  return str_obj;
+  return str;
 }
 
-string_t *string_of_capacity(const size_t capacity) {
-  string_t *str_obj = malloc(capacity + sizeof(string_t));
-  if (str_obj == NULL) return NULL;
-  str_obj->data = (char *)str_obj + sizeof(string_t);
-  str_obj->length = 0;
-  str_obj->capacity = capacity;
-  return str_obj;
+string *string_resize(string *str, const size_t new_capacity) {
+  const size_t ALLOCATION = calc_allocation(new_capacity);
+  str = realloc(str, new_capacity);
+  if (str == NULL) return NULL;
+  str->allocation = ALLOCATION;
+  str->capacity = new_capacity;
+
+  if (new_capacity < str->length) {
+    char *const str_contents = get_string_contents(str);
+    str->length = str->capacity;
+    str_contents[str->length] = '\0';
+  }
+  return str;
+}
+
+string *string_shrink_alloc(string *const str_obj) {
+  return string_resize(str_obj, str_obj->length);
+}
+
+int main(void) {
+  string *str = string_new("hey");
+  puts(str->data);
+  return 0;
 }
