@@ -30,10 +30,6 @@ static inline char *get_string_contents(string *const str) {
   return (char *)(str + 1);
 }
 
-static inline size_t get_unused_capacity(const string *const str) {
-  return get_capacity(str) - str->length;
-}
-
 /*
  * Expands the capacity of `str` to at least `new_capacity` as if expanded by
  * `string_expand()`.
@@ -56,40 +52,63 @@ static inline string *expand_str_to_capacity(string *str,
   return str;
 }
 
+static inline string *_find_replace(string *src, const char *const needle,
+                                    const char *const replacer,
+                                    const size_t needle_len,
+                                    const size_t replacer_len) {
+  if (needle_len == 0) return src;
+
+  char *const needle_pos = strstr(src->data, needle);
+  if (needle_pos != NULL) {
+    const size_t REQ_CAPACITY = src->length + replacer_len - needle_len;
+    if (src->capacity < REQ_CAPACITY) {
+      string *const realloc_str = string_expand(src);
+      if (realloc_str == NULL) return NULL;
+      src = realloc_str;
+    }
+
+    const size_t REMAINDER = src->length - (needle_pos - src->data);
+    memmove(needle_pos + replacer_len, needle_pos + needle_len, REMAINDER);
+    /* Using `memcpy()` since `strcpy()` appends a null terminator. */
+    memcpy(needle_pos, replacer, replacer_len);
+  }
+  if (replacer_len > needle_len)
+    src->length += replacer_len - needle_len;
+  else
+    src->length -= needle_len - replacer_len;
+  src->data[src->length] = '\0';
+  return src;
+}
+
+static string *_string_insert(string *dst, const char *src, size_t src_len,
+                              size_t index) {
+  if (index > dst->length) return NULL;
+
+  const size_t REQ_CAPACITY = dst->length + src_len;
+  dst = expand_str_to_capacity(dst, REQ_CAPACITY);
+  if (dst == NULL) return NULL;
+
+  char *const dst_pos = dst->data + index;
+  const size_t REMAINDER = dst->length - index;
+  memmove(dst_pos + src_len, dst_pos, REMAINDER);
+  memcpy(dst_pos, src, src_len);
+  dst->length += src_len;
+  dst->data[dst->length] = '\0';
+  return dst;
+}
+
 /* - LIBRARY FUNCTIONS - */
 
 string *string_append_char(string *dst, const char chr) {
-  if (get_unused_capacity(dst) == 0) {
-    string *const realloc_str = string_expand(dst);
-    if (realloc_str == NULL) return NULL;
-    dst = realloc_str;
-  }
-  char *const str_contents = get_string_contents(dst);
-  str_contents[dst->length] = chr;
-  dst->length++;
-  str_contents[dst->length] = '\0';
-  return dst;
+  return string_insert_char(dst, chr, dst->length);
 }
 
 string *string_append_str(string *dst, string *const src) {
-  const size_t SRC_LEN = src->length;
-  {
-    const size_t REQ_DST_CAPACITY = dst->length + SRC_LEN;
-    dst = expand_str_to_capacity(dst, REQ_DST_CAPACITY);
-    if (dst == NULL) return NULL;
-  }
-  strcpy(dst->data + dst->length, src->data);
-  dst->length += SRC_LEN;
-  return dst;
+  return string_insert_str(dst, src, dst->length);
 }
 
 string *string_append_raw_str(string *dst, const char *src) {
-  while (*src != '\0') {
-    dst = string_append_char(dst, *src);
-    if (dst == NULL) return NULL;
-    src++;
-  }
-  return dst;
+  return string_insert_raw_str(dst, src, dst->length);
 }
 
 string *string_append_int(string *str, long long num) {
@@ -122,50 +141,51 @@ void string_clear_s(string *const str) {
   str->length = 0;
 }
 
-void _string_delete(string **const str_obj) {
-  free(*str_obj);
-  *str_obj = NULL;
+void _string_delete(string **const str) {
+  free(*str);
+  *str = NULL;
 }
 
-void _string_delete_s(string **const str_obj) {
-  memset(*str_obj, 0, (*str_obj)->allocation);
-  _string_delete(str_obj);
+void _string_delete_s(string **const str) {
+  memset(*str, 0, (*str)->allocation);
+  _string_delete(str);
 }
 
-string *string_expand(string *const str_obj) {
+string *string_expand(string *const str) {
   const size_t NEW_CAP =
-      str_obj->capacity > 1 ? EXPANSION_FACTOR * str_obj->capacity : 1;
-  return string_resize(str_obj, NEW_CAP);
+      (str->capacity > 1) ? EXPANSION_FACTOR * str->capacity : 1;
+  return string_resize(str, NEW_CAP);
 }
 
-string *string_find_replace(string *hay, const string *const needle,
-                            const string *const replace) {
-  const size_t NEEDLE_LEN = needle->length;
-  const size_t REPLACER_LEN = replace->length;
+string *string_find_replace_str(string *const src, const string *const needle,
+                                const string *const replace) {
+  return _find_replace(src, needle->data, replace->data, needle->length,
+                       replace->length);
+}
 
-  /*
-   * There exists a bug where if `needle` is a zero-length string (that is, a
-   * string containing only a null terminator), `replace` will be prepended
-   * to `hay`.
-   * Beyond that, this statement only serves to terminate the function if any
-   * passed strings are of length 0, since no meaningful operation can be had.
-   */
-  // if (NEEDLE_LEN == 0) return hay;
-  char *const needle_pos = strstr(hay->data, needle->data);
-  if (needle_pos != NULL) {
-    {
-      const size_t BYTES_REQUIRED = REPLACER_LEN - NEEDLE_LEN;
-      if (hay->capacity < BYTES_REQUIRED) {
-        string *const realloc_str = string_expand(hay);
-        if (realloc_str == NULL) return NULL;
-        hay = realloc_str;
-      }
-    }
-    const size_t SHIFT_SIZE = hay->length - (needle_pos - hay->data);
-    memmove(needle_pos + NEEDLE_LEN, needle_pos, SHIFT_SIZE);
-    strcpy(needle_pos, replace->data);
-  }
-  return hay;
+string *string_find_replace_raw_str(string *const src, const char *const needle,
+                                    const string *const replace) {
+  const size_t NEEDLE_LEN = strlen(needle);
+  return _find_replace(src, needle, replace->data, NEEDLE_LEN, replace->length);
+}
+
+string *string_find_replace_char(string *const src, const char needle,
+                                 const string *const replace) {
+  return _find_replace(src, &needle, replace->data, 1, replace->length);
+}
+
+string *string_insert_char(string *dst, const char chr, const size_t index) {
+  return _string_insert(dst, &chr, 1, index);
+}
+
+string *string_insert_raw_str(string *dst, const char *const src,
+                              const size_t index) {
+  const size_t SRC_LEN = strlen(src);
+  return _string_insert(dst, src, SRC_LEN, index);
+}
+
+string *string_insert_str(string *dst, string *const src, const size_t index) {
+  return _string_insert(dst, src->data, src->length, index);
 }
 
 string *string_of_capacity(const size_t capacity) {
@@ -202,7 +222,7 @@ string *string_of_raw_str(const char *raw_str) {
   while (*raw_str != '\0') {
     string *const realloc_str = string_append(str, *raw_str);
     if (realloc_str == NULL) {
-      free(str);
+      string_delete(str);
       return NULL;
     }
     str = realloc_str;
@@ -218,7 +238,7 @@ string *string_of_stream(FILE *const stream) {
   while (c != EOF) {
     string *const realloc_str = string_append(str, (char)c);
     if (realloc_str == NULL) {
-      free(str);
+      string_delete(str);
       return NULL;
     }
     str = realloc_str;
@@ -234,7 +254,7 @@ string *string_of_stream_delim(FILE *const stream, const char delim) {
   while (c != delim && c != EOF) {
     string *const realloc_str = string_append(str, (char)c);
     if (realloc_str == NULL) {
-      free(str);
+      string_delete(str);
       return NULL;
     }
     str = realloc_str;
@@ -245,28 +265,34 @@ string *string_of_stream_delim(FILE *const stream, const char delim) {
 
 string *string_resize(string *str, const size_t new_capacity) {
   const size_t ALLOCATION = calc_allocation(new_capacity);
-  str = realloc(str, new_capacity);
+  str = realloc(str, ALLOCATION);
   if (str == NULL) return NULL;
-  str->allocation = ALLOCATION;
+  str->data = get_string_contents(str);
   str->capacity = new_capacity;
+  str->allocation = ALLOCATION;
 
   if (new_capacity < str->length) {
-    char *const str_contents = get_string_contents(str);
     str->length = str->capacity;
-    str_contents[str->length] = '\0';
+    str->data[str->length] = '\0';
   }
   return str;
 }
 
-string *string_shrink_alloc(string *const str_obj) {
-  return string_resize(str_obj, str_obj->length);
+string *string_shrink_alloc(string *const str) {
+  return string_resize(str, str->length);
 }
 
 int main(void) {
-  string *str = string_new("hejsdjnfkdasnvinjksfody");
-  str = string_append(str, '1');
-  printf("before: %s\n", str->data);
-  string_clear(str);
-  printf("after: %s\n", str->data);
+  string *str = string_new("hey buddy");
+  string *str2 = string_new("hey");
+
+  str = string_append(str, (char)'!');
+  printf("\"%s\" (length: %zu | capacity: %zu | allocation: %zu)\n", str->data,
+         str->length, str->capacity, str->allocation);
+
+  str = string_find_replace(str, "hey", str2);
+  printf("\"%s\" (length: %zu | capacity: %zu | allocation: %zu)\n", str->data,
+         str->length, str->capacity, str->allocation);
+
   return 0;
 }
