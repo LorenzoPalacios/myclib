@@ -51,157 +51,232 @@ typedef struct {
        signed char: string_append_char,              \
        unsigned char: string_append_char)(str, appended))
 
-#define string_delete(str) _delete_string(&(str))
-#define string_delete_s(str) _delete_string_s(&(str))
+#define string_delete(str) _string_delete(&(str))
+#define string_delete_s(str) _string_delete_s(&(str))
 
-/*
- * Appends `appended` to the end of `dst`, expanding if necessary.
+/**
+ * @brief Appends a character to the end of the string.
  *
- * \return A pointer associated with the data of `dst`, or `NULL` if
- * the operation failed.
+ * This function appends the given character to the end of the string,
+ * expanding the string if necessary.
+ *
+ * @param dst A pointer to the string to which the character will be appended.
+ * @param chr The character to append to the string.
+ * @return A pointer to the modified string, or NULL if the operation failed.
  */
 string *string_append_char(string *dst, char appended);
 
-string *string_append_int(string *str, long long num);
-
-string *string_append_uint(string *str, unsigned long long num);
-
-/*
- * Appends `src` to the end of `dst_str`, expanding if necessary.
+/**
+ * @brief Appends one string to another.
  *
- * \return A pointer associated with the data of `dst`, or `NULL` if the
- * operation failed.
+ * This function appends the contents of the source string to the destination
+ * string, expanding the destination string if necessary.
+ *
+ * @param dst A pointer to the destination string.
+ * @param src A pointer to the source string.
+ * @return A pointer to the modified destination string, or NULL if the operation failed.
  */
 string *string_append_str(string *dst, string *src);
 
-/*
- * Appends `src` to the end of `dst_str`, expanding if necessary.
+/**
+ * @brief Appends a raw C-string to the end of the string.
  *
- * \return A pointer associated with the data of `dst`, or `NULL` if the
- * operation failed.
+ * This function appends the given raw C-string to the end of the string,
+ * expanding the string if necessary.
+ *
+ * @param dst A pointer to the string to which the raw C-string will be appended.
+ * @param src The raw C-string to append to the string.
+ * @return A pointer to the modified string, or NULL if the operation failed.
  */
 string *string_append_raw_str(string *dst, const char *src);
 
+/**
+ * @brief Appends a long long integer to the string.
+ *
+ * This function converts the given long long integer to its string
+ * representation and appends it to the end of the string, expanding the
+ * string if necessary.
+ *
+ * @param str A pointer to the string to which the integer will be appended.
+ * @param num The long long integer to append to the string.
+ * @return A pointer to the modified string, or NULL if the operation failed.
+ */
+string *string_append_int(string *str, long long num);
+
+/**
+ * @brief Appends an unsigned long long integer to the string.
+ *
+ * This function converts the given unsigned long long integer to its string
+ * representation and appends it to the end of the string, expanding the
+ * string if necessary.
+ *
+ * @param str A pointer to the string to which the integer will be appended.
+ * @param num The unsigned long long integer to append to the string.
+ * @return A pointer to the modified string, or NULL if the operation failed.
+ */
+string *string_append_uint(string *str, unsigned long long num);
+
+/**
+ * @brief Clears the contents of the string.
+ *
+ * This function sets the length of the string to 0 and sets the first
+ * character of the string data to the null terminator.
+ *
+ * @param str A pointer to the string to be cleared.
+ */
 void string_clear(string *str);
 
+/**
+ * @brief Securely clears the contents of the string.
+ *
+ * This function sets all characters in the string data to the null terminator
+ * and sets the length of the string to 0.
+ *
+ * @param str A pointer to the string to be securely cleared.
+ */
 void string_clear_s(string *str);
 
+/**
+ * @brief Deletes the string and frees its memory.
+ *
+ * This function frees the memory allocated for the string and sets the
+ * string pointer to NULL.
+ *
+ * @param str A pointer to the string pointer to be deleted.
+ */
 void _string_delete(string **str);
 
+/**
+ * @brief Securely deletes the string and frees its memory.
+ *
+ * This function sets all bytes in the string to 0, frees the memory allocated
+ * for the string, and sets the string pointer to NULL.
+ *
+ * @param str A pointer to the string pointer to be securely deleted.
+ */
 void _string_delete_s(string **str);
 
-/*
- * Expands the passed string's allocated boundaries by
- * `expansion_factor`, updating the stats of `str` as necessary.
+/**
+ * @brief Expands the capacity of the string.
  *
- * \return A (possibly new) pointer associated with the data of
- * `str`, or `NULL` if reallocation failed.
+ * This function expands the capacity of the string by a predefined expansion
+ * factor, updating the string's stats as necessary.
  *
- * \note If reallocation failed, `str` will be unmodified.
+ * @param str A pointer to the string to be expanded.
+ * @return A pointer to the expanded string, or NULL if the operation failed.
  */
 string *string_expand(string *str);
 
-/*
- * Finds the first occurrence of `needle` within `haystack` starting
- * from the beginning of `haystack->data` and replaces it with
- * `replacement`, expanding `haystack` as necessary.
+/**
+ * @brief Finds and replaces the first occurrence of a substring within a string.
  *
- * \return A (possibly new) pointer associated with the data of
- * `haystack`, or `NULL` if the operation failed.
+ * This function finds the first occurrence of the needle string within the
+ * haystack string and replaces it with the replacement string, expanding the
+ * haystack string if necessary.
  *
- * \note A returned `NULL` pointer does not guarantee `haystack` is
- * unmodified by this function.
+ * @param hay A pointer to the haystack string.
+ * @param needle A pointer to the needle string.
+ * @param replace A pointer to the replacement string.
+ * @return A pointer to the modified haystack string, or NULL if the operation failed.
  */
 string *string_find_replace(string *hay, const string *needle,
                             const string *replace);
 
-/*
- * Finds all occurrences of `needle` within `haystack` starting from the
- * beginning of `haystack->data`, replacing any findings with
- * `replacement` and expanding `haystack` as necessary.
+/**
+ * @brief Creates a new string with a default capacity.
  *
- * \return A (possibly new) pointer associated with the data of
- * `haystack`, or `NULL` if the operation failed.
+ * This function creates a new string object with a default capacity.
  *
- * \note A returned `NULL` pointer does not guarantee `haystack` is
- * unmodified by this function.
- *
- * \attention Function not yet complete.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
-string *string_find_replace_all(string *hay, const string *needle,
-                                const string *replace);
-
 string *string_new_default(void);
 
-/*
- * Creates a `string` object capable of storing `capacity` number of
- * characters.
+/**
+ * @brief Creates a new string with a specified capacity.
  *
- * \return A pointer to a `string` object of size
- * `capacity + sizeof(string)`, or `NULL` upon failure.
+ * This function creates a new string object capable of storing the specified
+ * number of characters.
+ *
+ * @param capacity The number of characters the string should be able to store.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
-string *string_of_capacity(const size_t capacity);
+string *string_of_capacity(size_t capacity);
 
+/**
+ * @brief Creates a new string containing a single character.
+ *
+ * This function creates a new string object containing the specified character.
+ *
+ * @param chr The character to be contained in the new string.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
+ */
 string *string_of_char(char chr);
 
-/*
- * Generates a `string` object whose `data` consists of the passed raw
- * null-terminated string, `raw_str`.
+/**
+ * @brief Creates a new string from a raw C-string.
  *
- * \return A `string` object containing characters from `raw_str`, or
- * `NULL` upon failure.
+ * This function creates a new string object containing the characters from
+ * the specified raw C-string.
+ *
+ * @param raw_str The raw C-string to be contained in the new string.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
 string *string_of_raw_str(const char *raw_str);
 
-/*
- * Generates a `string` object whose `data` consists of a single line of
- * characters from `stdin`.
+/**
+ * @brief Creates a new string from a single line of input from stdin.
  *
- * \return A `string` object containing characters from `stdin`, or
- * `NULL` upon failure.
+ * This function creates a new string object containing a single line of
+ * characters read from stdin.
+ *
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
 string *string_of_line_stdin(void);
 
-/*
- * Creates a `string` object whose `data` consists of characters within
- * `stream` until `EOF` is met.
+/**
+ * @brief Creates a new string from a stream.
  *
- * \return A pointer to a `string` object containing characters from
- * `stream`, or `NULL` upon failure.
+ * This function creates a new string object containing the characters read
+ * from the specified stream until EOF is met.
+ *
+ * @param stream The stream to read characters from.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
 string *string_of_stream(FILE *stream);
 
-/*
- * Creates a `string` object whose `data` consists of characters from
- * `stream` until either `EOF` or the specified `delim` character is
- * met.
+/**
+ * @brief Creates a new string from a stream until a delimiter is met.
  *
- * \return A pointer to a `string` object containing characters from
- * `stream`, or `NULL` upon failure.
+ * This function creates a new string object containing the characters read
+ * from the specified stream until either EOF or the specified delimiter
+ * character is met.
+ *
+ * @param stream The stream to read characters from.
+ * @param delim The delimiter character to stop reading at.
+ * @return A pointer to the newly created string, or NULL if the operation failed.
  */
 string *string_of_stream_delim(FILE *stream, char delim);
 
-/*
- * Reallocates the memory used for `str` to fit `new_size` bytes,
- * updating the stats of `str` as necessary.
+/**
+ * @brief Resizes the string to fit the specified number of bytes.
  *
- * This function only modifies the memory allocated for characters,
- * meaning there will always be enough space for the data members of
- * `string` regardless of the value passed as `new_size`.
+ * This function reallocates the memory used for the string to fit the
+ * specified number of bytes, updating the string's stats as necessary.
  *
- * \return A (possibly new) pointer associated with the data of
- * `str`, or `NULL` if reallocation failed.
- *
- * \note If reallocation failed, `str` will be unmodified.
+ * @param str A pointer to the string to be resized.
+ * @param new_capacity The new capacity of the string in bytes.
+ * @return A pointer to the resized string, or NULL if the operation failed.
  */
 string *string_resize(string *str, size_t new_size);
 
-/*
- * Shrinks the memory used for `str` to fit the number of characters
- * it contains.
+/**
+ * @brief Shrinks the memory used for the string to fit its contents.
  *
- * \return A (possibly new) pointer associated with the data of
- * `str`, or `NULL` if reallocation failed.
+ * This function reallocates the memory used for the string to fit the number
+ * of characters it contains.
+ *
+ * @param str A pointer to the string to be shrunk.
+ * @return A pointer to the shrunk string, or NULL if the operation failed.
  */
 string *string_shrink_alloc(string *str);
 
