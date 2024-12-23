@@ -281,18 +281,3 @@ string *string_resize(string *str, const size_t new_capacity) {
 string *string_shrink_alloc(string *const str) {
   return string_resize(str, str->length);
 }
-
-int main(void) {
-  string *str = string_new("hey buddy");
-  string *str2 = string_new("hey");
-
-  str = string_append(str, (char)'!');
-  printf("\"%s\" (length: %zu | capacity: %zu | allocation: %zu)\n", str->data,
-         str->length, str->capacity, str->allocation);
-
-  str = string_find_replace(str, "hey", str2);
-  printf("\"%s\" (length: %zu | capacity: %zu | allocation: %zu)\n", str->data,
-         str->length, str->capacity, str->allocation);
-
-  return 0;
-}
