@@ -5,7 +5,9 @@
 *.o
 
 # Specific Files
+CMakeCache.txt
 
 # Folders
 .vscode
 build
+CMakeFiles
