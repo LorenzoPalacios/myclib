@@ -2,7 +2,6 @@
 #define RANDOM_H
 
 #include <stdbool.h>
-#include <stddef.h>
 
 typedef unsigned int seed_t;
 
