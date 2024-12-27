@@ -1,125 +1,231 @@
 #include "random.h"
 
+#include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
-#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-unsigned char *random_unsigned_raw_string(const unsigned char min,
-                                          const unsigned char max,
-                                          const size_t length) {
-  /* (length + 1) to account for the null terminator. */
-  unsigned char *str = malloc(length + 1);
-  if (str == NULL) return NULL;
+#if (CACHE_ALLOWED)
 
-  for (size_t i = 0; i < length; i++)
-    str[i] = random_unsigned_char_in_range(min, max);
+typedef void *cache;
+typedef cache *(*cache_constructor)(void);
 
-  str[length] = '\0';
+#define INT_CACHE_SIZE (CACHED_ELEMS * sizeof(int))
+// We use `INT_CACHE_SIZE` because `rand()` returns an int.
+#define BOOL_CACHE_SIZE (INT_CACHE_SIZE)
 
-  return str;
-}
+// - CACHE STOCKERS -
 
-/* Returns a random string of `char` using `random_vis_uchar()`. */
-char *random_raw_string(const char min, const char max, const size_t length) {
-  // (length + 1) to account for the null terminator
-  char *str = malloc(length + 1);
-  if (str == NULL) return NULL;
-
-  for (size_t i = 0; i < length; i++)
-    str[i] = random_unsigned_char_in_range(min, max);
-  str[length] = '\0';
-
-  return str;
-}
-
-char *random_alphabetical_raw_string(const size_t length) {
-  /* (length + 1) to account for the null terminator */
-  char *str = malloc(length + 1);
-  if (str == NULL) return NULL;
-
-  for (size_t i = 0; i < length; i++) {
-    if (random_bool() & 1)
-      str[i] = random_unsigned_char_in_range('a', 'z');
-    else
-      str[i] = random_unsigned_char_in_range('A', 'Z');
+/**
+ * @brief Stocks the integer cache with random values.
+ *
+ * This function fills the provided cache with random integer values.
+ *
+ * @param cache Pointer to the cache to be stocked.
+ */
+static void stock_int_cache(void *const cache) {
+  for (size_t i = 0; i < CACHED_ELEMS; i++) {
+    ((int *)cache)[i] = rand();
   }
-  str[length] = '\0';
-
-  return str;
 }
 
-char random_visible_char(void) {
-#if (!ALLOW_RANDOM_GEN_CACHING)
-  return random_int(VIS_CHAR_START, CHAR_MAX);
-#else
-  static char cache[CACHE_SIZE];
-  static size_t iterator = CACHE_SIZE;
+/**
+ * @brief Stocks the boolean cache with random values.
+ *
+ * This function fills the provided cache with random boolean values.
+ *
+ * @param cache Pointer to the cache to be stocked.
+ */
+static inline void stock_bool_cache(void *const cache) {
+  stock_int_cache(cache);
+}
 
-  if (iterator == CACHE_SIZE) {
-    for (size_t i = 0; i < CACHE_SIZE; i++)
-      cache[i] = random_int(VIS_CHAR_START, CHAR_MAX);
-    iterator = 0;
+// - CACHE CONSTRUCTORS -
+
+/**
+ * @brief Retrieves the integer cache.
+ *
+ * This function returns a pointer to the integer cache, allocating and
+ * stocking it if necessary.
+ *
+ * @return Pointer to the integer cache.
+ */
+static cache *get_int_cache(void) {
+  static cache int_cache = NULL;
+  if (int_cache == NULL) {
+    int_cache = malloc(INT_CACHE_SIZE);
+    if (int_cache != NULL) {
+      stock_int_cache(int_cache);
+    }
   }
-  return cache[iterator++];
+  return &int_cache;
+}
+
+/**
+ * @brief Retrieves the boolean cache.
+ *
+ * This function returns a pointer to the boolean cache, allocating and
+ * stocking it if necessary.
+ *
+ * @return Pointer to the boolean cache.
+ */
+static cache *get_bool_cache(void) {
+  static cache bool_cache = NULL;
+  if (bool_cache == NULL) {
+    bool_cache = malloc(BOOL_CACHE_SIZE);
+    if (bool_cache != NULL) {
+      stock_bool_cache(bool_cache);
+    }
+  }
+  return &bool_cache;
+}
+
+// - INTERNAL IMPLEMENTATION -
+
+/**
+ * @brief Finds the highest bit index in RAND_MAX.
+ *
+ * This function calculates and returns the highest bit index in RAND_MAX.
+ *
+ * @return The highest bit index in RAND_MAX.
+ */
+static inline size_t rand_max_highest_bit_index(void) {
+  static size_t HIGHEST_BIT_INDEX = 0;
+  if (HIGHEST_BIT_INDEX == 0) {
+    // Although `RAND_MAX` is guaranteed to be at least `32767` and at most
+    // `INT_MAX`, two's complement is not guaranteed, so we cannot initialize
+    // `bit` with `15`.
+    size_t bit = 0;
+    while ((RAND_MAX >> bit) != 0) {
+      bit++;
+    }
+    HIGHEST_BIT_INDEX = bit;
+  }
+  return HIGHEST_BIT_INDEX;
+}
+
+/**
+ * @brief Retrieves a random boolean value from the cache.
+ *
+ * This function returns a random boolean value from the cache, restocking
+ * the cache as necessary.
+ *
+ * @note This method restocks its cache after
+ * `(CACHED_ELEMS * RAND_MAX_HIGHEST_BIT_INDEX)` hits.
+ *
+ * @return A random boolean value.
+ */
+static bool get_bool_from_cache(void) {
+  int *const cache = *get_bool_cache();
+
+  if (cache == NULL) {
+    return rand() & 1;
+  }
+
+  static size_t cache_index = 0;
+  static size_t bit_index = 0;
+
+  if (cache_index == CACHED_ELEMS) {
+    bit_index++;
+    cache_index = 0;
+    /*
+     * The highest bit is unlikely to show up with `rand()`, so we reset
+     * `bit_index` despite the highest bit technically being valid. If we did
+     * not reset `bit_index`, a majority of the returned values will be `false`,
+     * since many of the cache elements will not have this bit set by due to
+     * being less than `RAND_MAX`.
+     */
+    if (bit_index == rand_max_highest_bit_index()) {
+      bit_index = 0;
+      stock_bool_cache(cache);
+    }
+  }
+  return cache[cache_index++] & (1 << bit_index);
+}
+
+/**
+ * @brief Retrieves a random integer value from the cache.
+ *
+ * This function returns a random integer value from the cache, restocking
+ * the cache as necessary.
+ *
+ * @return A random integer value.
+ */
+static int get_int_from_cache(void) {
+  int *const cache = *get_int_cache();
+
+  if (cache == NULL) {
+    return rand();
+  }
+
+  static size_t cache_index = 0;
+
+  if (cache_index == CACHED_ELEMS) {
+    cache_index = 0;
+    stock_int_cache(cache);
+  }
+  return cache[cache_index++];
+}
+
+// Cache constructors go here
+#define cache_constructors \
+  ((cache_constructor[]){get_bool_cache, get_int_cache})
+#define NUM_GETTERS (sizeof(cache_constructors) / sizeof *(cache_constructors))
+
+// - PUBLIC CACHE-RELATED FUNCTIONS -
+
+void random_destroy_caches(void) {
+  for (size_t i = 0; i < NUM_GETTERS; i++) {
+    cache *const cache = cache_constructors[i]();
+    free(*cache);
+    *cache = NULL;
+  }
+}
+
+seed_t random_init(void) {
+  seed_t SEED;
+  {
+    struct timespec t_spec;
+    timespec_get(&t_spec, TIME_UTC);
+    const long long UTC_NS = t_spec.tv_nsec;
+    const long long EPOCH_TIME = time(NULL);
+    const long long CLOCK_TIME = clock();
+    SEED = (seed_t)(UTC_NS ^ EPOCH_TIME ^ CLOCK_TIME);
+  }
+  srand(SEED);
+
+  // The first call to the cache constructors will allocate and stock the
+  // caches.
+  for (size_t i = 0; i < NUM_GETTERS; i++) {
+    void *const cache = *cache_constructors[i]();
+    if (cache == NULL) {
+      fprintf(stderr, "random_init(): Failed to create cache %zu\n", i);
+    }
+  }
+  // The first call to this function finds the highest bit in `RAND_MAX`, which
+  // will be returned by any subsequent calls.
+  rand_max_highest_bit_index();
+  return SEED;
+}
 #endif
-}
 
-unsigned char random_unsigned_char_in_range(const unsigned char min,
-                                            const unsigned char max) {
-  return random_int(min, max);
-}
-
-unsigned char random_visible_unsigned_char(void) {
-#if (!ALLOW_RANDOM_GEN_CACHING)
-  return random_int(VIS_CHAR_START, UCHAR_MAX);
-#else
-  static unsigned char cache[CACHE_SIZE];
-  static size_t iterator = CACHE_SIZE;
-
-  if (iterator == CACHE_SIZE) {
-    for (size_t i = 0; i < CACHE_SIZE; i++)
-      cache[i] = random_int(VIS_CHAR_START, UCHAR_MAX);
-    iterator = 0;
-  }
-  return cache[iterator++];
-#endif
-}
+// - RANDOM GENERATORS -
 
 bool random_bool(void) {
-#if (!ALLOW_RANDOM_GEN_CACHING)
-  return rand() & 1;
+#if (CACHE_ALLOWED)
+  return get_bool_from_cache();
 #else
-  /*
-   * For this particular cache, the stored elements in the below array are used
-   * as bitfields. The bits within each bitfield are accessed by shifting `0b1`
-   * to the left `bit_iterator` times. Once `bit_iterator` reaches the maximum
-   * number of bits within that bitfield, `cache_iterator` is incremented so
-   * the next bitfield can be used, and `bit_iterator` is reset to 0.
-   */
-  static uint_fast8_t cache[CACHE_SIZE];
-  /*
-   * Setting the iterator to the end of the cache will prompt its restocking
-   * upon the initial call to this function.
-   */
-  static size_t cache_iterator = CACHE_SIZE;
-  static uint_fast8_t bit_iterator = 1;
-  if (bit_iterator == CHAR_BIT * sizeof(*cache)) {
-    bit_iterator = 1;
-    cache_iterator++;
-  }
-
-  if (cache_iterator == CACHE_SIZE) {
-    for (size_t i = 0; i < CACHE_SIZE; ++i) {
-      cache[i] = rand();
-    }
-    cache_iterator = 0;
-  }
-  return cache[cache_iterator] & (1 << bit_iterator++);
+  return rand() & 1;
 #endif
 }
 
-int random_int(const int min, const int max) {
-  return rand() % (max - min) + min;
+// This function will need revising to deal with the variable range of `rand()`.
+int random_int(void) {
+#if (CACHE_ALLOWED)
+  return get_int_from_cache();
+#else
+  return rand();
+#endif
 }

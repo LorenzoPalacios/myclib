@@ -1,78 +1,61 @@
-/*
- * This file utilizes rand().
- * Ensure srand() is called with a valid seed before using these functions.
- */
-
 #ifndef RANDOM_H
 #define RANDOM_H
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "random.h"
-
-/* The minimum `signed char` value for a visible ASCII character (inclusive). */
-#define VIS_CHAR_START (' ' + 1)
-/* The maximum `signed char` value for a visible ASCII character (inclusive). */
-#define VIS_CHAR_END ('' - 1)
+typedef unsigned int seed_t;
 
 /*
- * Set to `true` for certain random generator methods to generate
+ * Set to `true` for certain random generator functions to generate
  * a cache of data as needed and return elements from that cache.
  */
-#define ALLOW_RANDOM_GEN_CACHING (true)
+#define CACHE_ALLOWED (true)
 
-/*
- * Determines the number of elements (not bytes) each relevant function will
- * cache.
+#if (CACHE_ALLOWED)
+
+// This is the size of each generator's cache in terms of elements.
+#define CACHED_ELEMS (4096)
+
+/**
+ * @brief Initializes the random generator.
+ * 
+ * This function sets up the random generator with an initial seed.
+ * It should be called before any other random number generation functions
+ * are used.
+ * 
+ * @return seed_t The initial seed value used for the random number generator.
  */
-#if (ALLOW_RANDOM_GEN_CACHING)
-#define CACHE_SIZE ((size_t)1024)
+
+seed_t random_init(void);
+
+/**
+ * @brief Destroys all caches used by the random generator functions.
+ *
+ * This function frees any memory allocated for caches used by the random
+ * generator functions.
+ */
+void random_destroy_caches(void);
+
 #endif
 
-/* Returns an `int` from `rand()` within the specified range (inclusive). */
-int random_int(int min, int max);
-
-/*
- * Returns either `true` or `false`.
+/**
+ * @brief Returns a random boolean value.
  *
- * If caching is enabled, the first call to this function will create a cache,
- * then return the first element from the created cache.
+ * If caching is enabled, the first call to this function will create a
+ * cache, then return the first element from the created cache.
+ *
+ * @return `true` or `false`.
  */
 bool random_bool(void);
 
-/* Returns a random string of `char` using `random_vis_uchar()`. */
-char *random_raw_string(char min, char max, size_t length);
-
-/*
- * Returns a random string of alphabetical chararacters using
- * `random_vis_uchar()`.
- */
-char *random_alphabetical_raw_string(size_t length);
-
-/* Returns a random string of `unsigned char` using `random_vis_uchar()`. */
-unsigned char *random_unsigned_raw_string(unsigned char min, unsigned char max,
-                                          size_t length);
-
-/*
- * Returns a visible extended ASCII character using `rand()`.
+/**
+ * @brief Returns a random integer value.
  *
- * If caching is enabled, the first call to this function will stock the cache.
- */
-unsigned char random_visible_unsigned_char(void);
-
-/*
- * Returns a visible standard ASCII character using `rand()`.
+ * This function generates and returns a random integer value.
  *
- * If caching is enabled, the first call to this function will stock the cache.
+ * @return A random integer.
  */
-char random_visible_char(void);
-
-/*
- * Returns an `unsigned char` from `rand()` whose value is between `min`
- * and `max` (inclusive).
- */
-unsigned char random_unsigned_char_in_range(unsigned char min,
-                                            unsigned char max);
+int random_int(void);
 
 #endif
