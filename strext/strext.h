@@ -3,94 +3,95 @@
 
 #include <stdio.h>
 
-typedef struct {
-  char *data;
-  size_t length;
-  size_t capacity;
-  size_t allocation;
+typedef struct
+{
+    char *data;
+    size_t length;
+    size_t capacity;
+    size_t allocation;
 } string;
 
-#define string_delete(str) _string_delete(&(str))
-#define string_delete_s(str) _string_delete_s(&(str))
+#define string_delete(str) string_delete_(&(str))
+#define string_delete_s(str) string_delete_s_(&(str))
 
-#define string_append(str, appended)                 \
-  (_Generic((appended),                              \
-       short: string_append_int,                     \
-       int: string_append_int,                       \
-       long: string_append_int,                      \
-       long long: string_append_int,                 \
-       unsigned short: string_append_uint,           \
-       unsigned int: string_append_uint,             \
-       unsigned long: string_append_uint,            \
-       unsigned long long: string_append_uint,       \
-       string *: string_append_str,                  \
-       const string *: string_append_str,            \
-       char *: string_append_raw_str,                \
-       signed char *: string_append_raw_str,         \
-       unsigned char *: string_append_raw_str,       \
-       const char *: string_append_raw_str,          \
-       const signed char *: string_append_raw_str,   \
-       const unsigned char *: string_append_raw_str, \
-       char: string_append_char,                     \
-       signed char: string_append_char,              \
-       unsigned char: string_append_char)(str, appended))
+#define string_append(str, appended)                                                                                   \
+    (_Generic((appended),                                                                                              \
+         short: string_append_int,                                                                                     \
+         int: string_append_int,                                                                                       \
+         long: string_append_int,                                                                                      \
+         long long: string_append_int,                                                                                 \
+         unsigned short: string_append_uint,                                                                           \
+         unsigned int: string_append_uint,                                                                             \
+         unsigned long: string_append_uint,                                                                            \
+         unsigned long long: string_append_uint,                                                                       \
+         string *: string_append_str,                                                                                  \
+         const string *: string_append_str,                                                                            \
+         char *: string_append_raw_str,                                                                                \
+         signed char *: string_append_raw_str,                                                                         \
+         unsigned char *: string_append_raw_str,                                                                       \
+         const char *: string_append_raw_str,                                                                          \
+         const signed char *: string_append_raw_str,                                                                   \
+         const unsigned char *: string_append_raw_str,                                                                 \
+         char: string_append_char,                                                                                     \
+         signed char: string_append_char,                                                                              \
+         unsigned char: string_append_char)(str, appended))
 
-#define string_find_replace(src, needle, replacer)         \
-  (_Generic((needle),                                      \
-       string *: string_find_replace_str,                  \
-       const string *: string_find_replace_str,            \
-       char *: string_find_replace_raw_str,                \
-       signed char *: string_find_replace_raw_str,         \
-       unsigned char *: string_find_replace_raw_str,       \
-       const char *: string_find_replace_raw_str,          \
-       const signed char *: string_find_replace_raw_str,   \
-       const unsigned char *: string_find_replace_raw_str, \
-       char: string_find_replace_char,                     \
-       signed char: string_find_replace_char,              \
-       unsigned char: string_find_replace_char)(str, needle, replacer))
+#define string_find_replace(src, needle, replacer)                                                                     \
+    (_Generic((needle),                                                                                                \
+         string *: string_find_replace_str,                                                                            \
+         const string *: string_find_replace_str,                                                                      \
+         char *: string_find_replace_raw_str,                                                                          \
+         signed char *: string_find_replace_raw_str,                                                                   \
+         unsigned char *: string_find_replace_raw_str,                                                                 \
+         const char *: string_find_replace_raw_str,                                                                    \
+         const signed char *: string_find_replace_raw_str,                                                             \
+         const unsigned char *: string_find_replace_raw_str,                                                           \
+         char: string_find_replace_char,                                                                               \
+         signed char: string_find_replace_char,                                                                        \
+         unsigned char: string_find_replace_char)(str, needle, replacer))
 
-#define string_insert(str, inserted, index)          \
-  (_Generic((inserted),                              \
-       short: string_insert_int,                     \
-       int: string_insert_int,                       \
-       long: string_insert_int,                      \
-       long long: string_insert_int,                 \
-       unsigned short: string_insert_uint,           \
-       unsigned int: string_insert_uint,             \
-       unsigned long: string_insert_uint,            \
-       unsigned long long: string_insert_uint,       \
-       string *: string_insert_str,                  \
-       const string *: string_insert_str,            \
-       char *: string_insert_raw_str,                \
-       signed char *: string_insert_raw_str,         \
-       unsigned char *: string_insert_raw_str,       \
-       const char *: string_insert_raw_str,          \
-       const signed char *: string_insert_raw_str,   \
-       const unsigned char *: string_insert_raw_str, \
-       char: string_insert_char,                     \
-       signed char: string_insert_char,              \
-       unsigned char: string_insert_char)(str, inserted, index))
+#define string_insert(str, inserted, index)                                                                            \
+    (_Generic((inserted),                                                                                              \
+         short: string_insert_int,                                                                                     \
+         int: string_insert_int,                                                                                       \
+         long: string_insert_int,                                                                                      \
+         long long: string_insert_int,                                                                                 \
+         unsigned short: string_insert_uint,                                                                           \
+         unsigned int: string_insert_uint,                                                                             \
+         unsigned long: string_insert_uint,                                                                            \
+         unsigned long long: string_insert_uint,                                                                       \
+         string *: string_insert_str,                                                                                  \
+         const string *: string_insert_str,                                                                            \
+         char *: string_insert_raw_str,                                                                                \
+         signed char *: string_insert_raw_str,                                                                         \
+         unsigned char *: string_insert_raw_str,                                                                       \
+         const char *: string_insert_raw_str,                                                                          \
+         const signed char *: string_insert_raw_str,                                                                   \
+         const unsigned char *: string_insert_raw_str,                                                                 \
+         char: string_insert_char,                                                                                     \
+         signed char: string_insert_char,                                                                              \
+         unsigned char: string_insert_char)(str, inserted, index))
 
-#define string_new(arg)                          \
-  (_Generic((arg),                               \
-       char: string_of_char,                     \
-       signed char: string_of_char,              \
-       unsigned char: string_of_char,            \
-       short: string_of_capacity,                \
-       int: string_of_capacity,                  \
-       long: string_of_capacity,                 \
-       long long: string_of_capacity,            \
-       unsigned short: string_of_capacity,       \
-       unsigned int: string_of_capacity,         \
-       unsigned long: string_of_capacity,        \
-       unsigned long long: string_of_capacity,   \
-       char *: string_of_raw_str,                \
-       signed char *: string_of_raw_str,         \
-       unsigned char *: string_of_raw_str,       \
-       const char *: string_of_raw_str,          \
-       const signed char *: string_of_raw_str,   \
-       const unsigned char *: string_of_raw_str, \
-       FILE *: string_of_stream)(arg))
+#define string_new(arg)                                                                                                \
+    (_Generic((arg),                                                                                                   \
+         char: string_of_char,                                                                                         \
+         signed char: string_of_char,                                                                                  \
+         unsigned char: string_of_char,                                                                                \
+         short: string_of_capacity,                                                                                    \
+         int: string_of_capacity,                                                                                      \
+         long: string_of_capacity,                                                                                     \
+         long long: string_of_capacity,                                                                                \
+         unsigned short: string_of_capacity,                                                                           \
+         unsigned int: string_of_capacity,                                                                             \
+         unsigned long: string_of_capacity,                                                                            \
+         unsigned long long: string_of_capacity,                                                                       \
+         char *: string_of_raw_str,                                                                                    \
+         signed char *: string_of_raw_str,                                                                             \
+         unsigned char *: string_of_raw_str,                                                                           \
+         const char *: string_of_raw_str,                                                                              \
+         const signed char *: string_of_raw_str,                                                                       \
+         const unsigned char *: string_of_raw_str,                                                                     \
+         FILE *: string_of_stream)(arg))
 
 /**
  * @brief Appends a character to the end of the string.
@@ -102,7 +103,7 @@ typedef struct {
  * @param chr The character to append to the string.
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
-string *string_append_char(string *dst, char appended);
+string *string_append_char(string *dst, char chr);
 
 /**
  * @brief Appends one string to another.
@@ -184,7 +185,7 @@ void string_clear_s(string *str);
  *
  * @param str A pointer to the string pointer to be deleted.
  */
-void _string_delete(string **str);
+void string_delete_(string **str);
 
 /**
  * @brief Securely deletes the string and frees its memory.
@@ -194,7 +195,7 @@ void _string_delete(string **str);
  *
  * @param str A pointer to the string pointer to be securely deleted.
  */
-void _string_delete_s(string **str);
+void string_delete_s_(string **str);
 
 /**
  * @brief Expands the capacity of the string.
@@ -221,8 +222,7 @@ string *string_expand(string *str);
  * @return A pointer to the modified haystack string, or `NULL` if the operation
  * failed.
  */
-string *string_find_replace_str(string *src, const string *needle,
-                                const string *replace);
+string *string_find_replace_str(string *src, const string *tgt, const string *replace);
 
 /**
  * @brief Finds and replaces the first occurrence of a raw C-string within a
@@ -238,8 +238,7 @@ string *string_find_replace_str(string *src, const string *needle,
  * @return A pointer to the modified haystack string, or `NULL` if the operation
  * failed.
  */
-string *string_find_replace_raw_str(string *src, const char *needle,
-                                    const string *replace);
+string *string_find_replace_raw_str(string *src, const char *tgt, const string *replace);
 
 /**
  * @brief Finds and replaces the first occurrence of a character within a
@@ -255,7 +254,7 @@ string *string_find_replace_raw_str(string *src, const char *needle,
  * @return A pointer to the modified haystack string, or `NULL` if the operation
  * failed.
  */
-string *string_find_replace_char(string *src, const char needle,
+string *string_find_replace_char(string *src, char tgt,
                                  const string *replace);
 
 /**
@@ -296,7 +295,7 @@ string *string_insert_int(string *dst, long long num, size_t index);
  * @param index The index at which to insert the raw C-string.
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
-string *string_insert_raw_str(string *dst, const char *src, const size_t index);
+string *string_insert_raw_str(string *dst, const char *src, size_t index);
 
 /**
  * @brief Inserts an `unsigned long long` integer into the string at the
@@ -326,7 +325,7 @@ string *string_insert_uint(string *dst, unsigned long long num, size_t index);
  * @return A pointer to the modified destination string, or `NULL` if the
  * operation failed.
  */
-string *string_insert_str(string *dst, string *src, size_t index);
+string *string_insert_str(string *dst, const string *src, size_t index);
 
 /**
  * @brief Creates a new string with a default capacity.
