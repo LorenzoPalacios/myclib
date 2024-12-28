@@ -1,6 +1,5 @@
 #include "strext.h"
 
-#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -52,8 +51,7 @@ static inline string *expand_str_to_capacity(string *str,
 }
 
 static string *find_replace_(string *src, const char *const tgt,
-                             const size_t tgt_len,
-                             const char *const repl,
+                             const size_t tgt_len, const char *const repl,
                              const size_t repl_len) {
   if (tgt_len == 0) return src;
 
@@ -66,7 +64,7 @@ static string *find_replace_(string *src, const char *const tgt,
       src = realloc_str;
     }
 
-    const size_t REMAINDER = src->length - (needle_pos - src->data);
+    const size_t REMAINDER = src->length - (size_t)(needle_pos - src->data);
     memmove(needle_pos + repl_len, needle_pos + tgt_len, REMAINDER);
     /* Using `memcpy()` since `strcpy()` appends a null terminator. */
     memcpy(needle_pos, repl, repl_len);
@@ -172,7 +170,8 @@ string *string_find_replace_char(string *const src, const char tgt,
   return find_replace_(src, &tgt, 1, repl->data, repl->length);
 }
 
-string *string_insert_char(string *const dst, const char chr, const size_t index) {
+string *string_insert_char(string *const dst, const char chr,
+                           const size_t index) {
   return string_insert_(dst, index, &chr, 1);
 }
 
@@ -182,7 +181,8 @@ string *string_insert_raw_str(string *dst, const char *const src,
   return string_insert_(dst, index, src, SRC_LEN);
 }
 
-string *string_insert_str(string *const dst, const string *const src, const size_t index) {
+string *string_insert_str(string *const dst, const string *const src,
+                          const size_t index) {
   return string_insert_(dst, index, src->data, src->length);
 }
 
@@ -263,8 +263,11 @@ string *string_of_stream_delim(FILE *const stream, const char delim) {
 
 string *string_resize(string *str, const size_t new_capacity) {
   const size_t ALLOCATION = calc_allocation(new_capacity);
-  str = realloc(str, ALLOCATION);
-  if (str == NULL) return NULL;
+  {
+    string *const new_str = realloc(str, ALLOCATION);
+    if (new_str == NULL) return NULL;
+    str = new_str;
+  }
   str->data = get_string_contents(str);
   str->capacity = new_capacity;
   str->allocation = ALLOCATION;
