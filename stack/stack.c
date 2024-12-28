@@ -1,56 +1,41 @@
 #include "stack.h"
 
-#include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* The factor by which to expand a stack's capacity. */
 #define STACK_EXPANSION_FACTOR (2)
 
-stack *_new_stack(const void *const data, const size_t len,
-                  const size_t elem_size) {
-  stack *const stk = new_empty_stack(len, elem_size);
-  if (stk == NULL) return NULL;
-  stk->length = len;
-  stk->used_capacity = stk->capacity;
-  /* 
-   * Elements of `data` are inserted in reverse so that the first element of
-   * `data` will always be the top-level element in the stack.
-   */
-  for (size_t stk_i = 0, data_i = len - 1; stk_i < len; stk_i++, data_i--) {
-    memcpy((byte_t *)stk->data + stk_i * elem_size,
-           (byte_t *)data + data_i * elem_size, elem_size);
-  }
-  return stk;
+static inline size_t alloc_calc(const stack *const stk, const size_t capacity) {
+  return (capacity * stk->elem_size) + sizeof(stack);
 }
 
-static stack *alloc_stack(const size_t stack_capacity) {
-  return malloc(stack_capacity + sizeof(stack));
+size_t stack_capacity(const stack *const stk) {
+  return (stk->allocation - sizeof(stack)) / stk->elem_size;
 }
 
-void clear_stack(stack *stk) {
+void stack_clear(stack *const stk) { stk->length = 0; }
+
+void stack_clear_s(stack *const stk) {
   stk->length = 0;
-  stk->used_capacity = 0;
+  memset(stk->data, 0, stack_capacity(stk));
 }
 
-void clear_stack_s(stack *stk) {
-  stk->length = 0;
-  stk->used_capacity = 0;
-  memset(stk->data, 0, stk->capacity);
-}
+static inline byte *stack_data(stack *const stk) { return (byte *)(stk + 1); }
 
-void delete_stack(stack **const stk) {
+void stack_delete_(stack **const stk) {
   free(*stk);
   *stk = NULL;
 }
 
-void delete_stack_s(stack **const stk) {
-  memset(*stk, 0, (*stk)->capacity);
-  delete_stack(stk);
+void stack_delete_s_(stack **const stk) {
+  memset(*stk, 0, (*stk)->allocation);
+  stack_delete_(stk);
 }
 
-stack *expand_stack(stack *stk) {
-  stack *new_stk = resize_stack(stk, STACK_EXPANSION_FACTOR * stk->capacity);
+stack *stack_expand(stack *const stk) {
+  stack *new_stk = stack_resize(stk, STACK_EXPANSION_FACTOR * stk->allocation);
   /*
    * Reallocation may fail because the requested memory is too large.
    * In this case, we fall back to the safer, yet generally less efficient
@@ -61,37 +46,53 @@ stack *expand_stack(stack *stk) {
    * memory, so it's fine to return `NULL`.
    */
   if (new_stk == NULL)
-    new_stk = resize_stack(stk, stk->capacity + stk->elem_size);
+    new_stk = stack_resize(stk, stk->allocation + stk->elem_size);
   return new_stk;
 }
 
-stack *new_empty_stack(const size_t num_elems, const size_t elem_size) {
-  const size_t STACK_CAPACITY = num_elems * elem_size;
-  stack *const stk = alloc_stack(STACK_CAPACITY);
-  if (stk == NULL) return NULL;
-  stk->capacity = STACK_CAPACITY;
-  stk->used_capacity = 0;
-  stk->elem_size = elem_size;
-  stk->data = stk + 1; /* Increment past the stack header. */
-  stk->length = 0;
-  return stk;
+static inline byte *stack_get_elem(stack *const stk, const size_t index) {
+  return stk->data + (index * stk->elem_size);
 }
 
-stack *resize_stack(stack *stk, size_t new_size) {
-  {
-    const size_t SIZE_DIFF = new_size % stk->elem_size;
-    if (SIZE_DIFF != 0) new_size += stk->elem_size - SIZE_DIFF;
+stack *stack_new_(const void *const data, const size_t len,
+                  const size_t elem_size) {
+  stack *const stk = stack_empty_new(len, elem_size);
+  if (stk == NULL) return NULL;
+  stk->length = len;
+
+  for (size_t i = 0; i < len; i++) {
+    memcpy(stk->data + (i * elem_size), (const byte *)data + (i * elem_size),
+           elem_size);
   }
-  stk = realloc(stk, new_size + sizeof(stack));
-  if (stk == NULL) return NULL;
-  stk->capacity = new_size;
-  stk->data = stk + 1; /* Increment past the stack header. */
   return stk;
 }
 
-stack *shrink_stack_to_fit(stack *stk) {
-  if (stk->capacity > stk->used_capacity)
-    stk = resize_stack(stk, stk->used_capacity);
+stack *stack_empty_new(const size_t num_elems, const size_t elem_size) {
+  const size_t ALLOCATION = (num_elems * elem_size) + sizeof(stack);
+  stack *const stk = malloc(ALLOCATION);
+  if (stk == NULL) return NULL;
+  stk->data = stack_data(stk);
+  stk->length = 0;
+  stk->elem_size = elem_size;
+  stk->allocation = ALLOCATION;
+  return stk;
+}
+
+stack *stack_resize(stack *const stk, const size_t new_capacity) {
+  const size_t ALLOCATION = alloc_calc(stk, new_capacity);
+  stack *const new_stk = realloc(stk, ALLOCATION);
+  if (new_stk == NULL) return NULL;
+  new_stk->data = stack_data(new_stk);
+  new_stk->allocation = ALLOCATION;
+
+  if (new_capacity < new_stk->length) new_stk->length = new_capacity;
+
+  return new_stk;
+}
+
+stack *stack_shrink_to_fit(stack *stk) {
+  const size_t CAPACITY = stack_capacity(stk);
+  if (CAPACITY > stk->length) stk = stack_resize(stk, stk->length);
   return stk;
 }
 
@@ -101,68 +102,61 @@ void *stack_peek(stack *const stk) {
    * Subtracting by one since `stk->length` is equivalent to the number of
    * elements within `stk`.
    */
-  return (byte_t *)stk->data + (stk->length - 1) * stk->elem_size;
+  return stk->data + ((stk->length - 1) * stk->elem_size);
 }
 
 void *stack_pop(stack *const stk) {
   if (stk->length == 0) return NULL;
-  void *val = stack_peek(stk);
+  void *const val = stack_peek(stk);
   stk->length--;
-  stk->used_capacity -= stk->elem_size;
   return val;
 }
 
 stack *stack_push(stack *stk, const void *const elem) {
-  if (stk->used_capacity + stk->elem_size > stk->capacity) {
-    stk = expand_stack(stk);
+  const size_t LENGTH = stk->length;
+  if (LENGTH + 1 > stack_capacity(stk)) {
+    stk = stack_expand(stk);
     if (stk == NULL) return NULL;
   }
-  const size_t LENGTH = stk->length;
-  const size_t ELEM_SIZE = stk->elem_size;
-  memcpy((byte_t *)stk->data + LENGTH * ELEM_SIZE, elem, ELEM_SIZE);
+  memcpy(stack_get_elem(stk, LENGTH), elem, stk->elem_size);
   stk->length++;
-  stk->used_capacity += stk->elem_size;
   return stk;
 }
 
 /* For heapless stacks. */
 
-void *heapless_stack_peek(stack *const stk) { return stack_peek(stk); }
+void *stack_heapless_peek(stack *const stk) { return stack_peek(stk); }
 
-void *heapless_stack_pop(stack *const stk) { return stack_pop(stk); }
+void *stack_heapless_pop(stack *const stk) { return stack_pop(stk); }
 
-stack *heapless_stack_push(stack *const stk, const void *const elem) {
-  if (stk->used_capacity + stk->elem_size > stk->capacity) return NULL;
+stack *stack_heapless_push(stack *const stk, const void *const elem) {
   const size_t LENGTH = stk->length;
-  const size_t ELEM_SIZE = stk->elem_size;
-  memcpy((byte_t *)stk->data + LENGTH * ELEM_SIZE, elem, ELEM_SIZE);
+  if (LENGTH + 1 > stack_capacity(stk)) return NULL;
+  memcpy(stack_get_elem(stk, LENGTH), elem, stk->elem_size);
   stk->length++;
-  stk->used_capacity += stk->elem_size;
   return stk;
 }
 
 /* For stacks as interfaces. */
 
-stack *_new_interface_stack(void *const data, const size_t len,
+stack *stack_interface_new_(void *const data, const size_t len,
                             const size_t elem_size) {
   /*
    * The stack itself should not be managing any memory as it is an interface.
    * However, it should still have an allocation for its header.
    */
-  stack *const stk_interface = alloc_stack(0);
+  stack *const stk_interface = stack_empty_new(0, 0);
   if (stk_interface == NULL) return NULL;
   stk_interface->data = data;
-  stk_interface->capacity = len * elem_size;
-  stk_interface->used_capacity = stk_interface->capacity;
   stk_interface->elem_size = elem_size;
   stk_interface->length = len;
   return stk_interface;
 }
 
-void *interface_stack_pop(stack *const stk) { return stack_pop(stk); }
+void *stack_interface_pop(stack *const stk) { return stack_pop(stk); }
 
-void *interface_stack_peek(stack *const stk) { return stack_peek(stk); }
+void *stack_interface_peek(stack *const stk) { return stack_peek(stk); }
 
-stack *interface_stack_push(stack *const stk, const void *const elem) {
-  return heapless_stack_push(stk, elem);
+stack *stack_interface_push(stack *const stk, const void *const elem) {
+  return stack_heapless_push(stk, elem);
 }
