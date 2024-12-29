@@ -2,243 +2,272 @@
 #define STACK_H
 
 /*
- * Define `STACK_INCL_HEAPLESS_STACK` to include support for stacks of automatic
+ * Define `STACK_WANT_HEAPLESS` to include support for stacks of automatic
  * storage.
  */
 
-#include <stdlib.h>
+#include <stddef.h>
 
+typedef unsigned char byte;
+
+/**
+ * @brief Structure representing a stack.
+ */
 typedef struct {
-  void *data;
-  size_t capacity; /* `capacity + sizeof(stack)` will give total allocation */
-  size_t used_capacity;
-  size_t elem_size;
-  size_t length;
+  byte *data;         /**< Pointer to the stack data. */
+  size_t length;      /**< Number of elements in the stack. */
+  size_t elem_size;   /**< Size of each element in the stack. */
+  size_t allocation;  /**< Total allocated memory for the stack. */
 } stack;
 
-typedef unsigned char byte_t;
-
-/*
- * This is a convenience macro for `_new_stack()`.
- * Use with caution if `data` has side effects.
+/**
+ * @brief Macro to delete a stack and free its memory.
+ *
+ * @param stk Pointer to the stack.
  */
-#define new_stack(data) \
-  _new_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
+#define stack_delete(stk) stack_delete_(&(stk))
 
-/*
- * This is a convenience macro for `_new_interface_stack().`
- * Use with caution if `data` has side effects.
+/**
+ * @brief Macro to securely delete a stack by zeroing its memory before freeing.
+ *
+ * @param stk Pointer to the stack.
+ */
+#define stack_delete_s(stk) stack_delete_s_(&(stk))
+
+/**
+ * @brief Convenience macro for creating a new stack from data.
+ *
+ * @param data Pointer to the data.
+ */
+#define stack_new(data) \
+  stack_new_(data, sizeof(data) / sizeof *(data), sizeof *(data))
+
+/**
+ * @brief Convenience macro for creating a new stack interface from data.
+ *
+ * @param data Pointer to the data.
  */
 #define new_interface_stack(data) \
-  _new_interface_stack(data, sizeof(data) / sizeof *(data), sizeof *(data))
+  stack_interface_new_(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
-/* Creates a stack based off the elements in `data`. */
-stack *_new_stack(const void *data, size_t len, size_t elem_size);
-
-/* Resets `stk->length` and `stk->used_capacity` to `0`. */
-void clear_stack(stack *stk);
-
-/*
- * Same as `clear_stack()`, except this function will overwrite the contents of
- * `stk->data` with zeros.
- */
-void clear_stack_s(stack *stk);
-
-/*
- * Frees the memory used by `stk` and invalidates the passed pointer
- * associated with it.
- */
-void delete_stack(stack **const stk);
-
-/*
- * Same as `delete_stack()`, except this function will overwrite the contents of
- * `stk` with zeros before freeing the memory associated with `*stk`.
- */
-void delete_stack_s(stack **stk);
-
-/*
- * Expands the memory used by `stk->data`, thereby increasing its capacity.
+/**
+ * @brief Creates a stack based off the elements in `data`.
  *
- * \return A pointer associated with the contents of `stk` or `NULL` upon
- * failure.
+ * @param data Pointer to the data.
+ * @param len Length of the data.
+ * @param elem_size Size of each element.
+ * @return Pointer to the new stack or NULL if allocation fails.
  */
-stack *expand_stack(stack *stk);
+stack *stack_new_(const void *data, size_t len, size_t elem_size);
 
-/*
- * Returns and removes the top element from `stk`.
+/**
+ * @brief Gets the capacity of the stack.
  *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
- * stack was reached.
+ * @param stk Pointer to the stack.
+ * @return Capacity of the stack.
  */
-void *interface_stack_pop(stack *stk);
+size_t stack_capacity(const stack *stk);
 
-/*
- * Returns, but does not remove, the top element of `stk`.
+/**
+ * @brief Resets `stk->length` to `0`.
  *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
- * stack was reached.
+ * @param stk Pointer to the stack.
  */
-void *interface_stack_peek(stack *stk);
+void stack_reset(stack *stk);
 
-/*
- * Adds `elem` to `stk` if space permits (this can only be true if
- * `interface_stack_pop(stk)` was called). `elem` will then be the new top
- * element and will be returned by functions such as `interface_stack_peek()`.
+/**
+ * @brief Resets the stack and sets all elements to zero.
  *
- * \return `stk` if the push was successful or `NULL` upon failure.
+ * @param stk Pointer to the stack.
  */
-stack *interface_stack_push(stack *stk, const void *elem);
+void stack_clear(stack *stk);
 
-/*
- * Creates a stack header which interfaces upon the contents of `data`.
+/**
+ * @brief Deletes the stack and frees memory.
  *
- * \return A stack header associated with `data` or NULL upon failure.
- * \note Any operations carried out on the stack may affect the contents stored
+ * @param stk Double pointer to the stack.
+ */
+void stack_delete_(stack **stk);
+
+/**
+ * @brief Deletes the stack, sets all elements to zero, and frees memory.
+ *
+ * @param stk Double pointer to the stack.
+ */
+void stack_delete_s_(stack **stk);
+
+/**
+ * @brief Expands the memory used by `stk->data`, thereby increasing its capacity.
+ *
+ * @param stk Pointer to the stack.
+ * @return Pointer to the expanded stack or NULL if reallocation fails.
+ */
+stack *stack_expand(stack *stk);
+
+/**
+ * @brief Creates a new empty stack.
+ *
+ * @param num_elems Number of elements.
+ * @param elem_size Size of each element.
+ * @return Pointer to the new stack or NULL if allocation fails.
+ */
+stack *stack_empty_new(size_t num_elems, size_t elem_size);
+
+/**
+ * @brief Creates a stack header which interfaces upon the contents of `data`.
+ *
+ * @param data Pointer to the data.
+ * @param len Length of the data.
+ * @param elem_size Size of each element.
+ * @return Pointer to the stack header or NULL if allocation fails.
+ * @note Any operations carried out on the stack may affect the contents stored
  * at `data`. This is in contrast to the standard stack which allocates distinct
  * memory for its contents. An example of such an operation would be
- * `interface_stack_push()`.
+ * `stack_interface_push()`.
  */
-stack *_new_interface_stack(void *data, size_t len, size_t elem_size);
+stack *stack_interface_new_(void *data, size_t len, size_t elem_size);
 
-/*
- * Creates a new `stack` with enough capacity for `num_elems` elements
- * where each element is of size `elem_size`. The stack will be empty.
+/**
+ * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity` elements.
  *
- * \return A pointer to an empty `stack` or `NULL` upon failure.
+ * @param stk Pointer to the stack.
+ * @param new_capacity New capacity of the stack.
+ * @return Pointer to the resized stack or NULL if reallocation fails.
  */
-stack *new_empty_stack(size_t num_elems, size_t elem_size);
+stack *stack_resize(stack *stk, size_t new_capacity);
 
-/*
- * Resizes the memory used by `stk->data` to `new_size`.
+/**
+ * @brief Shrinks the memory used by `stk->data` to `stk->used_capacity`.
  *
- * \return A pointer associated with the contents of `stk` or `NULL` upon
- * failure.
- * \note If `new_size` is not a multiple of `stk->elem_size`, the closest
- * multiple to `elem_size` (rounded up) is used instead.
+ * @param stk Pointer to the stack.
+ * @return Pointer to the resized stack or NULL if reallocation fails.
  */
-stack *resize_stack(stack *stk, size_t new_size);
+stack *stack_shrink_to_fit(stack *stk);
 
-/*
- * Shrinks the memory used by `stk->data` to `stk->used_capacity`.
+/**
+ * @brief Returns, but does not remove, the top element of `stk`.
  *
- * \return A pointer associated with the contents of `stk` or `NULL` upon
- * failure.
- */
-stack *shrink_stack_to_fit(stack *stk);
-
-/*
- * Returns, but does not remove, the top element of `stk`.
- *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
+ * @param stk Pointer to the stack.
+ * @return Pointer to the top element in `stk` or NULL if the end of the
  * stack was reached.
  */
 void *stack_peek(stack *stk);
 
-/*
- * Returns and removes the top element from `stk`.
+/**
+ * @brief Returns and removes the top element from `stk`.
  *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
+ * @param stk Pointer to the stack.
+ * @return Pointer to the top element in `stk` or NULL if the end of the
  * stack was reached.
  */
 void *stack_pop(stack *stk);
 
-/*
- * Adds `elem` to `stk`, expanding if necessary. `elem` will then be the new top
+/**
+ * @brief Adds `elem` to `stk`, expanding if necessary. `elem` will then be the new top
  * element and will be returned by functions such as `stack_peek()`.
  *
- * \return A pointer associated with the contents of `stk` or `NULL` upon
- * failure.
+ * @param stk Pointer to the stack.
+ * @param elem Pointer to the element to push.
+ * @return Pointer to the stack or NULL if reallocation fails.
  */
-stack *stack_push(stack *stk, const void *const elem);
+stack *stack_push(stack *stk, const void *elem);
 
-#ifdef STACK_INCL_HEAPLESS_STACK
+#define STACK_WANT_HEAPLESS
+
+#ifdef STACK_WANT_HEAPLESS
 /* For memcpy(). */
 #include <string.h>
 /* Ensures that each stack's allocation gets a unique name. */
-#define GET_STACK_NAME(local_stk) _stk_data_##local_stk
+#define GET_STACK_NAME(id) _stk_data_##id
 
-/*
- * Creates a stack with automatic storage duration.
+/**
+ * @brief Creates a stack with automatic storage duration.
  *
- * \param stk_id The identifer for the stack being assigned.
- * \param num_elems The maximum number of elements the stack will contain.
- * \param _elem_size The size of each element in the stack.
- * \note This is a macro. Use with caution if any of the arguments have side
+ * @param stk_id The identifier for the stack being assigned.
+ * @param num_elems The maximum number of elements the stack will contain.
+ * @param _elem_size The size of each element in the stack.
+ * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define heapless_new_empty_stack(stk_id, num_elems, _elem_size) \
-  {.capacity = (num_elems) * (_elem_size),                      \
-   .used_capacity = 0,                                          \
-   .elem_size = _elem_size,                                     \
+#define stack_heapless_empty_new(stk_id, num_elems, _elem_size) \
+  {.allocation = ((num_elems) * (_elem_size)) + sizeof(stack),  \
+   .elem_size = (_elem_size),                                   \
    .length = 0};                                                \
-  byte_t GET_STACK_NAME(stk_id)[stk_id.capacity];               \
-  stk_id.data = GET_STACK_NAME(stk_id)
+  byte GET_STACK_NAME(stk_id)[(num_elems) * (_elem_size)];      \
+  (stk_id).data = GET_STACK_NAME(stk_id)
 
-/*
- * Creates a stack with automatic storage duration whose contents are a copy of
+/**
+ * @brief Creates a stack with automatic storage duration whose contents are a copy of
  * the contents of `data`.
  *
- * \param stk_id The identifer for the stack being assigned.
- * \param num_elems The maximum number of elements the stack will contain.
- * \param _elem_size The size of each element in the stack.
- * \note This is a macro. Use with caution if any of the arguments have side
+ * @param stk_id The identifier for the stack being assigned.
+ * @param num_elems The maximum number of elements the stack will contain.
+ * @param _elem_size The size of each element in the stack.
+ * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define heapless_new_stack(stk_id, data)                          \
-  heapless_new_empty_stack(stk_id, sizeof(data) / sizeof *(data), \
+#define stack_heapless_new(stk_id, data)                          \
+  stack_heapless_empty_new(stk_id, sizeof(data) / sizeof *(data), \
                            sizeof *(data));                       \
-  stk_id.capacity = sizeof(data);                                 \
-  stk_id.used_capacity = sizeof(data);                            \
-  stk_id.length = sizeof(data) / sizeof *(data);                  \
+  (stk_id).allocation = sizeof(data);                             \
+  (stk_id).used_capacity = sizeof(data);                          \
+  (stk_id).length = sizeof(data) / sizeof *(data);                \
   memcpy(GET_STACK_NAME(stk_id), data, sizeof(data));
 
-/*
- * Creates a stack of automatic storage duration which allocates memory solely
+/**
+ * @brief Creates a stack of automatic storage duration which allocates memory solely
  * for the stack header (that is, the data members of `stack`). `stack->data`
  * will take the value of the pointer, `data`.
  *
- * \param _data A pointer to the data to be interfaced.
- * \param num_elems The number of elements in `_data`.
- * \param _elem_size The size of each element in bytes.
+ * @param _data A pointer to the data to be interfaced.
+ * @param num_elems The number of elements in `_data`.
+ * @param _elem_size The size of each element in bytes.
  *
- * \note This stack will not modify the allocation of memory at `data`,
+ * @note This stack will not modify the allocation of memory at `data`,
  * however it can modify the contents of `data` through `heapless_stack_pop()`
  * and `heapless_stack_push()`.
  */
-#define _heapless_new_interface_stack(_data, num_elems, _elem_size) \
-  {.data = _data,                                                   \
-   .capacity = (num_elems) * (_elem_size),                          \
-   .used_capacity = (num_elems) * (_elem_size),                     \
-   .elem_size = _elem_size,                                         \
-   .length = num_elems}
+#define stack_heapless_interface_new_(_data, num_elems, _elem_size) \
+  {.data = (byte *)(_data),                                         \
+   .allocation = ((num_elems) * (_elem_size)) + sizeof(stack),      \
+   .elem_size = (_elem_size),                                       \
+   .length = (num_elems)}
 
-/* Convenience macro equivalent to `_heapless_new_interface_stack()`. */
-#define heapless_new_interface_stack(_data)                             \
-  _heapless_new_interface_stack(_data, sizeof(_data) / sizeof *(_data), \
+/**
+ * @brief Convenience macro equivalent to `heapless_new_interface_stack_()`.
+ *
+ * @param _data Pointer to the data.
+ */
+#define stack_heapless_interface_new(_data)                             \
+  stack_heapless_interface_new_(_data, sizeof(_data) / sizeof *(_data), \
                                 sizeof *(_data))
 
-/*
- * Returns, but does not remove, the top element of `stk`.
+/**
+ * @brief Returns, but does not remove, the top element of the heapless stack.
  *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
+ * @param stk Pointer to the stack.
+ * @return Pointer to the top element in `stk` or NULL if the end of the
  * stack was reached.
  */
-void *heapless_stack_peek(stack *stk);
+void *stack_heapless_peek(stack *stk);
 
-/*
- * Returns and removes the top element from `stk`.
+/**
+ * @brief Returns and removes the top element from the heapless stack.
  *
- * \return A pointer to the top element in `stk` or `NULL` if the end of the
+ * @param stk Pointer to the stack.
+ * @return Pointer to the top element in `stk` or NULL if the end of the
  * stack was reached.
  */
-void *heapless_stack_pop(stack *stk);
+void *stack_heapless_pop(stack *stk);
 
-/*
- * Adds `elem` to `stk` if space permits. `elem` will then be the new top
+/**
+ * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new top
  * element and will be returned by functions such as `heapless_stack_peek()`.
  *
- * \return `stk` if the element was added successfully or `NULL` upon failure.
+ * @param stk Pointer to the stack.
+ * @param elem Pointer to the element to push.
+ * @return `stk` if the element was added successfully or `NULL` upon failure.
  */
-stack *heapless_stack_push(stack *stk, const void *const elem);
+stack *stack_heapless_push(stack *stk, const void *elem);
 #endif
 #endif
