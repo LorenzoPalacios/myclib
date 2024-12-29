@@ -5,15 +5,14 @@
 #include <stddef.h>
 
 #include "../../stack/stack.h"
-#include "../trees.h"
 
 /*
- * Determines how many calls to `traverse_from()` where the internal
+ * Determines how many calls to `traverse_from()` (where the internal
  * stack's `used_capacity` never exceeds the product of its `capacity` and
- * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` must be made before shrinking the
+ * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`) must be made before shrinking the
  * internal stack's allocated memory.
  */
-static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 5;
+#define TRAVERSAL_STACK_SHRINK_COUNTER_MAX (5)
 
 /*
  * If `traverse_from` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
@@ -30,26 +29,27 @@ static size_t TRAVERSAL_STACK_SHRINK_COUNTER_MAX = 5;
  * If `u < kc` over three subsequent calls to `traverse_from()`, then
  * the internal stack of `traverse_from()` will shrink its allocation.
  */
-static double TRAVERSAL_STACK_MAJOR_USAGE_PERCENT = .8;
+#define TRAVERSAL_STACK_MAJOR_USAGE_PERCENT (.8)
 
-/* `node_bt` stands for node_binary_tree. */
+typedef struct node_bt node_bt;
+
+// `node_bt` stands for node_binary_tree.
 typedef struct node_bt {
-  size_t value_offset;
-  struct node_bt *parent;
-  struct node_bt *left, *right;
+  size_t value_index;
+  node_bt *parent;
+  node_bt *left, *right;
 } node_bt;
 
-/* Container structure for a binary tree data structure. */
+// Binary tree header.
 typedef struct {
   node_bt *root;
-  stack *unused_nodes;    /* Contains pointers to unused nodes. */
-  size_t value_size;      /* Size (in bytes) of each node's stored values. */
-  size_t allocation;      /* Total bytes allocated for the tree and nodes. */
-  size_t used_allocation; /* Total bytes used from `allocation`. */
-  size_t align_size;
+  stack *unused_nodes; /* Contains pointers to unused nodes. */
+  size_t value_size;   /* Size (in bytes) of each node's stored values. */
+  size_t allocation;   /* Total bytes allocated for the tree and nodes. */
+  size_t padding;
 } binary_tree;
 /*
- * A note regarding the `align_size` data member.
+ * A note regarding the `padding` data member.
  *
  * If there are no unused nodes to be overwritten when adding a node to a tree,
  * new memory must be allocated to accomodate that new node.
@@ -85,12 +85,10 @@ typedef struct {
  * tree, don't worry about this.
  */
 
-/*
- * This is a convenience macro for generating a `binary_tree` from an array.
- * Use caution if the arguments to this macro have side effects.
- */
+// This is a convenience macro for generating a binary tree from an array.
+// Use caution if the arguments to this macro have side effects.
 #define new_binary_tree(arr) \
-  _new_binary_tree(arr, sizeof(*arr), sizeof(arr) / sizeof(*arr))
+  new_binary_tree_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -120,8 +118,8 @@ typedef struct {
  * \return A balanced binary tree whose structure is in accordance with the
  * above example or `NULL` if the tree could not be created.
  */
-binary_tree *_new_binary_tree(const void *data, size_t elem_size,
-                              size_t length);
+binary_tree *new_binary_tree_(const void *data, size_t elem_size,
+                              size_t num_elems);
 
 /*
  * Adds the specified freestanding node to `tree`. On success, the pointer to
@@ -221,7 +219,7 @@ binary_tree *force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  */
 size_t get_depth(const node_bt *origin);
 
-node_bt **get_open_child_in_node(node_bt *const node);
+node_bt **get_open_child_in_node(node_bt *node);
 
 node_bt *get_unalloc_node(binary_tree *tree);
 
@@ -292,25 +290,27 @@ size_t right_branch_depth(const node_bt *origin);
 
 /*
  * Traverses all of the descendant nodes of `origin`, including `origin` itself,
- * and passes `tree` and each traversed node as a pointer to `op` and
+ * and passes `tree` and each traversed node as a pointer to `operation` and
  * `stop_condition` until `stop_condition` returns `true` or all the nodes in
  * the lineage of `origin` are contacted.
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
  *
- * The arguments for both `op` and `stop_condition` will be an array containing
- * a pointer to the current traversed node and `tree`, respectively. This pocket
- * of memory will be of size `sizeof(binary_tree *) + sizeof(node_bt *)`.
+ * The arguments for both `operation` and `stop_condition` will be an array
+ * containing a pointer to the current traversed node and `tree`, respectively.
+ * This pocket of memory will be of size `sizeof(binary_tree *) + sizeof(node_bt
+ * *)`.
  *
- * \return The last returned value from `op` or `NULL` if `op` is `NULL`.
+ * \return The last returned value from `operation` or `NULL` if `operation` is
+ * `NULL`.
  *
  * \note
  * - Calling this function with `stop_condition` equal to `NULL` will always
- * cause all descendant nodes of `origin` to be traversed. This can be used for
- * pre-allocating memory for the internal stack.
+ * cause all descendant nodes of `origin` to be traversed. This can be used to
+ * pre-allocate memory for the internal stack.
  *
- * - The data passed to `op` is an array of a pointer to `tree` and a
+ * - The data passed to `operation` is an array of a pointer to `tree` and a
  * pointer to the current traversed node. To access these nodes requires a
  * double dereference, not a single dereference.
  * That is, `*(type-name-1 **)tree_and_cur_node` accesses the first pointer and
@@ -318,19 +318,19 @@ size_t right_branch_depth(const node_bt *origin);
  * second pointer.
  *
  * - If a traversed node meets the criteria for `stop_condition` to return
- * `true`, `op` will still be run for that node.
+ * `true`, `operation` will still be run for that node.
  *
  * - If the internal stack used for traversal does not use most of its
  * capacity after a few calls to this function (internal library calls count
  * towards this), it will shrink itself to reduce memory footprint.
  *
  * - `tree` is present only to permit tree-level operations or checks that
- * might be required of `op` and `stop_condition`. It is not used in the actual
- * traversal and can be `NULL` if neither `op` nor `stop_condition` will make
- * use of it.
+ * might be required of `operation` and `stop_condition`. It is not used in the
+ * actual traversal and can be `NULL` if neither `operation` nor
+ * `stop_condition` will make use of it.
  */
 void *traverse_from(binary_tree *tree, node_bt *origin,
-                    void *(*op)(void *tree_and_cur_node),
+                    void *(*operation)(void *tree_and_cur_node),
                     bool (*stop_condition)(void *tree_and_cur_node));
 
 #endif

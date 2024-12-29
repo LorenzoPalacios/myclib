@@ -9,36 +9,29 @@
 
 typedef unsigned char byte;
 
-/*
- * Stacks are used to track unallocated nodes in trees and in
- * `traverse_from()` to avoid the usage of recursion.
- */
+// Stacks are used to track unallocated nodes in trees and in
+// `traverse_from()` to avoid the usage of recursion.
 #include "../../stack/stack.h"
-#include "../trees.h"
 
-/* Reallocation factor used by `expand_binary_tree()`. */
-#define BT_REALLOC_FACTOR (2)
+// Reallocation factor used by `expand_binary_tree()`.
+#define EXPANSION_FACTOR (2)
 
-binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
+binary_tree *new_binary_tree_(const void *const data, const size_t elem_size,
                               const size_t num_elems) {
   binary_tree *tree;
-  const size_t NODE_ALIGNMENT_OVERHEAD =
-      (elem_size * num_elems) % alignof(node_bt);
-  /*
-   * This region is enclosed in its own block to avoid autocomplete pollution
-   * later during tree construction.
-   */
+  const size_t NODE_VALUE_PADDING = (elem_size * num_elems) % alignof(node_bt);
+  // This region is enclosed in its own block to avoid autocomplete pollution
+  // later during tree construction.
   {
     const size_t NODE_SIZE = sizeof(node_bt) + elem_size;
     const size_t TOTAL_REQ_MEM =
-        num_elems * NODE_SIZE + sizeof(binary_tree) + NODE_ALIGNMENT_OVERHEAD;
+        num_elems * NODE_SIZE + sizeof(binary_tree) + NODE_VALUE_PADDING;
     tree = malloc(TOTAL_REQ_MEM); /* TREE ALLOCATED HERE */
     if (tree == NULL) return NULL;
 
     tree->value_size = elem_size;
-    tree->used_allocation = tree->allocation = TOTAL_REQ_MEM;
-    tree->unused_nodes = new_empty_stack(1, sizeof(node_bt **));
-    tree->align_size = NODE_ALIGNMENT_OVERHEAD;
+    tree->unused_nodes = stack_empty_new(1, sizeof(node_bt **));
+    tree->padding = NODE_VALUE_PADDING;
   }
   /* The values will be stored directly after the tree header. */
   byte *const values_region_start = (void *)(tree + 1);
@@ -51,7 +44,7 @@ binary_tree *_new_binary_tree(const void *const data, const size_t elem_size,
    */
   node_bt *const nodes_region_start =
       (void *)(values_region_start + num_elems * elem_size +
-               NODE_ALIGNMENT_OVERHEAD);
+               NODE_VALUE_PADDING);
   for (size_t i = 0; i < num_elems; i++) {
     node_bt *const cur_node = nodes_region_start + i;
     const size_t value_offset = i * elem_size;
@@ -199,7 +192,6 @@ size_t get_num_nodes_in_tree(const binary_tree *const tree) {
 void delete_node(binary_tree *const tree, node_bt *target) {
   const size_t TOTAL_NODE_SIZE = sizeof(node_bt) + tree->value_size;
   if (target == tree->root) {
-    tree->used_allocation -= get_num_nodes_in_tree(tree) * TOTAL_NODE_SIZE;
     tree->root = NULL;
     return;
   }
@@ -345,8 +337,7 @@ binary_tree *resize_tree(binary_tree *tree, size_t new_size) {
   {
     const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
     const size_t SIZE_DIFF = new_size % NODE_SIZE;
-    if (SIZE_DIFF != 0)
-      new_size += NODE_SIZE - SIZE_DIFF;
+    if (SIZE_DIFF != 0) new_size += NODE_SIZE - SIZE_DIFF;
   }
   if (new_size < tree->used_allocation) {
     const size_t NODE_SIZE = tree->value_size + sizeof(node_bt);
@@ -365,7 +356,7 @@ binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
 }
 
 binary_tree *expand_binary_tree(binary_tree *const tree) {
-  return resize_tree(tree, tree->allocation * BT_REALLOC_FACTOR);
+  return resize_tree(tree, tree->allocation * BT_EXPANSION_FACTOR);
 }
 
 void register_unalloc_node(binary_tree *const tree, node_bt *const open_node) {
@@ -400,9 +391,7 @@ node_bt *find_open_descendant(node_bt *const origin) {
                        node_has_open_child);
 }
 
-void *get_node_value(node_bt *const node) {
-  return 
-}
+void *get_node_value(node_bt *const node) { return }
 
 /*
  * There's likely a better implementation to check whether or not two nodes
@@ -474,10 +463,10 @@ static void *make_room_for_new_value(binary_tree *const tree) {
   /* Increment past the tree header, then increment past the nodes. */
   void *const NODES_BEGIN = (byte *)(tree + 1) + NUM_NODES * tree->value_size;
   size_t SHIFT_MAGNITUDE = tree->value_size * alignof(node_bt) + 1;
-  if (tree->align_size != 0) {
+  if (tree->padding != 0) {
     const size_t diff = tree->value_size % alignof(node_bt);
     SHIFT_MAGNITUDE -=
-        (tree->align_size + diff) / alignof(node_bt) * alignof(node_bt);
+        (tree->padding + diff) / alignof(node_bt) * alignof(node_bt);
   }
 
   void *const NEW_NODES_BEGIN = (byte *)NODES_BEGIN + SHIFT_MAGNITUDE;
@@ -499,7 +488,7 @@ static node_bt *get_end_of_nodes_region(binary_tree *const tree) {
   const size_t NUM_NODES = get_num_nodes_in_tree(tree);
   const size_t NODES_ALLOC = sizeof(node_bt) * NUM_NODES;
   const void *const VALUES_REGION_END = get_end_of_values_region(tree);
-  return (void *)((byte *)VALUES_REGION_END + tree->align_size + NODES_ALLOC);
+  return (void *)((byte *)VALUES_REGION_END + tree->padding + NODES_ALLOC);
 }
 
 static void incorporate_node(binary_tree *const tree, node_bt *const node) {
