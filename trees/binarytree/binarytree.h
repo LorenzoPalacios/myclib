@@ -3,11 +3,16 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
+// Stacks are used to track unallocated nodes in trees and in
+// `bt_traverse()` to avoid the usage of recursion.
 #include "../../stack/stack.h"
 
+#define NULL_INDEX (SIZE_MAX)
+
 /*
- * Determines how many calls to `traverse_from()` (where the internal
+ * Determines how many calls to `bt_traverse()` (where the internal
  * stack's `used_capacity` never exceeds the product of its `capacity` and
  * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`) must be made before shrinking the
  * internal stack's allocated memory.
@@ -15,9 +20,9 @@
 #define TRAVERSAL_STACK_SHRINK_COUNTER_MAX (5)
 
 /*
- * If `traverse_from` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
+ * If `bt_traverse` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
  * and the `used_capacity` of the internal stack used by
- * `traverse_from()` is less than the product of this multiplier and the
+ * `bt_traverse()` is less than the product of this multiplier and the
  * stack's `capacity`, the internal stack will shrink its allocated memory.
  *
  * Expressed mathematically:
@@ -26,27 +31,28 @@
  * u - The used capacity of the stack.
  * k - The value of `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`.
  *
- * If `u < kc` over three subsequent calls to `traverse_from()`, then
- * the internal stack of `traverse_from()` will shrink its allocation.
+ * If `u < kc` over three subsequent calls to `bt_traverse()`, then
+ * the internal stack of `bt_traverse()` will shrink its allocation.
  */
-#define TRAVERSAL_STACK_MAJOR_USAGE_PERCENT (.8)
+#define TRAVERSAL_STACK_MAJOR_USAGE_PERCENT ((long double).8)
 
-typedef struct node_bt node_bt;
+typedef struct bt_node bt_node;
 
-// `node_bt` stands for node_binary_tree.
-typedef struct node_bt {
+// `bt_node` stands for node_binary_tree.
+typedef struct bt_node {
   size_t value_index;
-  node_bt *parent;
-  node_bt *left, *right;
-} node_bt;
+  size_t parent_index;
+  size_t left_index;
+  size_t right_index;
+} bt_node;
 
 // Binary tree header.
 typedef struct {
-  node_bt *root;
-  stack *unused_nodes; /* Contains pointers to unused nodes. */
-  size_t value_size;   /* Size (in bytes) of each node's stored values. */
-  size_t allocation;   /* Total bytes allocated for the tree and nodes. */
+  stack *unused_nodes;  // Contains pointers to unused nodes.
+  size_t allocation;    // Total bytes allocated for the tree and nodes.
   size_t padding;
+  size_t root_index;
+  size_t value_size;  // Size (in bytes) of a stored value.
 } binary_tree;
 /*
  * A note regarding the `padding` data member.
@@ -87,8 +93,8 @@ typedef struct {
 
 // This is a convenience macro for generating a binary tree from an array.
 // Use caution if the arguments to this macro have side effects.
-#define new_binary_tree(arr) \
-  new_binary_tree_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
+#define binary_tree_new(arr) \
+  bt_new_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -118,74 +124,24 @@ typedef struct {
  * \return A balanced binary tree whose structure is in accordance with the
  * above example or `NULL` if the tree could not be created.
  */
-binary_tree *new_binary_tree_(const void *data, size_t elem_size,
-                              size_t num_elems);
+binary_tree *bt_new_(const void *data, size_t elem_size, size_t num_elems);
 
 /*
- * Adds the specified freestanding node to `tree`. On success, the pointer to
- * `node` will be updated to its new position in `tree` and the original pointer
- * to `node` invalidated.
- *
- * It is assumed that the data at `node->value` is of size equivalent to
- * `tree->value_size`. If this assumption is false, the behavior is determined
- * by the size of the value stored at `node`:
- *
- * - If the value is larger than `tree->value_size`, then the value is truncated
- * according to `tree->value_size`.
- *
- * - If the value is smaller than `tree->value_size`, then the behavior is
- * undefined.
- *
- * \return A (potentially new) pointer associated with the contents of `tree`
- * or `NULL` upon failure.
- * \note If `node` is a node within a binary tree, the behavior is undefined.
- */
-binary_tree *add_freestanding_node(binary_tree *tree, node_bt **node);
-
-/*
- * Counts the number of descendant nodes linked to `origin`.
- *
- * \return The total amount of descendant nodes connected to `origin`.
- */
-size_t count_descendant_nodes(node_bt *origin);
-
-/*
- * Creates a discrete binary tree node with no ties to any trees, child nodes,
- * or parent nodes.
- *
- * \return A pointer to a discrete binary tree node or `NULL` upon failure.
- * \note The `value` associated with the returned node will be stored in memory
- * directly after the node itself.
- */
-node_bt *new_bt_node(const void *value, size_t value_size);
-
-/*
- * Same as `delete_binary_tree()`, except this function will write `0` across
+ * Same as `bt_delete_()`, except this function will write `0` across
  * the allocated memory of `tree`.
  */
-void delete_binary_tree(binary_tree **tree);
+void bt_delete_(binary_tree **tree);
 
 /*
- * Same as `delete_binary_tree()`, except this function will set all allocated
+ * Same as `bt_delete_()`, except this function will set all allocated
  * memory of the tree to zero, including pointers and tree/node statistics.
  */
-void delete_binary_tree_s(binary_tree **tree);
+void bt_delete_s_(binary_tree **tree);
 
 /* Removes `target` and all its descendant nodes from `tree`. */
-void delete_node(binary_tree *tree, node_bt *target);
+void bt_delete_node(binary_tree *tree, bt_node *target);
 
-/*
- * Removes `target` from the hierarchy of `tree` and adds it to
- * `tree->unused_nodes`.
- *
- * \return A (potentially new) pointer associated with the contents of `tree`
- * or `NULL` upon failure.
- * \note Any child nodes of `target` will not be deleted. Instead, their new
- * parent will be somewhere in the lineage of `tree->parent`.
- */
-binary_tree *delete_node_from_tree(binary_tree *tree, node_bt *target);
-
-binary_tree *expand_binary_tree(binary_tree *tree);
+binary_tree *bt_expand(binary_tree *tree);
 
 /*
  * Finds the closest descendant node of `origin` (if not `origin` itself) whose
@@ -195,46 +151,11 @@ binary_tree *expand_binary_tree(binary_tree *tree);
  * returned. Otherwise, a descendant node of `origin` meeting the same criteria
  * is returned.
  */
-node_bt *find_open_descendant(node_bt *origin);
+bt_node *bt_get_leaf(bt_node *origin);
 
-/*
- * Finds the first open `left` or `right` pointer in `dst` and places `src`
- * there. If neither `left` or `right` are open, `dst->left` and its
- * descendants will be appended to the last open slot in the lineage of `src`
- * and `src` will overwrite `dst->left`.
- *
- * \note If `dst->left` must be appended to the lineage of `src` and a candidate
- * node in the descendants of `src` is found whose `left` or `right` pointer
- * values are `NULL`, the function will append the descendants of `dst` to the
- * availble pointer of that candidate node.
- */
-binary_tree *force_make_node_child_of(binary_tree *dst_tree, node_bt *dst,
-                                      binary_tree *src_tree, node_bt *src);
+bt_node **get_open_child_in_node(bt_node *node);
 
-/*
- * Finds the longest lineage of `origin`. This function searches both the
- * `left` and `right` branches of `origin`.
- *
- * \return The maximum depth of `origin`.
- */
-size_t get_depth(const node_bt *origin);
-
-node_bt **get_open_child_in_node(node_bt *node);
-
-node_bt *get_unalloc_node(binary_tree *tree);
-
-size_t left_branch_depth(const node_bt *origin);
-
-/*
- * Finds the first open `left` or `right` pointer in `dst` and places `src`
- * there. If neither `left` or `right` are open, both `dst` and `src` will be
- * unmodified.
- *
- * \return A (potentially new) pointer associated with the contents of `dst`
- * or `NULL` upon failure.
- */
-binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
-                                binary_tree *src_tree, node_bt *src);
+bt_node *get_unalloc_node(binary_tree *tree);
 
 /*
  * Registers `open_node` as an open block of memory in `tree` for any new
@@ -243,22 +164,7 @@ binary_tree *make_node_child_of(binary_tree *dst_tree, node_bt *dst,
  * \return A (potentially new) pointer associated with the contents of `tree`
  * or `NULL` upon failure.
  */
-void register_unalloc_node(binary_tree *tree, node_bt *open_node);
-
-/*
- * Searches along the ancestry of `origin` until a node is found whose `left`
- * and `right` pointers are not `NULL`. Such a node is considered divergent
- * since, during tree traversal, a search algorithm must choose either the
- * `left` or `right` branch of that node.
- *
- * \return A pointer to the first ancestral node of `origin` containing a branch
- * divergence or `NULL` if no suitable node is found.
- */
-node_bt *next_ancestral_divergence(const node_bt *origin);
-
-bool do_nodes_coexist_in_tree(const node_bt *node_1, const node_bt *node_2);
-
-node_bt *remove_node_from_tree(binary_tree *tree, node_bt *target);
+void register_unalloc_node(binary_tree *tree, bt_node *open_node);
 
 /*
  * Resizes the memory allocated for `tree` to `new_size`.
@@ -268,25 +174,7 @@ node_bt *remove_node_from_tree(binary_tree *tree, node_bt *target);
  * \note If `new_size` is less than `tree->used_allocation`, then tree data
  * can be corrupted. If this can occur, consider using `resize_tree_s()`.
  */
-binary_tree *resize_tree(binary_tree *tree, size_t new_size);
-
-/*
- * Resizes the memory allocated for `tree` to `new_size`.
- *
- * For any node corrupted as a result of a resize, that node's parent will no
- * longer maintain a `left` or `right` pointer to that node. Instead, the
- * value of `left` or `right` associated with the corrupted node will be
- * `NULL`.
- *
- * \return A (potentially new) pointer associated with the contents of `tree`
- * or `NULL` upon failure.
- * \note Use caution when resizing a tree to a smaller size. If reallocation
- * fails and the requested tree size would corrupt nodes, this function will
- * still remove the would-be corrupted nodes from the tree.
- */
-binary_tree *resize_tree_s(binary_tree *tree, size_t new_size);
-
-size_t right_branch_depth(const node_bt *origin);
+binary_tree *bt_resize(binary_tree *tree, size_t new_size);
 
 /*
  * Traverses all of the descendant nodes of `origin`, including `origin` itself,
@@ -299,7 +187,7 @@ size_t right_branch_depth(const node_bt *origin);
  *
  * The arguments for both `operation` and `stop_condition` will be an array
  * containing a pointer to the current traversed node and `tree`, respectively.
- * This pocket of memory will be of size `sizeof(binary_tree *) + sizeof(node_bt
+ * This pocket of memory will be of size `sizeof(binary_tree *) + sizeof(bt_node
  * *)`.
  *
  * \return The last returned value from `operation` or `NULL` if `operation` is
@@ -329,8 +217,7 @@ size_t right_branch_depth(const node_bt *origin);
  * actual traversal and can be `NULL` if neither `operation` nor
  * `stop_condition` will make use of it.
  */
-void *traverse_from(binary_tree *tree, node_bt *origin,
-                    void *(*operation)(void *tree_and_cur_node),
-                    bool (*stop_condition)(void *tree_and_cur_node));
+void bt_traverse(binary_tree *tree, bt_node *from,
+                 bool (*operation)(binary_tree *tree, bt_node *node));
 
 #endif
