@@ -14,6 +14,10 @@ typedef unsigned char byte;
 // Reallocation factor used by `bt_expand()`.
 #define EXPANSION_FACTOR (2)
 
+// - GETTERS BEGIN -
+
+// Getters for specific regions of memory.
+
 static inline byte *get_values(binary_tree *const tree) {
   return (byte *)(tree + 1);
 }
@@ -21,6 +25,8 @@ static inline byte *get_values(binary_tree *const tree) {
 static inline bt_node *get_nodes(binary_tree *const tree) {
   return (bt_node *)(get_values(tree) + tree->padding);
 }
+
+// Getters for specific nodes and values.
 
 static inline bt_node *get_node_from_index(binary_tree *const tree,
                                            const size_t index) {
@@ -30,28 +36,59 @@ static inline bt_node *get_node_from_index(binary_tree *const tree,
 
 static inline byte *get_value_from_index(binary_tree *const tree,
                                          const size_t index) {
+  if (index == NULL_INDEX) return NULL;
   return get_values(tree) + (index * tree->value_size);
 }
+
+// Getters for specific extents of allocations.
+
+static inline size_t get_values_allocation(binary_tree *const tree) {
+  return (size_t)((byte *)get_nodes(tree) - get_values(tree)) - tree->padding;
+}
+
+static inline size_t get_nodes_allocation(binary_tree *const tree) {
+  return tree->allocation - get_values_allocation(tree);
+}
+
+static inline size_t get_padding(binary_tree *const tree) {
+  return get_values_allocation(tree) % alignof(bt_node);
+}
+
+// Getter for indicies of nodes.
 
 static inline size_t get_node_index(binary_tree *const tree,
                                     const bt_node *const node) {
   return (size_t)(node - get_nodes(tree));
 }
 
+// Getters for nodes based on relative positions.
+
 static inline bt_node *get_parent_node(binary_tree *const tree,
                                        const bt_node *const node) {
+  if (node->parent_index == NULL_INDEX) return NULL;
   return get_node_from_index(tree, node->parent_index);
 }
 
 static inline bt_node *get_left_node(binary_tree *const tree,
                                      const bt_node *const node) {
+  if (node->left_index == NULL_INDEX) return NULL;
   return get_node_from_index(tree, node->left_index);
 }
 
 static inline bt_node *get_right_node(binary_tree *const tree,
                                       const bt_node *const node) {
+  if (node->right_index == NULL_INDEX) return NULL;
   return get_node_from_index(tree, node->right_index);
 }
+
+// An individual node's true allocation is counted as the size of its value and
+// the size of a `bt_node`.
+
+static inline size_t get_actual_node_size(binary_tree *const tree) {
+  return tree->value_size + sizeof(bt_node);
+}
+
+// - GETTERS END -
 
 binary_tree *bt_init(const size_t value_size, const size_t node_cnt) {
   const size_t NODES_ALLOC = sizeof(bt_node) * node_cnt;
@@ -65,7 +102,7 @@ binary_tree *bt_init(const size_t value_size, const size_t node_cnt) {
   tree->allocation = TOTAL_ALLOC;
   tree->padding = PADDING;
   tree->root_index = NULL_INDEX;
-  tree->unused_nodes = stack_empty_new(1, sizeof(bt_node *));
+  tree->unused_nodes = stack_empty_new(1, sizeof(size_t));
   tree->value_size = value_size;
   return tree;
 }
@@ -160,9 +197,9 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
   bt_node *cur_node = from;
   bt_node *next_node = NULL;
   while (cur_node != NULL) {
-    if (operation != NULL) operation(tree, cur_node);
-    if (stop_condition != NULL)
-      if (stop_condition(tree, cur_node)) break;
+    if (operation != NULL)
+      if (operation(tree, cur_node)) break;
+
     bt_node *const left = get_left_node(tree, cur_node);
     bt_node *const right = get_right_node(tree, cur_node);
     if (left != NULL) {
@@ -187,8 +224,7 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
       next_node = get_right_node(tree, *next_divergence);
     }
     // Checking if the stack is using a majority of its capacity.
-    if (divergent_nodes->length > STK_CAP_SHRNK_THRES)
-      low_stack_usage = false;
+    if (divergent_nodes->length > STK_CAP_SHRNK_THRES) low_stack_usage = false;
     cur_node = next_node;
   }
   if (low_stack_usage)
@@ -202,206 +238,30 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
   }
 }
 
-/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
-binary_tree *bt_resize(binary_tree *tree, size_t new_size) {
+binary_tree *bt_resize(binary_tree *tree, const size_t new_capacity) {
+  const size_t NODE_SIZE = get_actual_node_size(tree);
+  const size_t ALLOCATION = (NODE_SIZE * new_capacity) + sizeof(binary_tree);
   {
-    const size_t NODE_SIZE = tree->value_size + sizeof(bt_node);
-    const size_t SIZE_DIFF = new_size % NODE_SIZE;
-    if (SIZE_DIFF != 0) new_size += NODE_SIZE - SIZE_DIFF;
+    binary_tree *const new_tree = realloc(tree, ALLOCATION);
+    if (new_tree == NULL) return NULL;
+    tree = new_tree;
   }
-  if (new_size < tree->used_allocation) {
-    const size_t NODE_SIZE = tree->value_size + sizeof(bt_node);
-    tree->used_allocation = new_size;
-  }
-  tree = realloc(tree, new_size);
-  if (tree == NULL) return NULL;
-  tree->allocation = new_size;
+  tree->allocation = ALLOCATION;
+  tree->padding = get_padding(tree);
 
   return tree;
-}
-
-/* NEEDS REWRITE FOR COMPLIANCE WITH NEW TREE MEMORY STRUCTURE */
-binary_tree *resize_tree_s(binary_tree *tree, const size_t new_size) {
-  return realloc(tree, new_size);
 }
 
 binary_tree *bt_expand(binary_tree *const tree) {
-  return bt_resize(tree, tree->allocation * BT_EXPANSION_FACTOR);
+  return bt_resize(tree, tree->allocation * EXPANSION_FACTOR);
 }
 
 void register_unalloc_node(binary_tree *const tree, bt_node *const open_node) {
-  tree->unused_nodes = stack_push(tree->unused_nodes, &open_node);
+  const size_t NODE_INDEX = get_node_index(tree, open_node);
+  tree->unused_nodes = stack_push(tree->unused_nodes, &NODE_INDEX);
 }
 
-/* write documentation */
 bt_node *get_unalloc_node(binary_tree *const tree) {
-  bt_node **const unalloc_node = stack_pop(tree->unused_nodes);
-  return (unalloc_node == NULL) ? NULL : *unalloc_node;
-}
-
-/* Helper function used by `bt_get_open_leaf()`. */
-static bool node_has_open_child(void *const tree_and_node) {
-  const bt_node *const node = *(bt_node **)tree_and_node;
-  return node->left == NULL || node->right == NULL;
-}
-
-/*
- * Helper function used by `bt_get_open_leaf()`.
- *
- * \returns A pointer to a pointer to an open child node.
- */
-static void *ret_node_with_open_child(void *const tree_and_node) {
-  bt_node *const candidate = *(bt_node **)tree_and_node;
-  if (node_has_open_child(candidate)) return candidate;
-  return NULL;
-}
-
-bt_node *bt_get_open_leaf(bt_node *const origin) {
-  return bt_traverse(NULL, origin, ret_node_with_open_child,
-                     node_has_open_child);
-}
-
-void *get_node_value(bt_node *const node) { return }
-
-/*
- * There's likely a better implementation to check whether or not two nodes
- * exist within the same tree. For now, this will do.
- */
-bool do_nodes_coexist_in_tree(const bt_node *const node_1,
-                              const bt_node *const node_2) {
-  if (node_1 == node_2) return true;
-  if (node_1->parent == node_2->parent) return true;
-
-  const bt_node *node_1_root_node = NULL;
-  {
-    const bt_node *ancestor = node_1->parent;
-    while (ancestor != NULL) {
-      /*
-       * If `node_2` is encountered while traversing the ancestry of `node_1`,
-       * then we know they coexist in a tree.
-       */
-      if (ancestor == node_2) return true;
-      ancestor = ancestor->parent;
-    }
-  }
-
-  const bt_node *node_2_root_node = NULL;
-  {
-    const bt_node *ancestor = node_2->parent;
-    while (ancestor != NULL) {
-      /*
-       * If `node_1` is encountered while traversing the ancestry of `node_2`,
-       * then we know they coexist in a tree.
-       */
-      if (ancestor == node_1) return true;
-      ancestor = ancestor->parent;
-    }
-  }
-  /*
-   * If both `node_1` and `node_2` have no root node and are not equivalent to
-   * one another, then either one or both nodes are a root node for a tree or
-   * a freestanding node.
-   */
-  if (node_1_root_node == NULL && node_2_root_node == NULL) return false;
-  /*
-   * Otherwise, if the nodes share a common root node, then they are within the
-   * same tree.
-   */
-  return node_1_root_node == node_2_root_node;
-}
-
-bt_node **get_open_child_in_node(bt_node *const node) {
-  if (node->left == NULL) return &node->left;
-  if (node->right == NULL) return &node->right;
-  return NULL;
-}
-
-/*
- * Helper function used by functions whose purpose is to add nodes to a tree,
- * such as `add_freestanding_node()`.
- *
- * If possible, this function shifts the memory region dedicated to nodes to
- * the right by `tree->value_size` bytes.
- *
- * \return A pointer to a slot of unused memory in `tree` whose capacity is
- * equal to `tree->value_size`.
- * \note `tree` must have enough space to accomodate a new value. If this
- * condition is not met, the behavior is undefined.
- */
-static void *make_room_for_new_value(binary_tree *const tree) {
-  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
-  /* Increment past the tree header, then increment past the nodes. */
-  void *const NODES_BEGIN = (byte *)(tree + 1) + NUM_NODES * tree->value_size;
-  size_t SHIFT_MAGNITUDE = tree->value_size * alignof(bt_node) + 1;
-  if (tree->padding != 0) {
-    const size_t diff = tree->value_size % alignof(bt_node);
-    SHIFT_MAGNITUDE -=
-        (tree->padding + diff) / alignof(bt_node) * alignof(bt_node);
-  }
-
-  void *const NEW_NODES_BEGIN = (byte *)NODES_BEGIN + SHIFT_MAGNITUDE;
-  /*
-   * The number of values should correspond to the number of nodes, hence why
-   * the length argument is `NUM_NODES`.
-   */
-  memmove(NEW_NODES_BEGIN, NODES_BEGIN, NUM_NODES);
-  return NODES_BEGIN;
-}
-
-static void *get_end_of_values_region(binary_tree *const tree) {
-  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
-  const size_t VALUES_ALLOC = tree->value_size * NUM_NODES;
-  return (byte *)(tree + 1) + VALUES_ALLOC;
-}
-
-static bt_node *get_end_of_nodes_region(binary_tree *const tree) {
-  const size_t NUM_NODES = get_num_nodes_in_tree(tree);
-  const size_t NODES_ALLOC = sizeof(bt_node) * NUM_NODES;
-  const void *const VALUES_REGION_END = get_end_of_values_region(tree);
-  return (void *)((byte *)VALUES_REGION_END + tree->padding + NODES_ALLOC);
-}
-
-static void incorporate_node(binary_tree *const tree, bt_node *const node) {
-  bt_node *const node_parent = bt_get_open_leaf(tree->root);
-  if (node_parent->left == NULL)
-    node_parent->left = node;
-  else
-    node_parent->right = node;
-  node->parent = node_parent;
-}
-
-binary_tree *add_freestanding_node(binary_tree *tree, bt_node **const node) {
-  const bt_node *node_actual = *node;
-  if (node_actual == NULL) return tree;
-
-  bt_node *open_node;
-  if (tree->unused_nodes->length != 0)
-    /* Use any unallocated nodes in `tree` before reallocating. */
-    open_node = get_unalloc_node(tree);
-  else {
-    tree = bt_expand(tree);
-    void *const open_val = make_room_for_new_value(tree);
-    open_node = get_end_of_nodes_region(tree);
-    open_node->value = open_val;
-  }
-  incorporate_node(tree, open_node);
-  memcpy(open_node->value, node_actual->value, tree->value_size);
-  *node = open_node;
-  return tree;
-}
-
-bt_node *new_bt_node(const void *value, size_t value_size) {
-  bt_node *const new_node = malloc(sizeof(bt_node) + value_size);
-  if (new_node == NULL) return NULL;
-
-  new_node->value = new_node + 1;
-  new_node->parent = new_node->left = new_node->right = NULL;
-  memcpy(new_node->value, value, value_size);
-  return new_node;
-}
-
-static void *print_node(void *const tree_and_node) {
-  const bt_node *const node = *(bt_node **)tree_and_node;
-  printf("%d\n", *(int *)node->value);
-  return NULL;
+  const size_t *const node_index = (size_t *)stack_pop(tree->unused_nodes);
+  return (node_index == NULL) ? NULL : get_node_from_index(tree, *node_index);
 }

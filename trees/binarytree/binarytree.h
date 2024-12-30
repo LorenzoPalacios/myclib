@@ -174,48 +174,24 @@ void register_unalloc_node(binary_tree *tree, bt_node *open_node);
  * \note If `new_size` is less than `tree->used_allocation`, then tree data
  * can be corrupted. If this can occur, consider using `resize_tree_s()`.
  */
-binary_tree *bt_resize(binary_tree *tree, size_t new_size);
+binary_tree *bt_resize(binary_tree *tree, size_t new_capacity);
 
 /*
  * Traverses all of the descendant nodes of `origin`, including `origin` itself,
- * and passes `tree` and each traversed node as a pointer to `operation` and
- * `stop_condition` until `stop_condition` returns `true` or all the nodes in
- * the lineage of `origin` are contacted.
+ * and passes `tree` and each traversed node as a pointer to `operation` until
+ * `operation` returns `true` or all the nodes in the lineage of `origin` have
+ * been traversed.
  *
  * This function is NOT recursive; it has a dependency on the `stack` data
  * structure implemented elsewhere in this library.
  *
- * The arguments for both `operation` and `stop_condition` will be an array
- * containing a pointer to the current traversed node and `tree`, respectively.
- * This pocket of memory will be of size `sizeof(binary_tree *) + sizeof(bt_node
- * *)`.
- *
- * \return The last returned value from `operation` or `NULL` if `operation` is
- * `NULL`.
- *
  * \note
- * - Calling this function with `stop_condition` equal to `NULL` will always
- * cause all descendant nodes of `origin` to be traversed. This can be used to
- * pre-allocate memory for the internal stack.
- *
- * - The data passed to `operation` is an array of a pointer to `tree` and a
- * pointer to the current traversed node. To access these nodes requires a
- * double dereference, not a single dereference.
- * That is, `*(type-name-1 **)tree_and_cur_node` accesses the first pointer and
- * `*(type-name-2 **)((type-name-1 **)tree_and_cur_node + 1)` accesses the
- * second pointer.
- *
  * - If a traversed node meets the criteria for `stop_condition` to return
  * `true`, `operation` will still be run for that node.
  *
  * - If the internal stack used for traversal does not use most of its
  * capacity after a few calls to this function (internal library calls count
  * towards this), it will shrink itself to reduce memory footprint.
- *
- * - `tree` is present only to permit tree-level operations or checks that
- * might be required of `operation` and `stop_condition`. It is not used in the
- * actual traversal and can be `NULL` if neither `operation` nor
- * `stop_condition` will make use of it.
  */
 void bt_traverse(binary_tree *tree, bt_node *from,
                  bool (*operation)(binary_tree *tree, bt_node *node));
