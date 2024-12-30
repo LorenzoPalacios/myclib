@@ -50,51 +50,16 @@ typedef struct bt_node {
 typedef struct {
   stack *unused_nodes;  // Contains pointers to unused nodes.
   size_t allocation;    // Total bytes allocated for the tree and nodes.
-  size_t padding;
   size_t root_index;
   size_t value_size;  // Size (in bytes) of a stored value.
 } binary_tree;
-/*
- * A note regarding the `padding` data member.
- *
- * If there are no unused nodes to be overwritten when adding a node to a tree,
- * new memory must be allocated to accomodate that new node.
- *
- * Unfortunately, with the current memory model, adding a node requires a shift
- * to the right of the nodes in that tree. The magnitude of this shift is equal
- * to the closest multiple of `8` greater than the tree's `value_size`. This is
- * to preserve the alignment of the nodes in memory.
- *
- * Examples of the aforementioned behavior:
- *
- * - If `value_size` is `3`, the shift magnitude will be `8`, since the closest
- * multiple of `8` with regards to `3` is `8`.
- * - If `value_size` is `29`, the shift magnitude will be `32`, since the
- * closest multiple of `8` with regards to `31` is `32`.
- *
- * This is done to create a gap of unused memory to contain that new node's
- * associated value. However, the amount of memory actually used for the value
- * is dictated by `value_size`, which is not guaranteed to align with the nodes.
- * Therefore, the nodes themselves will not fill in whatever gap remains.
- *
- * Examples of this behavior:
- * - If `value_size` is `3`, the nodes will be shifted to the right by `8`
- * bytes. However, only `3` bytes out of the `8`-byte gap were used for the
- * value, leaving `5` unused bytes.
- * - If `value_size` is `29`, the nodes will be shifted to the right by `32`
- * bytes. However, only `29` bytes out of the `32`-byte gap were used for the
- * value, leaving `3` unused bytes.
- *
- * TL;DR:
- * This value keeps track of the size of an unallocated region within the tree
- * that could be used for future node additions. If all you need is a binary
- * tree, don't worry about this.
- */
 
 // This is a convenience macro for generating a binary tree from an array.
 // Use caution if the arguments to this macro have side effects.
-#define binary_tree_new(arr) \
-  bt_new_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
+#define bt_new(arr) bt_new_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
+
+#define bt_delete(tree) bt_delete_(&(tree))
+#define bt_delete_s(tree) bt_delete_s_(&(tree))
 
 /*
  * Initializes a binary tree with the given elements from the passed array.
@@ -138,22 +103,7 @@ void bt_delete_(binary_tree **tree);
  */
 void bt_delete_s_(binary_tree **tree);
 
-/* Removes `target` and all its descendant nodes from `tree`. */
-void bt_delete_node(binary_tree *tree, bt_node *target);
-
 binary_tree *bt_expand(binary_tree *tree);
-
-/*
- * Finds the closest descendant node of `origin` (if not `origin` itself) whose
- * `left` or `right` pointer is `NULL`.
- *
- * \return If `origin` has an either a `left` or `right` pointer, `origin` is
- * returned. Otherwise, a descendant node of `origin` meeting the same criteria
- * is returned.
- */
-bt_node *bt_get_leaf(bt_node *origin);
-
-bt_node **get_open_child_in_node(bt_node *node);
 
 bt_node *get_unalloc_node(binary_tree *tree);
 

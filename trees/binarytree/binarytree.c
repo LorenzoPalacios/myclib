@@ -16,6 +16,42 @@ typedef unsigned char byte;
 
 // - GETTERS BEGIN -
 
+// Miscellaneous getters.
+
+static inline size_t get_node_value_allocation(const binary_tree *const tree) {
+  return tree->allocation - sizeof(binary_tree);
+}
+
+// An individual node's true allocation is counted as the size of its value and
+// the size of a `bt_node`.
+static inline size_t get_actual_node_size(const binary_tree *const tree) {
+  return tree->value_size + sizeof(bt_node);
+}
+
+// This includes unallocated nodes.
+static inline size_t get_total_num_nodes(const binary_tree *const tree) {
+  return get_node_value_allocation(tree) / get_actual_node_size(tree);
+}
+
+// Getters for specific extents of allocations.
+
+static inline size_t get_values_allocation(const binary_tree *const tree) {
+  return get_total_num_nodes(tree) * tree->value_size;
+}
+
+static inline size_t get_nodes_allocation(const binary_tree *const tree) {
+  return get_total_num_nodes(tree) * sizeof(bt_node);
+}
+
+static inline size_t calc_padding(const size_t values_alloc) {
+  if (values_alloc == 0) return 0;
+  return alignof(bt_node) - (values_alloc % alignof(bt_node));
+}
+
+static inline size_t get_padding(const binary_tree *const tree) {
+  return calc_padding(get_values_allocation(tree));
+}
+
 // Getters for specific regions of memory.
 
 static inline byte *get_values(binary_tree *const tree) {
@@ -23,7 +59,14 @@ static inline byte *get_values(binary_tree *const tree) {
 }
 
 static inline bt_node *get_nodes(binary_tree *const tree) {
-  return (bt_node *)(get_values(tree) + tree->padding);
+  /*
+   * Although `bt_node` has a greater alignment requirement than `byte`, the
+   * casted value is guaranteed to be aligned to the size of `bt_node` thanks to
+   * the padding bytes. The cast to `void *` is present to remove the associated
+   * linter warning.
+   */
+  return (void *)(get_values(tree) + get_values_allocation(tree) +
+                  get_padding(tree));
 }
 
 // Getters for specific nodes and values.
@@ -38,20 +81,6 @@ static inline byte *get_value_from_index(binary_tree *const tree,
                                          const size_t index) {
   if (index == NULL_INDEX) return NULL;
   return get_values(tree) + (index * tree->value_size);
-}
-
-// Getters for specific extents of allocations.
-
-static inline size_t get_values_allocation(binary_tree *const tree) {
-  return (size_t)((byte *)get_nodes(tree) - get_values(tree)) - tree->padding;
-}
-
-static inline size_t get_nodes_allocation(binary_tree *const tree) {
-  return tree->allocation - get_values_allocation(tree);
-}
-
-static inline size_t get_padding(binary_tree *const tree) {
-  return get_values_allocation(tree) % alignof(bt_node);
 }
 
 // Getter for indicies of nodes.
@@ -81,28 +110,20 @@ static inline bt_node *get_right_node(binary_tree *const tree,
   return get_node_from_index(tree, node->right_index);
 }
 
-// An individual node's true allocation is counted as the size of its value and
-// the size of a `bt_node`.
-
-static inline size_t get_actual_node_size(binary_tree *const tree) {
-  return tree->value_size + sizeof(bt_node);
-}
-
 // - GETTERS END -
 
 binary_tree *bt_init(const size_t value_size, const size_t node_cnt) {
   const size_t NODES_ALLOC = sizeof(bt_node) * node_cnt;
   const size_t VALUES_ALLOC = value_size * node_cnt;
-  const size_t PADDING = VALUES_ALLOC % alignof(bt_node);
+  const size_t PADDING = calc_padding(VALUES_ALLOC);
   const size_t TOTAL_ALLOC =
       NODES_ALLOC + VALUES_ALLOC + PADDING + sizeof(binary_tree);
   binary_tree *const tree = malloc(TOTAL_ALLOC);
   if (tree == NULL) return NULL;
 
   tree->allocation = TOTAL_ALLOC;
-  tree->padding = PADDING;
   tree->root_index = NULL_INDEX;
-  tree->unused_nodes = stack_empty_new(1, sizeof(size_t));
+  tree->unused_nodes = stack_empty_new(node_cnt / 4, sizeof(size_t));
   tree->value_size = value_size;
   return tree;
 }
@@ -175,10 +196,12 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
   // If the stack is uninitialized, initialize it.
   // Otherwise, ensure the stack does not contain any divergent nodes from prior
   // searches by clearing its contents.
-  if (divergent_nodes == NULL)
-    divergent_nodes = stack_empty_new(12, sizeof(bt_node **));
-  else
+  if (divergent_nodes == NULL) {
+    const size_t NUM_NODES = get_total_num_nodes(tree);
+    divergent_nodes = stack_empty_new(NUM_NODES, sizeof(bt_node **));
+  } else {
     stack_reset(divergent_nodes);
+  }
 
   /*
    * If this value reaches `TRAVERSAL_STACK_SHRINK_COUNTER_MAX`,
@@ -247,13 +270,18 @@ binary_tree *bt_resize(binary_tree *tree, const size_t new_capacity) {
     tree = new_tree;
   }
   tree->allocation = ALLOCATION;
-  tree->padding = get_padding(tree);
+  if (new_capacity == 0) {
+    tree->root_index = NULL_INDEX;
+    stack_reset(tree->unused_nodes);
+  }
 
   return tree;
 }
 
 binary_tree *bt_expand(binary_tree *const tree) {
-  return bt_resize(tree, tree->allocation * EXPANSION_FACTOR);
+  const size_t NUM_NODES = get_total_num_nodes(tree);
+  if (NUM_NODES == 0) return bt_resize(tree, 1);
+  return bt_resize(tree, EXPANSION_FACTOR * NUM_NODES);
 }
 
 void register_unalloc_node(binary_tree *const tree, bt_node *const open_node) {
@@ -264,4 +292,37 @@ void register_unalloc_node(binary_tree *const tree, bt_node *const open_node) {
 bt_node *get_unalloc_node(binary_tree *const tree) {
   const size_t *const node_index = (size_t *)stack_pop(tree->unused_nodes);
   return (node_index == NULL) ? NULL : get_node_from_index(tree, *node_index);
+}
+
+#include <stdio.h>
+
+bool print_node(binary_tree *const tree, bt_node *const node) {
+  printf("%hhd ", *(char *)get_value_from_index(tree, node->value_index));
+  return false;
+}
+
+void print_tree_stats(binary_tree *const tree) {
+  printf("# nodes: %zu\n", get_total_num_nodes(tree));
+  printf("Nodes allocation: %zu\n", get_nodes_allocation(tree));
+  printf("Values allocation: %zu\n", get_values_allocation(tree));
+  printf("Padding: %zu\n", get_padding(tree));
+}
+
+int main(void) {
+  const char data[] = {7, 4, 9, 3, 0};
+  binary_tree *tree = bt_new(data);
+  if (tree == NULL) return EXIT_FAILURE;
+
+  bt_traverse(tree, get_node_from_index(tree, tree->root_index), print_node);
+  putchar('\n');
+  print_tree_stats(tree);
+
+  tree = bt_resize(tree, 0);
+  print_tree_stats(tree);
+
+  tree = bt_expand(tree);
+  print_tree_stats(tree);
+
+  bt_delete(tree);
+  return EXIT_SUCCESS;
 }
