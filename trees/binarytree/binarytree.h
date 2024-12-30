@@ -40,7 +40,6 @@ typedef struct bt_node bt_node;
 
 // `bt_node` stands for node_binary_tree.
 typedef struct bt_node {
-  size_t value_index;
   size_t parent_index;
   size_t left_index;
   size_t right_index;

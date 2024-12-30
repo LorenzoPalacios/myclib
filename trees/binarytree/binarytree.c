@@ -139,7 +139,6 @@ binary_tree *bt_new_(const void *const data, const size_t elem_size,
     root_node->parent_index = NULL_INDEX;
     root_node->left_index = NULL_INDEX;
     root_node->right_index = NULL_INDEX;
-    root_node->value_index = tree->root_index;
     memcpy(root_value, data, elem_size);
   }
 
@@ -147,7 +146,6 @@ binary_tree *bt_new_(const void *const data, const size_t elem_size,
     bt_node *const node = get_node_from_index(tree, i);
     byte *const value = get_value_from_index(tree, i);
 
-    node->value_index = i;
     node->parent_index = i / 2;
     // Each new node should have no children from the outset.
     node->left_index = node->right_index = NULL_INDEX;
@@ -292,37 +290,4 @@ void register_unalloc_node(binary_tree *const tree, bt_node *const open_node) {
 bt_node *get_unalloc_node(binary_tree *const tree) {
   const size_t *const node_index = (size_t *)stack_pop(tree->unused_nodes);
   return (node_index == NULL) ? NULL : get_node_from_index(tree, *node_index);
-}
-
-#include <stdio.h>
-
-bool print_node(binary_tree *const tree, bt_node *const node) {
-  printf("%hhd ", *(char *)get_value_from_index(tree, node->value_index));
-  return false;
-}
-
-void print_tree_stats(binary_tree *const tree) {
-  printf("# nodes: %zu\n", get_total_num_nodes(tree));
-  printf("Nodes allocation: %zu\n", get_nodes_allocation(tree));
-  printf("Values allocation: %zu\n", get_values_allocation(tree));
-  printf("Padding: %zu\n", get_padding(tree));
-}
-
-int main(void) {
-  const char data[] = {7, 4, 9, 3, 0};
-  binary_tree *tree = bt_new(data);
-  if (tree == NULL) return EXIT_FAILURE;
-
-  bt_traverse(tree, get_node_from_index(tree, tree->root_index), print_node);
-  putchar('\n');
-  print_tree_stats(tree);
-
-  tree = bt_resize(tree, 0);
-  print_tree_stats(tree);
-
-  tree = bt_expand(tree);
-  print_tree_stats(tree);
-
-  bt_delete(tree);
-  return EXIT_SUCCESS;
 }
