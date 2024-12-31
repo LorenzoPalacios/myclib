@@ -39,10 +39,6 @@ static inline size_t get_values_allocation(const binary_tree *const tree) {
   return get_total_num_nodes(tree) * tree->value_size;
 }
 
-static inline size_t get_nodes_allocation(const binary_tree *const tree) {
-  return get_total_num_nodes(tree) * sizeof(bt_node);
-}
-
 static inline size_t calc_padding(const size_t values_alloc) {
   if (values_alloc == 0) return 0;
   return alignof(bt_node) - (values_alloc % alignof(bt_node));
@@ -92,6 +88,11 @@ static inline size_t get_node_index(binary_tree *const tree,
 
 // Getters for nodes based on relative positions.
 
+static inline bt_node *get_root_node(binary_tree *const tree) {
+  if (tree->root_index == NULL_INDEX) return NULL;
+  return get_node_from_index(tree, tree->root_index);
+}
+
 static inline bt_node *get_parent_node(binary_tree *const tree,
                                        const bt_node *const node) {
   if (node->parent_index == NULL_INDEX) return NULL;
@@ -134,7 +135,7 @@ binary_tree *bt_new_(const void *const data, const size_t elem_size,
 
   if (num_elems > 0) {
     tree->root_index = 0;
-    bt_node *const root_node = get_node_from_index(tree, tree->root_index);
+    bt_node *const root_node = get_root_node(tree);
     byte *const root_value = get_value_from_index(tree, tree->root_index);
     root_node->parent_index = NULL_INDEX;
     root_node->left_index = NULL_INDEX;
@@ -147,16 +148,19 @@ binary_tree *bt_new_(const void *const data, const size_t elem_size,
     byte *const value = get_value_from_index(tree, i);
 
     node->parent_index = i / 2;
-    // Each new node should have no children from the outset.
+    // Each new node should start without children.
     node->left_index = node->right_index = NULL_INDEX;
 
     bt_node *const parent_node = get_parent_node(tree, node);
-    // Potential optimization to replace conditional:
-    // *((size_t *)parent_node + 1 + (i & 1)) = i;
-    if (i & 1)
-      parent_node->left_index = i;
-    else
-      parent_node->right_index = i;
+    /*
+     * The line below is equivalent to:
+     *  if (i & 1)
+     *    parent_node->left_index = i;
+     *  else
+     *    parent_node->right_index = i;
+     */
+    *((size_t *)parent_node + 1 + (i & 1)) = i;
+
     memcpy(value, (const byte *)data + (i * elem_size), elem_size);
   }
   return tree;
@@ -170,6 +174,40 @@ void bt_delete_(binary_tree **const tree) {
 void bt_delete_s_(binary_tree **const tree) {
   memset(*tree, 0, (*tree)->allocation);
   bt_delete_(tree);
+}
+
+// Helper function for `bt_traverse()`.
+static bool should_shrink_stack(const stack *const divergent_nodes) {
+  // Max calls to `bt_traverse()` before shrinking can occur.
+  static const size_t SHRINK_COUNTER_MAX = 5;
+
+  // Percentage of stack usage to determine if shrinking is needed.
+  // If `used_capacity < capacity * STACK_MAJOR_USAGE_PERCENT` over
+  // `STACK_SHRINK_COUNTER_MAX` calls, the stack will shrink.
+  static const long double MAJOR_USAGE_PERCENT = .8;
+
+  /*
+   * If this value reaches `TRAVERSAL_STACK_SHRINK_COUNTER_MAX`,
+   * `divergent_nodes` will have its allocation shrunk.
+   *
+   * This counter will reset if the used capacity of `divergent_nodes` comes
+   * within `STACK_MAJOR_USAGE_PERCENT` of the capacity of `divergent_nodes`.
+   */
+  static size_t shrink_counter = 0;
+
+  const size_t THRESHOLD =
+      (size_t)(MAJOR_USAGE_PERCENT * stack_capacity(divergent_nodes));
+
+  if (divergent_nodes->length > THRESHOLD) {
+    shrink_counter = 0;
+    return false;
+  }
+  shrink_counter++;
+  if (shrink_counter == SHRINK_COUNTER_MAX) {
+    shrink_counter = 0;
+    return true;
+  }
+  return false;
 }
 
 /*
@@ -188,7 +226,8 @@ void bt_delete_s_(binary_tree **const tree) {
  * stack (allocated on the heap) to keep track of divergent nodes in the tree.
  */
 void bt_traverse(binary_tree *const tree, bt_node *const from,
-                 bool (*const operation)(binary_tree *tree, bt_node *node)) {
+                 register bool (*const operation)(binary_tree *tree,
+                                                  bt_node *node)) {
   static stack *divergent_nodes = NULL;
 
   // If the stack is uninitialized, initialize it.
@@ -201,20 +240,7 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
     stack_reset(divergent_nodes);
   }
 
-  /*
-   * If this value reaches `TRAVERSAL_STACK_SHRINK_COUNTER_MAX`,
-   * `divergent_nodes` will have its allocation shrunk.
-   *
-   * This counter will reset if the `divergent_nodes->used_capacity` comes
-   * within `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT` of
-   * `divergent_nodes->capacity`.
-   */
-  static size_t stack_shrink_counter = 0;
-  const size_t STK_CAP_SHRNK_THRES =
-      (size_t)(TRAVERSAL_STACK_MAJOR_USAGE_PERCENT *
-               stack_capacity(divergent_nodes));
-
-  bool low_stack_usage = true;
+  bool shrink_stack = true;
   bt_node *cur_node = from;
   bt_node *next_node = NULL;
   while (cur_node != NULL) {
@@ -244,19 +270,13 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
       if (next_divergence == NULL) break;
       next_node = get_right_node(tree, *next_divergence);
     }
-    // Checking if the stack is using a majority of its capacity.
-    if (divergent_nodes->length > STK_CAP_SHRNK_THRES) low_stack_usage = false;
+    if (shrink_stack != true)
+      shrink_stack = should_shrink_stack(divergent_nodes);
     cur_node = next_node;
   }
-  if (low_stack_usage)
-    stack_shrink_counter++;
-  else
-    stack_shrink_counter = 0;
 
-  if (stack_shrink_counter == TRAVERSAL_STACK_SHRINK_COUNTER_MAX) {
+  if (shrink_stack)
     stack_resize(divergent_nodes, divergent_nodes->allocation / 2);
-    stack_shrink_counter = 0;
-  }
 }
 
 binary_tree *bt_resize(binary_tree *tree, const size_t new_capacity) {

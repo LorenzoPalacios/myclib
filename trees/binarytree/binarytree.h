@@ -11,31 +11,6 @@
 
 #define NULL_INDEX (SIZE_MAX)
 
-/*
- * Determines how many calls to `bt_traverse()` (where the internal
- * stack's `used_capacity` never exceeds the product of its `capacity` and
- * `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`) must be made before shrinking the
- * internal stack's allocated memory.
- */
-#define TRAVERSAL_STACK_SHRINK_COUNTER_MAX (5)
-
-/*
- * If `bt_traverse` is called `TRAVERSAL_STACK_SHRINK_COUNTER` times
- * and the `used_capacity` of the internal stack used by
- * `bt_traverse()` is less than the product of this multiplier and the
- * stack's `capacity`, the internal stack will shrink its allocated memory.
- *
- * Expressed mathematically:
- *
- * c - The capacity of the stack.
- * u - The used capacity of the stack.
- * k - The value of `TRAVERSAL_STACK_MAJOR_USAGE_PERCENT`.
- *
- * If `u < kc` over three subsequent calls to `bt_traverse()`, then
- * the internal stack of `bt_traverse()` will shrink its allocation.
- */
-#define TRAVERSAL_STACK_MAJOR_USAGE_PERCENT ((long double).8)
-
 typedef struct bt_node bt_node;
 
 // `bt_node` stands for node_binary_tree.
@@ -58,6 +33,7 @@ typedef struct {
 #define bt_new(arr) bt_new_(arr, sizeof *(arr), sizeof(arr) / sizeof *(arr))
 
 #define bt_delete(tree) bt_delete_(&(tree))
+
 #define bt_delete_s(tree) bt_delete_s_(&(tree))
 
 /*
