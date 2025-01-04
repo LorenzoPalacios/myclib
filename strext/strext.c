@@ -19,7 +19,7 @@ static inline size_t calc_allocation(const size_t requested_cap) {
   return requested_cap + sizeof(string) + 1;
 }
 
-static inline size_t get_capacity(const string *const str) {
+size_t string_capacity(const string *const str) {
   /* Subtracting one since a null terminator must be present in the string. */
   return str->allocation - sizeof(string) - 1;
 }
@@ -38,7 +38,7 @@ static inline char *get_string_contents(string *const str) {
  */
 static inline string *expand_str_to_capacity(string *str,
                                              const size_t new_capacity) {
-  const size_t DST_CAPACITY = get_capacity(str);
+  const size_t DST_CAPACITY = string_capacity(str);
   const size_t EXPANSION_CNT = new_capacity / (DST_CAPACITY + 1);
   if (EXPANSION_CNT != 0) {
     const size_t EXPANDED_CAPACITY =
@@ -53,26 +53,23 @@ static inline string *expand_str_to_capacity(string *str,
 static string *find_replace_(string *src, const char *const tgt,
                              const size_t tgt_len, const char *const repl,
                              const size_t repl_len) {
-  if (tgt_len == 0) return src;
+  if (tgt_len == 0 || tgt_len > src->length) return src;
 
   char *const needle_pos = strstr(src->data, tgt);
   if (needle_pos != NULL) {
     const size_t REQ_CAPACITY = src->length + repl_len - tgt_len;
-    if (src->capacity < REQ_CAPACITY) {
+    if (string_capacity(src) < REQ_CAPACITY) {
       string *const realloc_str = string_expand(src);
       if (realloc_str == NULL) return NULL;
       src = realloc_str;
     }
-
     const size_t REMAINDER = src->length - (size_t)(needle_pos - src->data);
     memmove(needle_pos + repl_len, needle_pos + tgt_len, REMAINDER);
     /* Using `memcpy()` since `strcpy()` appends a null terminator. */
     memcpy(needle_pos, repl, repl_len);
   }
-  if (repl_len > tgt_len)
-    src->length += repl_len - tgt_len;
-  else
-    src->length -= tgt_len - repl_len;
+  src->length += repl_len;
+  src->length -= tgt_len;
   src->data[src->length] = '\0';
   return src;
 }
@@ -119,11 +116,11 @@ string *string_append_int(string *str, long long num) {
 string *string_append_uint(string *str, const unsigned long long num) {
   const size_t DIGIT_CNT = (size_t)log10l(num);
   const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
-  if (str->capacity < REQ_CAPACITY) {
+  if (string_capacity(str) < REQ_CAPACITY) {
     str = expand_str_to_capacity(str, REQ_CAPACITY);
     if (str == NULL) return NULL;
   }
-  sprintf(str->data + str->length, "%llu", num);
+  (void)sprintf(str->data + str->length, "%llu", num);
   str->length += DIGIT_CNT;
   return str;
 }
@@ -134,7 +131,7 @@ void string_clear(string *const str) {
 }
 
 void string_clear_s(string *const str) {
-  memset(str->data, '\0', str->capacity);
+  memset(str->data, '\0', string_capacity(str));
   str->length = 0;
 }
 
@@ -149,8 +146,8 @@ void string_delete_s_(string **const str) {
 }
 
 string *string_expand(string *const str) {
-  const size_t NEW_CAP =
-      (str->capacity > 1) ? EXPANSION_FACTOR * str->capacity : 1;
+  const size_t CUR_CAP = string_capacity(str);
+  const size_t NEW_CAP = (CUR_CAP > 1) ? EXPANSION_FACTOR * CUR_CAP : 1;
   return string_resize(str, NEW_CAP);
 }
 
@@ -192,7 +189,6 @@ string *string_of_capacity(const size_t capacity) {
   if (str == NULL) return NULL;
   str->data = get_string_contents(str);
   str->length = 0;
-  str->capacity = capacity;
   str->allocation = ALLOCATION;
   str->data[str->length] = '\0';
   return str;
@@ -269,11 +265,10 @@ string *string_resize(string *str, const size_t new_capacity) {
     str = new_str;
   }
   str->data = get_string_contents(str);
-  str->capacity = new_capacity;
   str->allocation = ALLOCATION;
 
   if (new_capacity < str->length) {
-    str->length = str->capacity;
+    str->length = new_capacity;
     str->data[str->length] = '\0';
   }
   return str;

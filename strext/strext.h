@@ -7,7 +7,6 @@ typedef struct
 {
     char *data;
     size_t length;
-    size_t capacity;
     size_t allocation;
 } string;
 
@@ -156,6 +155,15 @@ string *string_append_int(string *str, long long num);
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
 string *string_append_uint(string *str, unsigned long long num);
+
+
+/**
+ * @brief Retrieves the capacity allocated for a given string.
+ *
+ * @param str A pointer to the string whose capacity is to be retrieved.
+ * @return The capacity of the string.
+ */
+size_t string_capacity(const string *str);
 
 /**
  * @brief Clears the contents of the string.
