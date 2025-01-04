@@ -3,11 +3,11 @@
 
 #include <stddef.h>
 
-#define new_array(data) \
+#define array_new(data) \
   array_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
 
-#define delete_array(arr) _delete_array(&(arr))
-#define delete_array_s(arr) _delete_array_s(&(arr))
+#define array_delete(arr) _delete_array(&(arr))
+#define array_delete_s(arr) _delete_array_s(&(arr))
 
 typedef struct {
   void *data;
