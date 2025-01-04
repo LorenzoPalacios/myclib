@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The factor by which to expand a stack's capacity. */
+// The factor by which to expand a stack's capacity.
 #define STACK_EXPANSION_FACTOR (2)
 
 static inline size_t alloc_calc(const stack *const stk, const size_t capacity) {
@@ -15,9 +15,9 @@ size_t stack_capacity(const stack *const stk) {
   return (stk->allocation - sizeof(stack)) / stk->elem_size;
 }
 
-void stack_clear(stack *const stk) { stk->length = 0; }
+void stack_reset(stack *const stk) { stk->length = 0; }
 
-void stack_clear_s(stack *const stk) {
+void stack_clear(stack *const stk) {
   stk->length = 0;
   memset(stk->data, 0, stack_capacity(stk));
 }
@@ -37,13 +37,13 @@ void stack_delete_s_(stack **const stk) {
 stack *stack_expand(stack *const stk) {
   stack *new_stk = stack_resize(stk, STACK_EXPANSION_FACTOR * stk->allocation);
   /*
-   * Reallocation may fail because the requested memory is too large.
-   * In this case, we fall back to the safer, yet generally less efficient
-   * option of only allocating enough memory for one new element in the stack.
-   * This has the likely side effect of requiring more later reallocations, but
-   * is more likely to ensure program stability.
-   * Of course, if this also fails, then chances are the system is out of
-   * memory, so it's fine to return `NULL`.
+   * Reallocation may fail because the requested memory is too large. In this
+   * case, we fall back to the safer, yet generally less efficient option of
+   * only allocating enough memory for one new element in the stack.
+   *
+   * This has the side effect of requiring more later reallocations, but is
+   * more likely to ensure stability. Of course, if this also fails, then
+   * chances are the system is out of memory, so it's fine to return `NULL`.
    */
   if (new_stk == NULL)
     new_stk = stack_resize(stk, stk->allocation + stk->elem_size);
@@ -123,7 +123,7 @@ stack *stack_push(stack *stk, const void *const elem) {
   return stk;
 }
 
-/* For heapless stacks. */
+// - HEAPLESS STACKS -
 
 void *stack_heapless_peek(stack *const stk) { return stack_peek(stk); }
 
@@ -137,7 +137,7 @@ stack *stack_heapless_push(stack *const stk, const void *const elem) {
   return stk;
 }
 
-/* For stacks as interfaces. */
+// - INTERFACE STACKS -
 
 stack *stack_interface_new_(void *const data, const size_t len,
                             const size_t elem_size) {

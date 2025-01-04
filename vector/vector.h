@@ -3,38 +3,143 @@
 
 #include <stddef.h>
 
-typedef unsigned char byte;
-
+/**
+ * @brief Creates a new vector from a raw C-style array.
+ * 
+ * @param data The array to initialize the vector with.
+ * @return A pointer to the newly created vector.
+ */
 #define vector_new(data) \
-  _vector_new(data, sizeof *(data), sizeof(data) / sizeof *(data))
+  vector_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
+
+/**
+ * @brief Deletes a vector and sets its pointer to NULL.
+ * 
+ * @param vec The vector to delete.
+ */
+#define vector_delete(vec) vector_delete_(&(vec))
+
+/**
+ * @brief Securely deletes a vector by zeroing its memory and setting its pointer to NULL.
+ * 
+ * @param vec The vector to delete securely.
+ */
+#define vector_delete_s(vec) vector_delete_s_(&(vec))
 
 typedef struct {
-  size_t length;
-  size_t elem_size;
-  size_t allocation;
+  size_t length;      // The number of elements in the vector.
+  size_t elem_size;   // The size of each element in the vector.
+  size_t allocation;  // The total allocated memory for the vector.
 } vector;
 
-vector *_vector_new(const void *data, size_t elem_size, size_t length);
+/**
+ * @brief Appends an element to the end of the vector.
+ * 
+ * @param vec The vector to append to.
+ * @param elem The element to append.
+ * @return A pointer to the updated vector.
+ */
+vector *vector_append(vector *vec, const void *elem);
 
-vector *vector_add_elem(vector *vec, const void *elem);
+/**
+ * @brief Returns the capacity of the vector.
+ * 
+ * @param vec The vector to query.
+ * @return The capacity of the vector.
+ */
+size_t vector_capacity(const vector *vec);
 
-void vector_delete(vector **v);
+/**
+ * @brief Returns a pointer to the data of the vector.
+ * 
+ * @param vec The vector to query.
+ * @return A pointer to the data of the vector.
+ */
+void *vector_data(vector *vec);
 
-void vector_delete_s(vector **v);
+/**
+ * @brief Deletes a vector and sets its pointer to NULL.
+ * 
+ * @param vec The vector to delete.
+ */
+void vector_delete_(vector **vec);
 
+/**
+ * @brief Securely deletes a vector by zeroing its memory and setting its pointer to NULL.
+ * 
+ * @param vec The vector to delete securely.
+ */
+void vector_delete_s_(vector **vec);
+
+/**
+ * @brief Expands the capacity of the vector.
+ * 
+ * @param vec The vector to expand.
+ * @return A pointer to the expanded vector.
+ */
 vector *vector_expand(vector *vec);
 
-void vector_for_each(vector *vec, void (*op)(void *elem));
+/**
+ * @brief Applies a function to each element of the vector.
+ * 
+ * @param vec The vector to iterate over.
+ * @param operation The function to apply to each element.
+ */
+void vector_for_each(vector *vec, void (*operation)(void *elem));
 
-size_t vector_get_capacity(const vector *vec);
+/**
+ * @brief Returns a pointer to the element at the specified index.
+ * 
+ * @param vec The vector to query.
+ * @param index The index of the element.
+ * @return A pointer to the element at the specified index.
+ */
+void *vector_get(vector *vec, size_t index);
 
-size_t vector_get_data_alloc(const vector *vec);
-
+/**
+ * @brief Initializes a new vector with the specified element size and length.
+ * 
+ * @param elem_size The size of each element.
+ * @param length The initial length of the vector.
+ * @return A pointer to the newly created vector.
+ */
 vector *vector_init(size_t elem_size, size_t length);
 
-vector *vector_insert_elem(vector *vec, const void *elem, size_t index);
+/**
+ * @brief Inserts an element at the specified index in the vector.
+ * 
+ * @param vec The vector to insert into.
+ * @param elem The element to insert.
+ * @param index The index at which to insert the element.
+ * @return A pointer to the updated vector.
+ */
+vector *vector_insert(vector *vec, const void *elem, size_t index);
 
-vector *vector_resize(vector *vec, size_t new_size);
+/**
+ * @brief Creates a new vector from an array.
+ * 
+ * @param data The array to initialize the vector with.
+ * @param elem_size The size of each element.
+ * @param length The length of the array.
+ * @return A pointer to the newly created vector.
+ */
+vector *vector_new_(const void *data, size_t elem_size, size_t length);
 
+/**
+ * @brief Resizes the vector to the specified capacity.
+ * 
+ * @param vec The vector to resize.
+ * @param new_capacity The new capacity of the vector.
+ * @return A pointer to the resized vector.
+ */
+vector *vector_resize(vector *vec, size_t new_capacity);
+
+/**
+ * @brief Shrinks the vector's capacity to fit its length.
+ * 
+ * @param vec The vector to shrink.
+ * @return A pointer to the resized vector.
+ */
 vector *vector_shrink_to_fit(vector *vec);
+
 #endif
