@@ -1,213 +1,312 @@
 #include "tests.h"
 
+#include <assert.h>
 #include <ctype.h>
-#include <limits.h>
-#include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <vadefs.h>
+
+#define STACK_WANT_HEAPLESS
+#define RANDOM_CACHE_ALLOWED
 
 #include "../array/array.h"
-#include "../randomgen/randomgen.h"
+#include "../random/random.h"
+#include "../stack/stack.h"
 #include "../strext/strext.h"
+#include "../vector/vector.h"
 
-/*
- * Generates and applies a seed for `rand()`.
- * \returns The applied seed.
- */
-static inline unsigned apply_seed_to_srand(void) {
-#if (MANUAL_SEED_SET == 0)
-  const unsigned NEW_SEED = (unsigned)time(NULL);
-  srand(NEW_SEED);
-  return NEW_SEED;
-#else
-  srand(MANUAL_SEED_SET);
-  return MANUAL_SEED_SET;
-#endif
-}
+#define ARR_LEN(arr) (sizeof(arr) / sizeof *(arr))
 
-/*
- * Operates as if `vprintf()` itself was called directly, but measures the time
- * taken for the function call to return.
- *
- * \return The time elapsed by the function.
- */
-static inline clock_t timed_printf(const char *format, ...) {
-  const clock_t start_time = clock();
-  va_list args;
-  _crt_va_start(args, format);
-  vprintf(format, args);
-  _crt_va_end(args);
-  const clock_t end_time = clock() - start_time;
-  return end_time;
-}
+#define INT_TO_CHAR(c) ((char)((unsigned char)(c)))
 
-/*
- * Helper function used by test functions to print `int` test data.
- *
- * Returns the amount of time taken to complete the operation.
- */
-static clock_t print_data(const int *data, const size_t num_elems) {
-  const clock_t START_TIME = clock();
-  char buf[512] = "[";
-  for (size_t data_i = 0, buf_i = 1; data_i < num_elems; data_i++) {
-    if (buf_i >= sizeof(buf) - 1) {
-      buf[sizeof(buf) - 1] = '\0';
-      printf("%s", buf);
-      buf_i = 0;
-    }
-    if (data_i == num_elems - 1) {
-      snprintf(buf + buf_i, sizeof(buf) - buf_i, "%d]", data[data_i]);
-      break;
-    }
-    buf_i += snprintf(buf + buf_i, sizeof(buf) - buf_i, "%d, ", data[data_i]);
+// This should be enough to hold a string representation of `SIZE_MAX`,
+// `RUN_ALL_TESTS_KEYWORD`, and a null terminator.
+#define BUFFER_SIZE (64)
+
+#define TEST_DATA "abc123!@#\n\t"
+#define TEST_DATA_LEN (ARR_LEN(TEST_DATA))
+#define TEST_DATA_STR_LEN (TEST_DATA_LEN - 1)
+
+// For any feature that defines a for-each operation.
+static void for_each_operation(void *const elem) { assert(elem != NULL); }
+
+// - TEST FUNCTIONS -
+
+static void test_array(void) {
+  array *arr = array_new(TEST_DATA);
+  assert(arr != NULL);
+  assert(arr->length == ARR_LEN(TEST_DATA));
+  assert(arr->capacity == arr->length);
+  assert(arr->elem_size == sizeof *(TEST_DATA));
+
+  for (size_t i = 0; i < arr->length; i++) {
+    const char *const elem = array_get(arr, i);
+    assert(elem != NULL);
+    assert(*elem == TEST_DATA[i]);
   }
-  puts(buf);
-  const clock_t elapsed_time = clock() - START_TIME;
-  return elapsed_time;
+  assert(array_get(arr, arr->length) == NULL);
+
+  array_for_each(arr, for_each_operation);
+
+  array_clear(arr);
+  assert(arr->length == 0);
+  assert(array_get(arr, 0) == NULL);
+
+  array_delete(arr);
 }
 
-/* - TEST FUNCTIONS BEGIN - */
-
-static clock_t _test_new_array(void) {
-  const int test_data[][10] = {{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}};
-  puts("Testing new_array()");
-  clock_t start_time = clock();
-  for (size_t i = 0; i < SIZEOF_ARR(test_data); i++) {
-    clock_t IO_TIME = timed_printf("Test %zu data: ", i) +
-                      print_data(test_data[i], SIZEOF_ARR(test_data[i]));
-    array_t *arr =
-        new_array(test_data[i], sizeof(**test_data), SIZEOF_ARR(*test_data));
-    IO_TIME += timed_printf("array_t contents: ") +
-               print_data(arr->data, arr->length) +
-               timed_printf("Status: (%d)\n",
-                            memcmp(test_data[i], arr->data, arr->length));
-    delete_array(arr);
-    start_time += IO_TIME;
+static void test_random(void) {
+  static const size_t ITERATIONS = 1000000;
+  {
+    const seed_t SEED = random_init();
+    printf("test_random: SEED = %u\n", SEED);
   }
-  const clock_t end_time = clock() - start_time;
 
-  puts("new_array() tests complete.");
-  return end_time;
+  size_t cnt_true = 0;
+  for (size_t i = 0; i < ITERATIONS; i++) cnt_true += random_bool();
+
+  const double PERCENT_TRUE = (double)cnt_true / (double)ITERATIONS;
+  printf("test_random: %g%% true for %zu iterations.\n", PERCENT_TRUE,
+         ITERATIONS);
 }
 
-/* - TEST FUNCTIONS END -*/
+static void test_stack(void) {
+  {
+    stack *stk = stack_new(TEST_DATA);
+    assert(stk != NULL);
+    assert(stk->length == TEST_DATA_LEN);
+    assert(stk->elem_size == sizeof *(TEST_DATA));
 
-/* MAKE SURE TO UPDATE BOTH ARRAYS */
-static clock_t (*const test_functions[])(void) = {_test_new_array};
-static const char *const test_names[NUM_TESTS] = {"new_array()"};
+    while (stk->length != 0) {
+      const char *const elem = stack_pop(stk);
+      assert(elem != NULL);
+      assert(*elem == TEST_DATA[stk->length]);
+    }
+    assert(stack_peek(stk) == NULL);
 
-static void prompt_user(void) {
+    {
+      const char new_elem = 'e';
+      stk = stack_push(stk, &new_elem);
+      assert(stk != NULL);
+      const char *const peeked_elem = stack_peek(stk);
+      assert(peeked_elem != NULL);
+      assert(*peeked_elem == new_elem);
+    }
+    stack_clear(stk);
+    assert(stack_peek(stk) == NULL);
+
+    stack_delete(stk);
+  }
+
+  {
+    stack stk = stack_heapless_new(stk, TEST_DATA);
+
+    assert(stk.length == TEST_DATA_LEN);
+    assert(stk.elem_size == sizeof *(TEST_DATA));
+    {
+      const char elem_cannot_fit = 'u';
+      assert(stack_heapless_push(&stk, &elem_cannot_fit) == NULL);
+    }
+
+    while (stk.length != 0) {
+      const char *const elem = stack_pop(&stk);
+      assert(elem != NULL);
+      assert(*elem == TEST_DATA[stk.length]);
+    }
+    assert(stack_peek(&stk) == NULL);
+
+    {
+      const char new_elem = 'e';
+      assert(stack_heapless_push(&stk, &new_elem) != NULL);
+      const char *const peeked_elem = stack_peek(&stk);
+      assert(peeked_elem != NULL);
+      assert(*peeked_elem == new_elem);
+    }
+    stack_clear(&stk);
+    assert(stack_peek(&stk) == NULL);
+  }
+}
+
+static void test_strext(void) {
+  string *str = string_new(TEST_DATA);
+  assert(str != NULL);
+  assert(strcmp(str->data, TEST_DATA) == 0);
+  assert(str->length == TEST_DATA_STR_LEN);
+
+  string_clear_s(str);
+  assert(str->length == 0);
+  assert(str->data[0] == 0);
+  {
+    str = string_append_raw_str(str, TEST_DATA);
+    assert(str != NULL);
+    str = string_append_str(str, str);
+    assert(str != NULL);
+
+    assert(str->length == 2 * TEST_DATA_STR_LEN);
+    assert(strncmp(str->data, TEST_DATA, TEST_DATA_STR_LEN) == 0);
+
+    char *const str_data_pos = str->data + TEST_DATA_STR_LEN;
+    assert(strncmp(str_data_pos, TEST_DATA, TEST_DATA_STR_LEN) == 0);
+  }
+  str = string_append_int(str, -1);
+  assert(str != NULL);
+
+  assert(str->length == 2 * TEST_DATA_STR_LEN + 2);
+  assert(str->data[str->length - 2] == '-');
+  assert(str->data[str->length - 1] == '1');
+  {
+    str = string_find_replace(str, "-1", str);
+    assert(str != NULL);
+    assert(str->length == 4 * TEST_DATA_STR_LEN + 2);
+    char *const str_data_pos = str->data + (2 * TEST_DATA_STR_LEN);
+    assert(strncmp(str_data_pos, TEST_DATA, TEST_DATA_STR_LEN) == 0);
+  }
+
+  string_delete(str);
+}
+
+static void test_vector(void) {
+  vector *vec = vector_new(TEST_DATA);
+  assert(vec != NULL);
+  assert(vec->length == ARR_LEN(TEST_DATA));
+  assert(vec->elem_size == sizeof *(TEST_DATA));
+
+  for (size_t i = 0; i < vec->length; i++) {
+    const char *const elem = vector_get(vec, i);
+    assert(elem != NULL);
+    assert(*elem == TEST_DATA[i]);
+  }
+  assert(vector_get(vec, vec->length) == NULL);
+
+  for (size_t i = 0; i < ARR_LEN(TEST_DATA); i++) {
+    const char elem = TEST_DATA[i];
+    vec = vector_insert(vec, &elem, i);
+    assert(vec != NULL);
+  }
+  assert(vec->length == 2 * ARR_LEN(TEST_DATA));
+  vector_for_each(vec, for_each_operation);
+
+  vector_delete(vec);
+}
+
+// - INTERNAL -
+
+#define TESTS \
+  ((test[]){test_array, test_random, test_stack, test_strext, test_vector})
+#define TEST_NAMES \
+  ((const char *const[]){"array", "random", "stack", "strext", "vector"})
+
+#define NUM_TESTS (sizeof(TESTS) / sizeof(*TESTS))
+#define NUM_TEST_NAMES (sizeof(TEST_NAMES) / sizeof(*TEST_NAMES))
+
+static_assert(NUM_TESTS == NUM_TEST_NAMES,
+              "Number of tests and test names must match.");
+#undef NUM_TEST_NAMES
+
+typedef struct {
+  size_t num_selected;
+  size_t test_indicies[NUM_TESTS];
+} test_selection;
+
+static inline void prompt_user(void) {
   puts("Your test choices are:");
-  for (size_t i = 0; i < NUM_TESTS; i++) printf("%zu. %s\n", i, test_names[i]);
-  printf(
-      "\nEnter the number(s) of the tests you want to run, or \"%s\" to run "
-      "all tests.\n"
+  for (size_t i = 0; i < NUM_TESTS; i++) printf("%zu. %s\n", i, TEST_NAMES[i]);
+  puts(
+      "\nEnter the number(s) of the tests you want to run, or "
+      "\"" RUN_ALL_TESTS_KEYWORD
+      "\" to run all tests.\n"
       "Press the enter/return key to complete your selection and begin running "
-      "the selected tests.\n",
-      RUN_ALL_TESTS_KEYWORD);
+      "your selected tests.");
 }
 
-void str_to_lower(char *str) {
+static void str_lower(char *str) {
   while (*str != '\0') {
-    *str = tolower(*str);
+    *str = INT_TO_CHAR(tolower(*str));
     str++;
   }
 }
 
-/*
- * Helper function used by `get_user_test_selection`.
- * `fgets()` retains newlines inside input, thereby making detection of
- * `RUN_ALL_TESTS_KEYWORD` difficult, and `scanf()` is too finicky.
- */
-static void get_line_from_stdin(char *const str, const size_t max_len) {
-  for (size_t i = 0; i < max_len; i++) {
-    const char chr = getchar();
-    if (chr == '\n') {
+// Helper function used by `get_test_selection`.
+// The capacity of `str` is assumed to account for a null terminator, meaning
+// `str` should be capable of holding `str_cap - 1` characters and a null
+// terminator.
+static void get_line_from_stdin(char *const str, const size_t str_cap) {
+  for (size_t i = 0; i < str_cap; i++) {
+    const int chr = getchar();
+    if (chr == '\n' || chr == EOF) {
       str[i] = '\0';
+      str_lower(str);
       return;
     }
-    str[i] = chr;
+    str[i] = INT_TO_CHAR(chr);
   }
-  /* Discard any unused input. */
-  while (getchar() != '\n');
+  str[str_cap] = '\0';
+  while (getchar() != '\n');  // Discard any unused input.
 }
 
-/*
- * Asks the user to choose from a list of available tests as defined by
- * `test_functions` and `test_names`.
- *
- * \returns An array of function pointers where each element corresponds to a
- * given test function.
- *
- * \note As it stands, this function was written with the intent of getting it
- * out of the way so the rest of this test suite can be worked on.
- * Bearing this in mind, the quality is not up to my usual standards, and I
- * intend to refactor this function later.
- */
-static test_entry *get_user_test_selection(void) {
-  test_entry *const selected_tests =
-      malloc(sizeof(test_entry) * (NUM_TESTS + 1));
+static test_selection get_test_selection(void) {
+  test_selection selection_obj;
+  size_t *const test_indicies = selection_obj.test_indicies;
 
-  char buf[DIGITS_IN_NUM(SIZE_MAX) + 1];
-  size_t test_index;
-  size_t i = 0;
-  for (; i < NUM_TESTS; i++) {
+  selection_obj.num_selected = 0;
+  for (size_t i = 0; i < NUM_TESTS; i++) {
+    char buf[BUFFER_SIZE];
     get_line_from_stdin(buf, sizeof(buf) - 1);
-    str_to_lower(buf);
+
+    // A single null terminator can only be present if either a newline was
+    // reached, or `stdin` is in `EOF` state. In either case, we don't need to
+    // worry about input anymore.
+    if (buf[0] == '\0') break;
+
     if (strcmp(RUN_ALL_TESTS_KEYWORD, buf) == 0) {
-      for (size_t j = 0; j < NUM_TESTS; j++) {
-        selected_tests[i].func = test_functions[i];
-        selected_tests[i].time_taken = 0;
-      }
-      selected_tests[NUM_TESTS].func = NULL;
-      return selected_tests;
+      for (size_t j = 0; j < NUM_TESTS; j++) test_indicies[j] = j;
+      selection_obj.num_selected = NUM_TESTS;
+      break;
     }
 
-    const int sscanf_status = sscanf(buf, "%zu", &test_index);
-    if (sscanf_status == 1 && test_index < NUM_TESTS) {
-      selected_tests[i].func = test_functions[test_index];
-      selected_tests[i].time_taken = 0;
-    } else if (sscanf_status == EOF) { /* Exit on single newline. */
-      break;
-    } else { /* Redo iteration on invalid entry. */
+    size_t test_index = NUM_TESTS;
+    (void)sscanf(buf, "%zu", &test_index);
+    if (test_index < NUM_TESTS) {
+      test_indicies[i] = test_index;
+      selection_obj.num_selected++;
+    } else {  // Redo iteration on invalid entry.
       i--;
     }
   }
-  selected_tests[i].func = NULL; /* Terminator element for `selected_tests`. */
-  return selected_tests;
+  return selection_obj;
 }
 
-static clock_t run_tests(test_entry *const test_selection) {
-  clock_t total_time = 0;
-  for (size_t i = 0; test_selection[i].func != NULL; i++) {
-    const clock_t time_taken = test_selection[i].func();
-    test_selection[i].time_taken = time_taken;
-    total_time += time_taken;
+static void run_tests(const test_selection *const test_selection) {
+  clock_t total_elapsed = 0;
+
+  const size_t *const test_indicies = test_selection->test_indicies;
+  const size_t test_cnt = test_selection->num_selected;
+  for (size_t i = 0; i < test_cnt; i++) {
+    const size_t CUR_TEST_INDEX = test_indicies[i];
+
+    printf("Beginning Test %zu (%s)...\n", i, TEST_NAMES[CUR_TEST_INDEX]);
+
+    const clock_t TEST_START = clock();
+    TESTS[CUR_TEST_INDEX]();
+    const clock_t TEST_ELAPSED = clock() - TEST_START;
+
+    const double ELAPSED_SEC = (double)TEST_ELAPSED / CLOCKS_PER_SEC;
+    printf("Test %zu (%s) took %g seconds.\n\n", i, TEST_NAMES[CUR_TEST_INDEX],
+           ELAPSED_SEC);
+    total_elapsed += TEST_ELAPSED;
   }
-  return total_time;
-}
 
-void greet_and_init(void) {
-  puts("\n - MyBasics Testing Suite - \n");
-  printf("rand() Seed: %u\nrand() Sample: %d\n", apply_seed_to_srand(), rand());
-  /* Ensures `RUN_ALL_TESTS_KEYWORD` is lowercase. */
-  /* clang-format off */
-  #if (!RUN_ALL_TESTS_KEYWORD_IS_CASE_SENSITIVE)
-    str_to_lower(RUN_ALL_TESTS_KEYWORD);
-  #endif
-  /* clang-format on */
+  const double total_elapsed_sec = (double)total_elapsed / CLOCKS_PER_SEC;
+  const double avg_elapsed_sec = total_elapsed_sec / (double)test_cnt;
+  printf("Total elapsed time: %g seconds.\n", total_elapsed_sec);
+  printf("Average test run time: %g seconds.\n", avg_elapsed_sec);
 }
 
 int main(void) {
-  greet_and_init();
   prompt_user();
-  test_entry *const selected_tests = get_user_test_selection();
-  const size_t total_time_taken = run_tests(selected_tests);
-  free(selected_tests);
-  printf("Total elapsed time: %zu ms\n", total_time_taken);
-
+  const test_selection selection = get_test_selection();
+  run_tests(&selection);
   return 0;
 }

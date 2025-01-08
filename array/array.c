@@ -72,4 +72,5 @@ void *array_insert(array *const arr, const void *const elem, size_t index) {
 void array_clear(array *const arr) {
   const size_t ELEM_ALLOC = arr->elem_size * arr->capacity;
   memset(arr->data, 0, ELEM_ALLOC);
+  arr->length = 0;
 }

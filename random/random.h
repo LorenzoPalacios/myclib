@@ -18,14 +18,14 @@ typedef unsigned int seed_t;
 
 /**
  * @brief Initializes the random generator.
- * 
- * This function sets up the random generator with an initial seed.
- * It should be called before any other random number generation functions
- * are used.
- * 
+ *
+ * This function sets up the random generator with an initial seed, and if
+ * `RANDOM_CACHE_ALLOWED` is `true`, will allocate a cache for each generator.
+ *
+ * This should be called before any random generation functions are used.
+ *
  * @return seed_t The initial seed value used for the random number generator.
  */
-
 seed_t random_init(void);
 
 /**

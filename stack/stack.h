@@ -172,13 +172,13 @@ void *stack_pop(stack *stk);
  */
 stack *stack_push(stack *stk, const void *elem);
 
-#define STACK_WANT_HEAPLESS
-
 #ifdef STACK_WANT_HEAPLESS
-/* For memcpy(). */
-#include <string.h>
-/* Ensures that each stack's allocation gets a unique name. */
-#define GET_STACK_NAME(id) _stk_data_##id
+#include <string.h> // For memcpy().
+
+#define GET_LINE __LINE__
+#define STRINGIFY_LINE(line) #line
+// Ensures that each stack's allocation gets a unique name.
+#define GET_STACK_NAME(id) _stk_data_ ## id
 
 /**
  * @brief Creates a stack with automatic storage duration.
@@ -209,8 +209,6 @@ stack *stack_push(stack *stk, const void *elem);
 #define stack_heapless_new(stk_id, data)                          \
   stack_heapless_empty_new(stk_id, sizeof(data) / sizeof *(data), \
                            sizeof *(data));                       \
-  (stk_id).allocation = sizeof(data);                             \
-  (stk_id).used_capacity = sizeof(data);                          \
   (stk_id).length = sizeof(data) / sizeof *(data);                \
   memcpy(GET_STACK_NAME(stk_id), data, sizeof(data));
 
@@ -236,29 +234,11 @@ stack *stack_push(stack *stk, const void *elem);
 /**
  * @brief Convenience macro equivalent to `heapless_new_interface_stack_()`.
  *
- * @param _data Pointer to the data.
+ * @param _data Pointer to an array.
  */
 #define stack_heapless_interface_new(_data)                             \
   stack_heapless_interface_new_(_data, sizeof(_data) / sizeof *(_data), \
                                 sizeof *(_data))
-
-/**
- * @brief Returns, but does not remove, the top element of the heapless stack.
- *
- * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the end of the
- * stack was reached.
- */
-void *stack_heapless_peek(stack *stk);
-
-/**
- * @brief Returns and removes the top element from the heapless stack.
- *
- * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the end of the
- * stack was reached.
- */
-void *stack_heapless_pop(stack *stk);
 
 /**
  * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new top

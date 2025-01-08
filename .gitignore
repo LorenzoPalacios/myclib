@@ -3,6 +3,7 @@
 *.s
 *.pch
 *.o
+*.a
 
 # Specific Files
 CMakeCache.txt

@@ -9,18 +9,16 @@
 #define EXPANSION_FACTOR (2)
 #define BASE_STR_CAPACITY (4096 - sizeof(string) - 1)
 
-/* - INTERNAL UTILITY FUNCTIONS - */
+// - INTERNAL -
 
-/*
- * Used by constructors and reallocators to calculate how much memory should be
- * allocated for a string.
- */
+// Used by constructors and reallocators to calculate how much memory should be
+// allocated for a string.
 static inline size_t calc_allocation(const size_t requested_cap) {
   return requested_cap + sizeof(string) + 1;
 }
 
 size_t string_capacity(const string *const str) {
-  /* Subtracting one since a null terminator must be present in the string. */
+  // Subtracting one since a null terminator must be present in the string.
   return str->allocation - sizeof(string) - 1;
 }
 
@@ -39,7 +37,7 @@ static inline char *get_string_contents(string *const str) {
 static inline string *expand_str_to_capacity(string *str,
                                              const size_t new_capacity) {
   const size_t DST_CAPACITY = string_capacity(str);
-  const size_t EXPANSION_CNT = new_capacity / (DST_CAPACITY + 1);
+  const size_t EXPANSION_CNT = new_capacity / DST_CAPACITY;
   if (EXPANSION_CNT != 0) {
     const size_t EXPANDED_CAPACITY =
         EXPANSION_FACTOR * EXPANSION_CNT * DST_CAPACITY;
@@ -58,14 +56,13 @@ static string *find_replace_(string *src, const char *const tgt,
   char *const needle_pos = strstr(src->data, tgt);
   if (needle_pos != NULL) {
     const size_t REQ_CAPACITY = src->length + repl_len - tgt_len;
-    if (string_capacity(src) < REQ_CAPACITY) {
-      string *const realloc_str = string_expand(src);
-      if (realloc_str == NULL) return NULL;
-      src = realloc_str;
-    }
+    string *const realloc_str = expand_str_to_capacity(src, REQ_CAPACITY);
+    if (realloc_str == NULL) return NULL;
+    src = realloc_str;
+    
     const size_t REMAINDER = src->length - (size_t)(needle_pos - src->data);
     memmove(needle_pos + repl_len, needle_pos + tgt_len, REMAINDER);
-    /* Using `memcpy()` since `strcpy()` appends a null terminator. */
+    // Using `memcpy()` since `strcpy()` appends a null terminator.
     memcpy(needle_pos, repl, repl_len);
   }
   src->length += repl_len;
@@ -91,7 +88,7 @@ static string *string_insert_(string *dst, size_t index, const char *const src,
   return dst;
 }
 
-/* - LIBRARY FUNCTIONS - */
+// - LIBRARY FUNCTIONS -
 
 string *string_append_char(string *dst, const char chr) {
   return string_insert_char(dst, chr, dst->length);
@@ -114,7 +111,7 @@ string *string_append_int(string *str, long long num) {
 }
 
 string *string_append_uint(string *str, const unsigned long long num) {
-  const size_t DIGIT_CNT = (size_t)log10l(num);
+  const size_t DIGIT_CNT = num == 0 ? 1 : (size_t)log10l(num) + 1;
   const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
   if (string_capacity(str) < REQ_CAPACITY) {
     str = expand_str_to_capacity(str, REQ_CAPACITY);

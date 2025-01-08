@@ -73,7 +73,7 @@ vector *vector_insert(vector *vec, const void *const elem, const size_t index) {
   const size_t ELEM_SIZE = vec->elem_size;
   const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index);
   byte *const insertion_pos = vector_get(vec, index);
-  byte *const shift_pos = insertion_pos + SHIFT_SIZE;
+  byte *const shift_pos = insertion_pos + ELEM_SIZE;
   memmove(shift_pos, insertion_pos, SHIFT_SIZE);
   memcpy(insertion_pos, elem, ELEM_SIZE);
 

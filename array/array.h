@@ -6,8 +6,8 @@
 #define array_new(data) \
   array_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
 
-#define array_delete(arr) _delete_array(&(arr))
-#define array_delete_s(arr) _delete_array_s(&(arr))
+#define array_delete(arr) array_delete_(&(arr))
+#define array_delete_s(arr) array_delete_s_(&(arr))
 
 typedef struct {
   void *data;

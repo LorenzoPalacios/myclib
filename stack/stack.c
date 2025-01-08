@@ -114,7 +114,7 @@ void *stack_pop(stack *const stk) {
 
 stack *stack_push(stack *stk, const void *const elem) {
   const size_t LENGTH = stk->length;
-  if (LENGTH + 1 > stack_capacity(stk)) {
+  if (LENGTH == stack_capacity(stk)) {
     stk = stack_expand(stk);
     if (stk == NULL) return NULL;
   }
@@ -125,13 +125,9 @@ stack *stack_push(stack *stk, const void *const elem) {
 
 // - HEAPLESS STACKS -
 
-void *stack_heapless_peek(stack *const stk) { return stack_peek(stk); }
-
-void *stack_heapless_pop(stack *const stk) { return stack_pop(stk); }
-
 stack *stack_heapless_push(stack *const stk, const void *const elem) {
   const size_t LENGTH = stk->length;
-  if (LENGTH + 1 > stack_capacity(stk)) return NULL;
+  if (LENGTH == stack_capacity(stk)) return NULL;
   memcpy(stack_get_elem(stk, LENGTH), elem, stk->elem_size);
   stk->length++;
   return stk;
