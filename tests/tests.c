@@ -8,9 +8,6 @@
 #include <string.h>
 #include <time.h>
 
-#define STACK_WANT_HEAPLESS
-#define RANDOM_CACHE_ALLOWED
-
 #include "../array/array.h"
 #include "../random/random.h"
 #include "../stack/stack.h"
@@ -68,7 +65,7 @@ static void test_random(void) {
   for (size_t i = 0; i < ITERATIONS; i++) cnt_true += random_bool();
 
   const double PERCENT_TRUE = (double)cnt_true / (double)ITERATIONS;
-  printf("test_random: %g%% true for %zu iterations.\n", PERCENT_TRUE,
+  printf("test_random: %g%% true over %zu iterations.\n", PERCENT_TRUE,
          ITERATIONS);
 }
 

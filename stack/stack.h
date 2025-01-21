@@ -1,23 +1,15 @@
 #ifndef STACK_H
 #define STACK_H
 
-/*
- * Define `STACK_WANT_HEAPLESS` to include support for stacks of automatic
- * storage.
- */
-
 #include <stddef.h>
 
 typedef unsigned char byte;
 
-/**
- * @brief Structure representing a stack.
- */
 typedef struct {
-  byte *data;         /**< Pointer to the stack data. */
-  size_t length;      /**< Number of elements in the stack. */
-  size_t elem_size;   /**< Size of each element in the stack. */
-  size_t allocation;  /**< Total allocated memory for the stack. */
+  byte *data;         // Pointer to the stack data.
+  size_t length;      // Number of elements in the stack.
+  size_t elem_size;   // Size of each element in the stack.
+  size_t allocation;  // Total allocated memory for the stack.
 } stack;
 
 /**
@@ -97,7 +89,8 @@ void stack_delete_(stack **stk);
 void stack_delete_s_(stack **stk);
 
 /**
- * @brief Expands the memory used by `stk->data`, thereby increasing its capacity.
+ * @brief Expands the memory used by `stk->data`, thereby increasing its
+ * capacity.
  *
  * @param stk Pointer to the stack.
  * @return Pointer to the expanded stack or NULL if reallocation fails.
@@ -128,7 +121,8 @@ stack *stack_empty_new(size_t num_elems, size_t elem_size);
 stack *stack_interface_new_(void *data, size_t len, size_t elem_size);
 
 /**
- * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity` elements.
+ * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity`
+ * elements.
  *
  * @param stk Pointer to the stack.
  * @param new_capacity New capacity of the stack.
@@ -163,8 +157,8 @@ void *stack_peek(stack *stk);
 void *stack_pop(stack *stk);
 
 /**
- * @brief Adds `elem` to `stk`, expanding if necessary. `elem` will then be the new top
- * element and will be returned by functions such as `stack_peek()`.
+ * @brief Adds `elem` to `stk`, expanding if necessary. `elem` will then be the
+ * new top element and will be returned by functions such as `stack_peek()`.
  *
  * @param stk Pointer to the stack.
  * @param elem Pointer to the element to push.
@@ -172,13 +166,10 @@ void *stack_pop(stack *stk);
  */
 stack *stack_push(stack *stk, const void *elem);
 
-#ifdef STACK_WANT_HEAPLESS
-#include <string.h> // For memcpy().
+#include <string.h>  // For memcpy().
 
-#define GET_LINE __LINE__
-#define STRINGIFY_LINE(line) #line
 // Ensures that each stack's allocation gets a unique name.
-#define GET_STACK_NAME(id) _stk_data_ ## id
+#define GET_STACK_NAME(id) _stk_data_##id
 
 /**
  * @brief Creates a stack with automatic storage duration.
@@ -197,8 +188,8 @@ stack *stack_push(stack *stk, const void *elem);
   (stk_id).data = GET_STACK_NAME(stk_id)
 
 /**
- * @brief Creates a stack with automatic storage duration whose contents are a copy of
- * the contents of `data`.
+ * @brief Creates a stack with automatic storage duration whose contents are a
+ * copy of the contents of `data`.
  *
  * @param stk_id The identifier for the stack being assigned.
  * @param num_elems The maximum number of elements the stack will contain.
@@ -213,9 +204,9 @@ stack *stack_push(stack *stk, const void *elem);
   memcpy(GET_STACK_NAME(stk_id), data, sizeof(data));
 
 /**
- * @brief Creates a stack of automatic storage duration which allocates memory solely
- * for the stack header (that is, the data members of `stack`). `stack->data`
- * will take the value of the pointer, `data`.
+ * @brief Creates a stack of automatic storage duration which allocates memory
+ * solely for the stack header (that is, the data members of `stack`).
+ * `stack->data` will take the value of the pointer, `data`.
  *
  * @param _data A pointer to the data to be interfaced.
  * @param num_elems The number of elements in `_data`.
@@ -249,5 +240,6 @@ stack *stack_push(stack *stk, const void *elem);
  * @return `stk` if the element was added successfully or `NULL` upon failure.
  */
 stack *stack_heapless_push(stack *stk, const void *elem);
-#endif
+
+stack *stack_interface_push(stack *stk, const void *elem);
 #endif

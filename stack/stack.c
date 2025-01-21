@@ -149,10 +149,6 @@ stack *stack_interface_new_(void *const data, const size_t len,
   return stk_interface;
 }
 
-void *stack_interface_pop(stack *const stk) { return stack_pop(stk); }
-
-void *stack_interface_peek(stack *const stk) { return stack_peek(stk); }
-
 stack *stack_interface_push(stack *const stk, const void *const elem) {
   return stack_heapless_push(stk, elem);
 }

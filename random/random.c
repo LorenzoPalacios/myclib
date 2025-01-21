@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+// - INTERNAL IMPLEMENTATION -
+
 #if (CACHE_ALLOWED)
 
 typedef void *cache;
@@ -24,9 +26,8 @@ typedef cache *(*cache_constructor)(void);
  * @param cache Pointer to the cache to be stocked.
  */
 static void stock_int_cache(void *const cache) {
-  for (size_t i = 0; i < CACHED_ELEMS; i++) {
-    ((int *)cache)[i] = rand();
-  }
+  int *const int_cache = cache;
+  for (size_t i = 0; i < CACHED_ELEMS; i++) int_cache[i] = rand();
 }
 
 /**
@@ -54,9 +55,7 @@ static cache *get_int_cache(void) {
   static cache int_cache = NULL;
   if (int_cache == NULL) {
     int_cache = malloc(INT_CACHE_SIZE);
-    if (int_cache != NULL) {
-      stock_int_cache(int_cache);
-    }
+    if (int_cache != NULL) stock_int_cache(int_cache);
   }
   return &int_cache;
 }
@@ -73,14 +72,10 @@ static cache *get_bool_cache(void) {
   static cache bool_cache = NULL;
   if (bool_cache == NULL) {
     bool_cache = malloc(BOOL_CACHE_SIZE);
-    if (bool_cache != NULL) {
-      stock_bool_cache(bool_cache);
-    }
+    if (bool_cache != NULL) stock_bool_cache(bool_cache);
   }
   return &bool_cache;
 }
-
-// - INTERNAL IMPLEMENTATION -
 
 /**
  * @brief Finds the highest bit index in RAND_MAX.
@@ -104,6 +99,55 @@ static inline size_t rand_max_highest_bit_index(void) {
   return HIGHEST_BIT_INDEX;
 }
 
+// Cache constructors go here
+#define cache_constructors \
+  ((cache_constructor[]){get_bool_cache, get_int_cache})
+#define NUM_GETTERS (sizeof(cache_constructors) / sizeof *(cache_constructors))
+
+// - PUBLIC CACHE-RELATED FUNCTIONS -
+
+void random_destroy_caches(void) {
+  for (size_t i = 0; i < NUM_GETTERS; i++) {
+    cache *const cache = cache_constructors[i]();
+    free(*cache);
+    *cache = NULL;
+  }
+}
+
+#endif
+
+seed_t random_init(void) {
+  seed_t SEED;
+  {
+    struct timespec t_spec;
+    (void)timespec_get(&t_spec, TIME_UTC);
+    const long long UTC_NANOSEC = t_spec.tv_nsec;
+    const long long EPOCH_TIME = time(NULL);
+    const long long PROGRAM_TIME = clock();
+    SEED = (seed_t)(UTC_NANOSEC ^ EPOCH_TIME ^ PROGRAM_TIME);
+  }
+  srand(SEED);
+
+#if (CACHE_ALLOWED)
+  // The first call to the cache constructors will allocate and stock the
+  // caches.
+  for (size_t i = 0; i < NUM_GETTERS; i++) {
+    void *const cache = *cache_constructors[i]();
+    if (cache == NULL)
+      (void)fprintf(stderr, "random_init(): Failed to create cache %zu\n", i);
+  }
+  // The first call to this function finds the highest bit in `RAND_MAX`, which
+  // will be returned by any subsequent calls.
+  rand_max_highest_bit_index();
+#endif
+
+  return SEED;
+}
+
+// - RANDOM GENERATORS -
+
+#if (CACHE_ALLOWED)
+
 /**
  * @brief Retrieves a random boolean value from the cache.
  *
@@ -115,12 +159,10 @@ static inline size_t rand_max_highest_bit_index(void) {
  *
  * @return A random boolean value.
  */
-static bool get_bool_from_cache(void) {
+bool random_bool(void) {
   int *const cache = *get_bool_cache();
 
-  if (cache == NULL) {
-    return rand() & 1;
-  }
+  if (cache == NULL) return rand() & 1;
 
   static size_t cache_index = 0;
   static size_t bit_index = 0;
@@ -151,12 +193,10 @@ static bool get_bool_from_cache(void) {
  *
  * @return A random integer value.
  */
-static int get_int_from_cache(void) {
+int random_int(void) {
   int *const cache = *get_int_cache();
 
-  if (cache == NULL) {
-    return rand();
-  }
+  if (cache == NULL) return rand();
 
   static size_t cache_index = 0;
 
@@ -167,63 +207,10 @@ static int get_int_from_cache(void) {
   return cache[cache_index++];
 }
 
-// Cache constructors go here
-#define cache_constructors \
-  ((cache_constructor[]){get_bool_cache, get_int_cache})
-#define NUM_GETTERS (sizeof(cache_constructors) / sizeof *(cache_constructors))
-
-// - PUBLIC CACHE-RELATED FUNCTIONS -
-
-void random_destroy_caches(void) {
-  for (size_t i = 0; i < NUM_GETTERS; i++) {
-    cache *const cache = cache_constructors[i]();
-    free(*cache);
-    *cache = NULL;
-  }
-}
-
-seed_t random_init(void) {
-  seed_t SEED;
-  {
-    struct timespec t_spec;
-    timespec_get(&t_spec, TIME_UTC);
-    const long long UTC_NS = t_spec.tv_nsec;
-    const long long EPOCH_TIME = time(NULL);
-    const long long CLOCK_TIME = clock();
-    SEED = (seed_t)(UTC_NS ^ EPOCH_TIME ^ CLOCK_TIME);
-  }
-  srand(SEED);
-
-  // The first call to the cache constructors will allocate and stock the
-  // caches.
-  for (size_t i = 0; i < NUM_GETTERS; i++) {
-    void *const cache = *cache_constructors[i]();
-    if (cache == NULL) {
-      fprintf(stderr, "random_init(): Failed to create cache %zu\n", i);
-    }
-  }
-  // The first call to this function finds the highest bit in `RAND_MAX`, which
-  // will be returned by any subsequent calls.
-  rand_max_highest_bit_index();
-  return SEED;
-}
-#endif
-
-// - RANDOM GENERATORS -
-
-bool random_bool(void) {
-#if (CACHE_ALLOWED)
-  return get_bool_from_cache();
 #else
-  return rand() & 1;
-#endif
-}
+
+bool random_bool(void) { return rand() & 1; }
 
 // This function will need revising to deal with the variable range of `rand()`.
-int random_int(void) {
-#if (CACHE_ALLOWED)
-  return get_int_from_cache();
-#else
-  return rand();
+int random_int(void) { return rand(); }
 #endif
-}

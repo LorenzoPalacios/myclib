@@ -14,7 +14,17 @@ typedef unsigned int seed_t;
 #if (CACHE_ALLOWED)
 
 // This is the size of each generator's cache in terms of elements.
-#define CACHED_ELEMS (4096)
+#define CACHED_ELEMS (8192)
+
+/**
+ * @brief Destroys all caches used by the random generator functions.
+ *
+ * This function frees any memory allocated for caches used by the random
+ * generator functions.
+ */
+void random_destroy_caches(void);
+
+#endif
 
 /**
  * @brief Initializes the random generator.
@@ -27,16 +37,6 @@ typedef unsigned int seed_t;
  * @return seed_t The initial seed value used for the random number generator.
  */
 seed_t random_init(void);
-
-/**
- * @brief Destroys all caches used by the random generator functions.
- *
- * This function frees any memory allocated for caches used by the random
- * generator functions.
- */
-void random_destroy_caches(void);
-
-#endif
 
 /**
  * @brief Returns a random boolean value.
