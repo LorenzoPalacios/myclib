@@ -1,5 +1,6 @@
 #include "strext.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -59,7 +60,7 @@ static string *find_replace_(string *src, const char *const tgt,
     string *const realloc_str = expand_str_to_capacity(src, REQ_CAPACITY);
     if (realloc_str == NULL) return NULL;
     src = realloc_str;
-    
+
     const size_t REMAINDER = src->length - (size_t)(needle_pos - src->data);
     memmove(needle_pos + repl_len, needle_pos + tgt_len, REMAINDER);
     // Using `memcpy()` since `strcpy()` appends a null terminator.
@@ -71,8 +72,8 @@ static string *find_replace_(string *src, const char *const tgt,
   return src;
 }
 
-static string *string_insert_(string *dst, size_t index, const char *const src,
-                              size_t src_len) {
+static string *string_insert_(string *dst, const size_t index,
+                              const char *const src, const size_t src_len) {
   if (index > dst->length) return NULL;
 
   const size_t REQ_CAPACITY = dst->length + src_len;
@@ -90,47 +91,30 @@ static string *string_insert_(string *dst, size_t index, const char *const src,
 
 // - LIBRARY FUNCTIONS -
 
-string *string_append_char(string *dst, const char chr) {
+string *string_append_char(string *const dst, const char chr) {
   return string_insert_char(dst, chr, dst->length);
 }
 
-string *string_append_str(string *dst, string *const src) {
+string *string_append_str(string *const dst, string *const src) {
   return string_insert_str(dst, src, dst->length);
 }
 
-string *string_append_raw_str(string *dst, const char *src) {
+string *string_append_raw_str(string *const dst, const char *src) {
   return string_insert_raw_str(dst, src, dst->length);
 }
 
-string *string_insert_int(string *str, const long long num,
+string *string_insert_int(string *const str, const long long num,
                           const size_t index) {
-  if (num >= 0) return string_insert_uint(str, (unsigned long long)num, index);
-
-  // Adding two to account for the logarithm and negative sign.
-  const size_t DIGIT_CNT = num == 0 ? 1 : (size_t)log10l(-num) + 2;
-  const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
-  str = expand_str_to_capacity(str, REQ_CAPACITY);
-  if (str == NULL) return NULL;
-
-  memmove(str->data + index + DIGIT_CNT, str->data + index, DIGIT_CNT);
-
-  (void)sprintf(str->data + index, "%lld", num);
-  str->length += DIGIT_CNT;
-  return str;
+  char buf[sizeof(num) * CHAR_BIT / 2];
+  const size_t NUM_DIGITS = (size_t)sprintf(buf, "%lld", num);
+  return string_insert_(str, index, buf, NUM_DIGITS);
 }
 
-string *string_insert_uint(string *str, const unsigned long long num,
+string *string_insert_uint(string *const str, const unsigned long long num,
                            const size_t index) {
-  const size_t DIGIT_CNT = num == 0 ? 1 : (size_t)log10l(num) + 1;
-  const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
-  str = expand_str_to_capacity(str, REQ_CAPACITY);
-  if (str == NULL) return NULL;
-
-  memmove(str->data + index + DIGIT_CNT, str->data + index, DIGIT_CNT);
-
-  (void)sprintf(str->data + index, "%llu", num);
-  str->length += DIGIT_CNT;
-  return str;
+  char buf[sizeof(num) * CHAR_BIT / 2];
+  const size_t NUM_DIGITS = (size_t)sprintf(buf, "%llu", num);
+  return string_insert_(str, index, buf, NUM_DIGITS);
 }
 
 string *string_append_int(string *str, long long num) {
@@ -195,9 +179,9 @@ string *string_find_replace_char(string *const src, const char tgt,
   return find_replace_(src, &tgt, 1, repl->data, repl->length);
 }
 
-string *string_insert_char(string *const dst, const char chr,
+string *string_insert_char(string *const str, const char chr,
                            const size_t index) {
-  return string_insert_(dst, index, &chr, 1);
+  return string_insert_(str, index, &chr, 1);
 }
 
 string *string_insert_raw_str(string *dst, const char *const src,
@@ -304,4 +288,12 @@ string *string_resize(string *str, const size_t new_capacity) {
 
 string *string_shrink_alloc(string *const str) {
   return string_resize(str, str->length);
+}
+
+int main(void) {
+  string *a = string_new("hey");
+  puts(a->data);
+  a = string_insert(a, ULONG_LONG_MAX, 0);
+  puts(a->data);
+  return 0;
 }

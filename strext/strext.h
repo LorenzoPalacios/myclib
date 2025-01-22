@@ -276,7 +276,7 @@ string *string_find_replace_char(string *src, char tgt,
  * @param index The index at which to insert the character.
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
-string *string_insert_char(string *dst, char chr, size_t index);
+string *string_insert_char(string *str, char chr, size_t index);
 
 /**
  * @brief Inserts a `long long` integer into the string at the specified index.
@@ -290,7 +290,7 @@ string *string_insert_char(string *dst, char chr, size_t index);
  * @param index The index at which to insert the integer.
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
-string *string_insert_int(string *dst, long long num, size_t index);
+string *string_insert_int(string *str, long long num, size_t index);
 
 /**
  * @brief Inserts a raw C-string into the string at the specified index.
@@ -318,7 +318,7 @@ string *string_insert_raw_str(string *dst, const char *src, size_t index);
  * @param index The index at which to insert the integer.
  * @return A pointer to the modified string, or `NULL` if the operation failed.
  */
-string *string_insert_uint(string *dst, unsigned long long num, size_t index);
+string *string_insert_uint(string *str, unsigned long long num, size_t index);
 
 /**
  * @brief Inserts one string into another at the specified index.
