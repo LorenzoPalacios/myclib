@@ -130,7 +130,7 @@ static inline size_t get_node_index(binary_tree *const tree,
 
 // Getter for node values
 
-static inline void *get_node_value(binary_tree *const tree,
+void *bt_node_value(binary_tree *const tree,
                                    bt_node *const node) {
   if (node == NULL) return NULL;
   return value_from_index(tree, get_node_index(tree, node));
@@ -208,7 +208,7 @@ binary_tree *bt_add_node(binary_tree *tree, const void *const value) {
   }
 
   bt_node *const node = get_unalloc_node(tree);
-  memcpy(get_node_value(tree, node), value, tree->value_size);
+  memcpy(bt_node_value(tree, node), value, tree->value_size);
 
   const size_t PARENT_INDEX = leftmost_leaf_index(tree);
   const size_t NODE_INDEX = get_node_index(tree, node);
@@ -328,8 +328,8 @@ void bt_swap_values(binary_tree *const tree, bt_node *const node_1,
                     bt_node *const node_2) {
   if (node_1 == node_2) return;
   const size_t VALUE_SIZE = tree->value_size;
-  byte *restrict const value_1 = get_node_value(tree, node_1);
-  byte *restrict const value_2 = get_node_value(tree, node_2);
+  byte *restrict const value_1 = bt_node_value(tree, node_1);
+  byte *restrict const value_2 = bt_node_value(tree, node_2);
   for (size_t i = 0; i < VALUE_SIZE; i++) {
     const byte temp = value_1[i];
     value_1[i] = value_2[i];

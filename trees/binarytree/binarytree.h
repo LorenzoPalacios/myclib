@@ -107,20 +107,31 @@ binary_tree *bt_init(size_t value_size, size_t node_cnt);
 binary_tree *bt_new_(const void *data, size_t value_size, size_t num_values);
 
 /**
- * @brief Resizes the memory allocated for the binary tree to the new capacity.
+ * @brief Retrieves the value stored in a given node of a binary tree.
+ *
+ * @param tree A pointer to the binary tree.
+ * @param node A pointer to the node whose value is to be retrieved.
+ * @return A pointer to the value stored in the specified node.
+ */
+void *bt_node_value(binary_tree *tree, bt_node *node);
+
+/**
+ * @brief Resizes the memory allocated for the binary tree to the new
+ * capacity.
  *
  * @param tree A pointer to the binary tree.
  * @param new_capacity The new capacity for the binary tree.
- * @return A pointer to the resized binary tree, or NULL if the operation fails.
- * @note If `new_capacity` would cause active nodes to be lost, the operation
- * will fail.
+ * @return A pointer to the resized binary tree, or NULL if the operation
+ * fails.
+ * @note If `new_capacity` would cause active nodes to be lost, the
+ * operation will fail.
  */
 binary_tree *bt_resize(binary_tree *tree, size_t new_capacity);
 
 /**
  * @brief Swaps the values of two nodes in a binary tree.
  *
- * This function takes a binary tree and two nodes within that tree, and swaps
+ * This function takes a binary tree and two nodes within that tree and swaps
  * their values. The structure of the tree remains unchanged.
  *
  * @param tree A pointer to the binary tree.
