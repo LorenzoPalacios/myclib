@@ -6,9 +6,6 @@
 #define array_new(data) \
   array_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
 
-#define array_delete(arr) array_delete_(&(arr))
-#define array_delete_s(arr) array_delete_s_(&(arr))
-
 typedef struct {
   void *data;
   size_t capacity;
@@ -37,14 +34,7 @@ void array_clear(array *arr);
  *
  * @param arr A pointer to the array to delete.
  */
-void array_delete_(array **arr);
-
-/**
- * @brief Securely deletes the array by zeroing its memory before freeing it.
- *
- * @param arr A pointer to the array to delete.
- */
-void array_delete_s_(array **arr);
+void array_delete(array *arr);
 
 /**
  * @brief Applies a function to each element of the array.

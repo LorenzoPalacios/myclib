@@ -10,9 +10,6 @@ typedef struct
     size_t allocation;
 } string;
 
-#define string_delete(str) string_delete_(&(str))
-#define string_delete_s(str) string_delete_s_(&(str))
-
 #define string_append(str, appended)                                                                                   \
     (_Generic((appended),                                                                                              \
          short: string_append_int,                                                                                     \
@@ -193,17 +190,7 @@ void string_clear_s(string *str);
  *
  * @param str A pointer to the string pointer to be deleted.
  */
-void string_delete_(string **str);
-
-/**
- * @brief Securely deletes the string and frees its memory.
- *
- * This function sets all bytes in the string to 0, frees the memory allocated
- * for the string, and sets the string pointer to `NULL`.
- *
- * @param str A pointer to the string pointer to be securely deleted.
- */
-void string_delete_s_(string **str);
+void string_delete(string *str);
 
 /**
  * @brief Expands the capacity of the string.
@@ -343,7 +330,7 @@ string *string_insert_str(string *dst, const string *src, size_t index);
  * @return A pointer to the newly created string, or `NULL` if the operation
  * failed.
  */
-string *string_new_default(void);
+string *string_init(void);
 
 /**
  * @brief Creates a new string with a specified capacity.

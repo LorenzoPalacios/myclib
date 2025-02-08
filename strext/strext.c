@@ -59,7 +59,7 @@ static string *find_replace_(string *src, const char *const tgt,
     string *const realloc_str = expand_str_to_capacity(src, REQ_CAPACITY);
     if (realloc_str == NULL) return NULL;
     src = realloc_str;
-    
+
     const size_t REMAINDER = src->length - (size_t)(needle_pos - src->data);
     memmove(needle_pos + repl_len, needle_pos + tgt_len, REMAINDER);
     // Using `memcpy()` since `strcpy()` appends a null terminator.
@@ -111,7 +111,7 @@ string *string_append_int(string *str, long long num) {
 }
 
 string *string_append_uint(string *str, const unsigned long long num) {
-  const size_t DIGIT_CNT = num == 0 ? 1 : (size_t)log10l(num) + 1;
+  const size_t DIGIT_CNT = num == 0 ? 1 : (size_t)log10l((long double)num) + 1;
   const size_t REQ_CAPACITY = str->length + DIGIT_CNT;
   if (string_capacity(str) < REQ_CAPACITY) {
     str = expand_str_to_capacity(str, REQ_CAPACITY);
@@ -127,20 +127,7 @@ void string_clear(string *const str) {
   str->data[str->length] = '\0';
 }
 
-void string_clear_s(string *const str) {
-  memset(str->data, '\0', string_capacity(str));
-  str->length = 0;
-}
-
-void string_delete_(string **const str) {
-  free(*str);
-  *str = NULL;
-}
-
-void string_delete_s_(string **const str) {
-  memset(*str, 0, (*str)->allocation);
-  string_delete_(str);
-}
+void string_delete(string *const str) { free(str); }
 
 string *string_expand(string *const str) {
   const size_t CUR_CAP = string_capacity(str);
@@ -202,12 +189,10 @@ string *string_of_line_stdin(void) {
   return string_of_stream_delim(stdin, '\n');
 }
 
-string *string_new_default(void) {
-  return string_of_capacity(BASE_STR_CAPACITY);
-}
+string *string_init(void) { return string_of_capacity(BASE_STR_CAPACITY); }
 
 string *string_of_raw_str(const char *raw_str) {
-  string *str = string_new_default();
+  string *str = string_init();
   if (str == NULL) return NULL;
 
   while (*raw_str != '\0') {
@@ -223,7 +208,7 @@ string *string_of_raw_str(const char *raw_str) {
 }
 
 string *string_of_stream(FILE *const stream) {
-  string *str = string_new_default();
+  string *str = string_init();
 
   int chr = getc(stream);
   while (chr != EOF) {
@@ -239,7 +224,7 @@ string *string_of_stream(FILE *const stream) {
 }
 
 string *string_of_stream_delim(FILE *const stream, const char delim) {
-  string *str = string_new_default();
+  string *str = string_init();
 
   int chr = getc(stream);
   while (chr != delim && chr != EOF) {

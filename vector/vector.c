@@ -28,14 +28,8 @@ size_t vector_capacity(const vector *const vec) {
 
 void *vector_data(vector *const vec) { return vec + 1; }
 
-void vector_delete_(vector **const vec) {
-  free(*vec);
-  *vec = NULL;
-}
-
-void vector_delete_s_(vector **const vec) {
-  memset(*vec, 0, (*vec)->allocation);
-  vector_delete_(vec);
+void vector_delete(vector *const vec) {
+  free(vec);
 }
 
 vector *vector_expand(vector *const vec) {

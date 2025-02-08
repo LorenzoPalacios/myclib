@@ -39,14 +39,8 @@ array *array_init(const size_t elem_size, const size_t length) {
   return new_arr;
 }
 
-void array_delete_(array **const arr) {
-  free(*arr);
-  *arr = NULL;
-}
-
-void array_delete_s_(array **const arr) {
-  memset(*arr, 0, (*arr)->capacity + sizeof(array));
-  array_delete_(arr);
+void array_delete(array *const arr) {
+  free(arr);
 }
 
 void *array_get(const array *const arr, const size_t index) {

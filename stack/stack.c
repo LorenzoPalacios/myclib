@@ -8,11 +8,11 @@
 #define STACK_EXPANSION_FACTOR (2)
 
 static inline size_t alloc_calc(const stack *const stk, const size_t capacity) {
-  return (capacity * stk->elem_size) + sizeof(stack);
+  return (capacity * stk->value_size) + sizeof(stack);
 }
 
 size_t stack_capacity(const stack *const stk) {
-  return (stk->allocation - sizeof(stack)) / stk->elem_size;
+  return (stk->allocation - sizeof(stack)) / stk->value_size;
 }
 
 void stack_reset(stack *const stk) { stk->length = 0; }
@@ -24,14 +24,8 @@ void stack_clear(stack *const stk) {
 
 static inline byte *stack_data(stack *const stk) { return (byte *)(stk + 1); }
 
-void stack_delete_(stack **const stk) {
-  free(*stk);
-  *stk = NULL;
-}
-
-void stack_delete_s_(stack **const stk) {
-  memset(*stk, 0, (*stk)->allocation);
-  stack_delete_(stk);
+void stack_delete(stack *const stk) {
+  free(stk);
 }
 
 stack *stack_expand(stack *const stk) {
@@ -46,34 +40,34 @@ stack *stack_expand(stack *const stk) {
    * chances are the system is out of memory, so it's fine to return `NULL`.
    */
   if (new_stk == NULL)
-    new_stk = stack_resize(stk, stk->allocation + stk->elem_size);
+    new_stk = stack_resize(stk, stk->allocation + stk->value_size);
   return new_stk;
 }
 
 static inline byte *stack_get_elem(stack *const stk, const size_t index) {
-  return stk->data + (index * stk->elem_size);
+  return stk->data + (index * stk->value_size);
 }
 
-stack *stack_new_(const void *const data, const size_t len,
-                  const size_t elem_size) {
-  stack *const stk = stack_empty_new(len, elem_size);
+stack *stack_new_(const void *const data, const size_t value_cnt,
+                  const size_t value_size) {
+  stack *const stk = stack_empty_new(value_cnt, value_size);
   if (stk == NULL) return NULL;
-  stk->length = len;
+  stk->length = value_cnt;
 
-  for (size_t i = 0; i < len; i++) {
-    memcpy(stk->data + (i * elem_size), (const byte *)data + (i * elem_size),
-           elem_size);
+  for (size_t i = 0; i < value_cnt; i++) {
+    memcpy(stk->data + (i * value_size), (const byte *)data + (i * value_size),
+           value_size);
   }
   return stk;
 }
 
-stack *stack_empty_new(const size_t num_elems, const size_t elem_size) {
-  const size_t ALLOCATION = (num_elems * elem_size) + sizeof(stack);
+stack *stack_empty_new(const size_t num_elems, const size_t value_size) {
+  const size_t ALLOCATION = (num_elems * value_size) + sizeof(stack);
   stack *const stk = malloc(ALLOCATION);
   if (stk == NULL) return NULL;
   stk->data = stack_data(stk);
   stk->length = 0;
-  stk->elem_size = elem_size;
+  stk->value_size = value_size;
   stk->allocation = ALLOCATION;
   return stk;
 }
@@ -102,7 +96,7 @@ void *stack_peek(stack *const stk) {
    * Subtracting by one since `stk->length` is equivalent to the number of
    * elements within `stk`.
    */
-  return stk->data + ((stk->length - 1) * stk->elem_size);
+  return stk->data + ((stk->length - 1) * stk->value_size);
 }
 
 void *stack_pop(stack *const stk) {
@@ -118,7 +112,7 @@ stack *stack_push(stack *stk, const void *const elem) {
     stk = stack_expand(stk);
     if (stk == NULL) return NULL;
   }
-  memcpy(stack_get_elem(stk, LENGTH), elem, stk->elem_size);
+  memcpy(stack_get_elem(stk, LENGTH), elem, stk->value_size);
   stk->length++;
   return stk;
 }
@@ -128,24 +122,22 @@ stack *stack_push(stack *stk, const void *const elem) {
 stack *stack_heapless_push(stack *const stk, const void *const elem) {
   const size_t LENGTH = stk->length;
   if (LENGTH == stack_capacity(stk)) return NULL;
-  memcpy(stack_get_elem(stk, LENGTH), elem, stk->elem_size);
+  memcpy(stack_get_elem(stk, LENGTH), elem, stk->value_size);
   stk->length++;
   return stk;
 }
 
 // - INTERFACE STACKS -
 
-stack *stack_interface_new_(void *const data, const size_t len,
-                            const size_t elem_size) {
-  /*
-   * The stack itself should not be managing any memory as it is an interface.
-   * However, it should still have an allocation for its header.
-   */
+stack *stack_interface_new_(void *const data, const size_t value_cnt,
+                            const size_t value_size) {
+  // The stack itself should not be managing any memory as it is an interface.
+  // However, it should still have an allocation for its header.
   stack *const stk_interface = stack_empty_new(0, 0);
   if (stk_interface == NULL) return NULL;
   stk_interface->data = data;
-  stk_interface->elem_size = elem_size;
-  stk_interface->length = len;
+  stk_interface->value_size = value_size;
+  stk_interface->length = value_cnt;
   return stk_interface;
 }
 

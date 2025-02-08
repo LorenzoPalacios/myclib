@@ -8,23 +8,9 @@ typedef unsigned char byte;
 typedef struct {
   byte *data;         // Pointer to the stack data.
   size_t length;      // Number of elements in the stack.
-  size_t elem_size;   // Size of each element in the stack.
+  size_t value_size;   // Size of each element in the stack.
   size_t allocation;  // Total allocated memory for the stack.
 } stack;
-
-/**
- * @brief Macro to delete a stack and free its memory.
- *
- * @param stk Pointer to the stack.
- */
-#define stack_delete(stk) stack_delete_(&(stk))
-
-/**
- * @brief Macro to securely delete a stack by zeroing its memory before freeing.
- *
- * @param stk Pointer to the stack.
- */
-#define stack_delete_s(stk) stack_delete_s_(&(stk))
 
 /**
  * @brief Convenience macro for creating a new stack from data.
@@ -47,10 +33,10 @@ typedef struct {
  *
  * @param data Pointer to the data.
  * @param len Length of the data.
- * @param elem_size Size of each element.
+ * @param value_size Size of each element.
  * @return Pointer to the new stack or NULL if allocation fails.
  */
-stack *stack_new_(const void *data, size_t len, size_t elem_size);
+stack *stack_new_(const void *data, size_t len, size_t value_size);
 
 /**
  * @brief Gets the capacity of the stack.
@@ -77,16 +63,9 @@ void stack_clear(stack *stk);
 /**
  * @brief Deletes the stack and frees memory.
  *
- * @param stk Double pointer to the stack.
+ * @param stk Pointer to the stack to be deleted.
  */
-void stack_delete_(stack **stk);
-
-/**
- * @brief Deletes the stack, sets all elements to zero, and frees memory.
- *
- * @param stk Double pointer to the stack.
- */
-void stack_delete_s_(stack **stk);
+void stack_delete(stack *stk);
 
 /**
  * @brief Expands the memory used by `stk->data`, thereby increasing its
@@ -101,24 +80,24 @@ stack *stack_expand(stack *stk);
  * @brief Creates a new empty stack.
  *
  * @param num_elems Number of elements.
- * @param elem_size Size of each element.
+ * @param value_size Size of each element.
  * @return Pointer to the new stack or NULL if allocation fails.
  */
-stack *stack_empty_new(size_t num_elems, size_t elem_size);
+stack *stack_empty_new(size_t num_elems, size_t value_size);
 
 /**
  * @brief Creates a stack header which interfaces upon the contents of `data`.
  *
  * @param data Pointer to the data.
  * @param len Length of the data.
- * @param elem_size Size of each element.
+ * @param value_size Size of each element.
  * @return Pointer to the stack header or NULL if allocation fails.
  * @note Any operations carried out on the stack may affect the contents stored
  * at `data`. This is in contrast to the standard stack which allocates distinct
  * memory for its contents. An example of such an operation would be
  * `stack_interface_push()`.
  */
-stack *stack_interface_new_(void *data, size_t len, size_t elem_size);
+stack *stack_interface_new_(void *data, size_t len, size_t value_size);
 
 /**
  * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity`
@@ -182,7 +161,7 @@ stack *stack_push(stack *stk, const void *elem);
  */
 #define stack_heapless_empty_new(stk_id, num_elems, _elem_size) \
   {.allocation = ((num_elems) * (_elem_size)) + sizeof(stack),  \
-   .elem_size = (_elem_size),                                   \
+   .value_size = (_elem_size),                                   \
    .length = 0};                                                \
   byte GET_STACK_NAME(stk_id)[(num_elems) * (_elem_size)];      \
   (stk_id).data = GET_STACK_NAME(stk_id)
@@ -219,7 +198,7 @@ stack *stack_push(stack *stk, const void *elem);
 #define stack_heapless_interface_new_(_data, num_elems, _elem_size) \
   {.data = (byte *)(_data),                                         \
    .allocation = ((num_elems) * (_elem_size)) + sizeof(stack),      \
-   .elem_size = (_elem_size),                                       \
+   .value_size = (_elem_size),                                       \
    .length = (num_elems)}
 
 /**
