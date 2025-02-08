@@ -1,5 +1,6 @@
 #include "random.h"
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,12 +103,13 @@ static inline size_t rand_max_highest_bit_index(void) {
 // Cache constructors go here
 #define cache_constructors \
   ((cache_constructor[]){get_bool_cache, get_int_cache})
-#define NUM_GETTERS (sizeof(cache_constructors) / sizeof *(cache_constructors))
+#define NUM_CONSTRUCTORS \
+  (sizeof(cache_constructors) / sizeof *(cache_constructors))
 
 // - PUBLIC CACHE-RELATED FUNCTIONS -
 
 void random_destroy_caches(void) {
-  for (size_t i = 0; i < NUM_GETTERS; i++) {
+  for (size_t i = 0; i < NUM_CONSTRUCTORS; i++) {
     cache *const cache = cache_constructors[i]();
     free(*cache);
     *cache = NULL;
@@ -116,22 +118,26 @@ void random_destroy_caches(void) {
 
 #endif
 
+static inline seed_t generate_seed(void) {
+  struct timespec t_spec;
+  (void)timespec_get(&t_spec, TIME_UTC);
+  const long UTC_NANOSEC =
+      t_spec.tv_nsec >> (CHAR_BIT * (sizeof(long) - sizeof(seed_t)));
+  const long long PROGRAM_TIME =
+      clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+  seed_t SEED = (seed_t)((UTC_NANOSEC ^ PROGRAM_TIME));
+  SEED = (SEED & 1) ? -SEED : SEED;
+  return SEED;
+}
+
 seed_t random_init(void) {
-  seed_t SEED;
-  {
-    struct timespec t_spec;
-    (void)timespec_get(&t_spec, TIME_UTC);
-    const long long UTC_NANOSEC = t_spec.tv_nsec;
-    const long long EPOCH_TIME = time(NULL);
-    const long long PROGRAM_TIME = clock();
-    SEED = (seed_t)(UTC_NANOSEC ^ EPOCH_TIME ^ PROGRAM_TIME);
-  }
+  seed_t SEED = generate_seed();
   srand(SEED);
 
 #if (CACHE_ALLOWED)
   // The first call to the cache constructors will allocate and stock the
   // caches.
-  for (size_t i = 0; i < NUM_GETTERS; i++) {
+  for (size_t i = 0; i < NUM_CONSTRUCTORS; i++) {
     void *const cache = *cache_constructors[i]();
     if (cache == NULL)
       (void)fprintf(stderr, "random_init(): Failed to create cache %zu\n", i);
