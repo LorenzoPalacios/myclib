@@ -1,106 +1,93 @@
 #include "vector.h"
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef unsigned char byte;
 
-vector *vector_append(vector *vec, const void *const elem) {
-  {
-    const size_t CAPACITY = vector_capacity(vec);
-    if (vec->length == CAPACITY) {
-      vec = vector_expand(vec);
-      if (vec == NULL) return NULL;
-    }
-  }
-  byte *const insertion_pos = vector_get(vec, vec->length);
-  memcpy(insertion_pos, elem, vec->elem_size);
-  vec->length++;
-  return vec;
+static inline byte *internal_vector_get(const vector *const vec,
+                                        const size_t index) {
+  return (byte *)vec->data + (vec->elem_size * index);
 }
 
-size_t vector_capacity(const vector *const vec) {
-  const size_t ELEM_SIZE = vec->elem_size;
-  const size_t DATA_ALLOC = vec->allocation - sizeof(vector);
-  const size_t CAPACITY = DATA_ALLOC / ELEM_SIZE;
-  return CAPACITY;
+void vector_clear_(const vector *const vec) {
+  memset(vec->data, 0, vec->elem_size * vec->length);
 }
 
-void *vector_data(vector *const vec) { return vec + 1; }
+byte *vector_contents(const vector *const vec) { return vec->data; }
 
-void vector_delete(vector *const vec) {
-  free(vec);
+void vector_delete_(const vector *const vec) { free(vec->data); }
+
+bool vector_expand_(vector *const vec) {
+  const size_t CUR_LENGTH = vec->capacity;
+  const size_t IDEAL_LENGTH = (CUR_LENGTH == 0 ? 1 : 2 * CUR_LENGTH);
+  const bool EXPANSION_SUCCESS = vector_resize_(vec, IDEAL_LENGTH);
+  if (!EXPANSION_SUCCESS) return vector_resize_(vec, CUR_LENGTH + 1);
+  return EXPANSION_SUCCESS;
 }
 
-vector *vector_expand(vector *const vec) {
-  const size_t CUR_CAPACITY = vector_capacity(vec);
-  const size_t IDEAL_CAPACITY = (CUR_CAPACITY == 0) ? (1) : (2 * CUR_CAPACITY);
-  vector *new_vec = vector_resize(vec, IDEAL_CAPACITY);
-  if (new_vec == NULL) new_vec = vector_resize(vec, CUR_CAPACITY + 1);
-  return new_vec;
-}
-
-void vector_for_each(vector *const vec, void (*const operation)(void *elem)) {
+void vector_for_each_(vector *const vec, bool (*const operation)(void *elem)) {
   const size_t LEN = vec->length;
-  for (size_t i = 0; i < LEN; i++) operation(vector_get(vec, i));
+  const size_t ELEM_SIZE = vec->elem_size;
+  byte *const contents = vec->data;
+  for (size_t i = 0; i < LEN && operation(contents + (i * ELEM_SIZE)); i++);
 }
 
-void *vector_get(vector *const vec, const size_t index) {
+void *vector_get_(const vector *const vec, const size_t index) {
   if (index >= vec->length) return NULL;
-  return (byte *)vector_data(vec) + (index * vec->elem_size);
+  return internal_vector_get(vec, index);
 }
 
-vector *vector_init(const size_t elem_size, const size_t length) {
-  const size_t ALLOCATION = (length * elem_size) + sizeof(vector);
-  vector *const vec = malloc(ALLOCATION);
-  if (vec == NULL) return NULL;
-  vec->length = 0;
-  vec->elem_size = elem_size;
-  vec->allocation = ALLOCATION;
-  return vec;
+vector vector_init_(const size_t elem_size, const size_t length) {
+  return (vector){.data = malloc(elem_size * length),
+                  .length = length,
+                  .capacity = length,
+                  .elem_size = elem_size};
 }
 
-vector *vector_insert(vector *vec, const void *const elem, const size_t index) {
-  if (index > vec->length) return vec;
-  if (vec->length == vector_capacity(vec)) vec = vector_expand(vec);
-
+void vector_insert_(vector *const vec, const void *const elem,
+                    const size_t index) {
+  if (index > vec->length) return;
+  if (index == vec->length) {
+    vector_expand_(vec);
+    vector_set_(vec, elem, index);
+  }
   const size_t ELEM_SIZE = vec->elem_size;
   const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index);
-  byte *const insertion_pos = vector_get(vec, index);
+  byte *const insertion_pos = internal_vector_get(vec, index);
   byte *const shift_pos = insertion_pos + ELEM_SIZE;
   memmove(shift_pos, insertion_pos, SHIFT_SIZE);
   memcpy(insertion_pos, elem, ELEM_SIZE);
+}
 
-  vec->length++;
+vector vector_new_(const void *const data, const size_t elem_size,
+                   const size_t length) {
+  const vector vec = vector_init(elem_size, length);
+  memcpy(vec.data, data, vec.elem_size * vec.length);
   return vec;
 }
 
-vector *vector_new_(const void *const data, const size_t elem_size,
-                    const size_t length) {
-  vector *const vec = vector_init(elem_size, length);
-  if (vec == NULL) return NULL;
-  vec->length = length;
-  const size_t DATA_ALLOC = elem_size * length;
-  memcpy(vector_data(vec), data, DATA_ALLOC);
-  return vec;
-}
-
-vector *vector_resize(vector *vec, const size_t new_capacity) {
-  {
-    const size_t CUR_CAPACITY = vector_capacity(vec);
-    if (CUR_CAPACITY == new_capacity) return vec;
+bool vector_resize_(vector *const vec, const size_t new_length) {
+  if (vec->length == new_length) return false;
+  if (new_length > vec->capacity) {
+    const size_t ALLOCATION = new_length * vec->elem_size;
+    byte *const new_data = realloc(vec->data, ALLOCATION);
+    if (new_data == NULL) return false;
+    vec->data = new_data;
+    vec->capacity = new_length;
   }
-
-  const size_t ALLOCATION = (new_capacity * vec->elem_size) + sizeof(vector);
-  vector *const new_vec = realloc(vec, ALLOCATION);
-  if (new_vec == NULL) return NULL;
-  vec = new_vec;
-  vec->allocation = ALLOCATION;
-  if (vec->length > new_capacity) vec->length = new_capacity;
-
-  return vec;
+  vec->length = new_length;
+  return true;
 }
 
-vector *vector_shrink_to_fit(vector *const vec) {
-  return vector_resize(vec, vec->length);
+void vector_set_(const vector *const vec, const void *const elem,
+                 const size_t index) {
+  if (index >= vec->length) return;
+  byte *const target = internal_vector_get(vec, index);
+  if (elem != target) memcpy(target, elem, vec->elem_size);
+}
+
+bool vector_shrink_to_fit_(vector *const vec) {
+  return vector_resize_(vec, vec->length);
 }

@@ -2,6 +2,7 @@
 #define ARRAY_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #define array_new(data) \
   array_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
@@ -16,6 +17,8 @@
 
 #define array_get(arr, index) array_get_(&(arr), index)
 
+#define array_init(type, length) array_init_(sizeof(type), length)
+
 #define array_insert(arr, elem) array_insert_(&(arr), elem)
 
 typedef struct {
@@ -29,14 +32,14 @@ typedef struct {
  *
  * @param arr The array to clear.
  */
-void array_clear_(array *arr);
+void array_clear_(const array *arr);
 
 /**
  * @brief Deletes an array and frees its memory.
  *
  * @param arr A pointer to the array to delete.
  */
-void array_delete_(array *arr);
+void array_delete_(const array *arr);
 
 /**
  * @brief Applies a function to each element of an array.
@@ -44,7 +47,7 @@ void array_delete_(array *arr);
  * @param arr The array to iterate over.
  * @param operation The function to apply to each element.
  */
-void array_for_each_(array *arr, void (*operation)(void *elem));
+void array_for_each_(array *arr, bool (*operation)(void *elem));
 
 /**
  * @brief Gets an element from an array by index.
@@ -62,7 +65,7 @@ void *array_get_(const array *arr, size_t index);
  * @param length The initial length of the array.
  * @return A pointer to the initialized array, or NULL if allocation fails.
  */
-array array_init(size_t elem_size, size_t length);
+array array_init_(size_t elem_size, size_t length);
 
 /**
  * @brief Inserts an element into an array at the specified index.
@@ -70,13 +73,11 @@ array array_init(size_t elem_size, size_t length);
  * @param arr The array to insert the element into.
  * @param elem The element to insert.
  * @param index The index to insert the element at.
- * @return A pointer to the inserted element, or NULL if the array is full or
- * the index is out of bounds.
  * @note Every element after the insertion index will be shifted over by one
  * index except for the last element, which will be overwritten by the
  * second-to-last element.
  */
-void *array_insert_(array *arr, const void *elem, size_t index);
+void array_insert_(const array *arr, const void *elem, size_t index);
 
 /**
  * @brief Creates a new array from the given data.
@@ -84,7 +85,7 @@ void *array_insert_(array *arr, const void *elem, size_t index);
  * @param data The data to initialize the array with.
  * @param elem_size The size of each element in the data.
  * @param length The length of the data.
- * @return A pointer to the new array, or NULL if allocation fails.
+ * @return A new array whose contents are a copy of those at `data`.
  */
 array array_new_(const void *data, size_t elem_size, size_t length);
 
@@ -93,8 +94,7 @@ array array_new_(const void *data, size_t elem_size, size_t length);
  *
  * @param arr The array to add the element to.
  * @param elem The element to add.
- * @return A pointer to the added element, or NULL if the array is full.
  */
-void *array_set_(array *arr, const void *elem, size_t index);
+void array_set_(const array *arr, const void *elem, size_t index);
 
 #endif
