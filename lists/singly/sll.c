@@ -100,7 +100,7 @@ static inline sl_node *get_deleted_node(sl_list *const list) {
 
   sl_node *deleted_node = NULL;
   if (cnt_deleted_nodes > 0) {
-    const size_t NODE_INDEX = *(size_t *)stack_pop(deleted_nodes);
+    const size_t NODE_INDEX = *(size_t *)stack_pop_(deleted_nodes);
     deleted_node = node_from_index(list, NODE_INDEX);
   }
   return deleted_node;

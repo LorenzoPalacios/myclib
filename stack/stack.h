@@ -1,16 +1,54 @@
 #ifndef STACK_H
 #define STACK_H
 
+#ifdef __STDC_VERSION__
+#if (__STDC_VERSION__ >= 199901L)
+#include <stdbool.h>
+#else
+typedef unsigned char bool;
+#define true (1)
+#define false (0)
+#define inline
+#endif
+#else
+typedef unsigned char bool;
+#define true (1)
+#define false (0)
+#define inline
+#endif
+
 #include <stddef.h>
 
-typedef unsigned char byte;
-
+/*
+ * `data` - Pointer to the contents of a stack.
+ * `length` - The current length of the stack.
+ * `capacity` - The number of values the stack can store before expansion is
+ * necessary.
+ * `value_size` - The size of each member value within the contents of the
+ * stack.
+ */
 typedef struct {
-  byte *data;         // Pointer to the stack data.
-  size_t length;      // Number of elements in the stack.
-  size_t value_size;   // Size of each element in the stack.
-  size_t allocation;  // Total allocated memory for the stack.
+  void *data;
+  size_t length;
+  size_t capacity;
+  size_t value_size;
 } stack;
+
+#define stack_delete(stk) stack_delete_(&(stk))
+
+#define stack_expand(stk) stack_expand(&(stk))
+
+#define stack_init(type, capacity) stack_init_(sizeof(type), capacity)
+
+#define stack_is_empty(stk) stack_is_empty_(&(stk))
+
+/**
+ * @brief Convenience macro for creating a new stack interface from data.
+ *
+ * @param data Pointer to the data.
+ */
+#define stack_interface(data) \
+  stack_interface_(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
 /**
  * @brief Convenience macro for creating a new stack from data.
@@ -20,84 +58,73 @@ typedef struct {
 #define stack_new(data) \
   stack_new_(data, sizeof(data) / sizeof *(data), sizeof *(data))
 
-/**
- * @brief Convenience macro for creating a new stack interface from data.
- *
- * @param data Pointer to the data.
- */
-#define new_interface_stack(data) \
-  stack_interface_new_(data, sizeof(data) / sizeof *(data), sizeof *(data))
+#define stack_reset(stk) stack_reset_(&(stk))
+
+#define stack_resize(stk) stack_resize_(&(stk))
+
+#define stack_shrink(stk) stack_shrink_(&(stk))
+
+#define stack_peek(stk) stack_peek_(&(stk))
+
+#define stack_pop(stk) stack_pop_(&(stk))
+
+#define stack_push(stk, elem) stack_push_(&(stk))
 
 /**
- * @brief Creates a stack based off the elements in `data`.
- *
- * @param data Pointer to the data.
- * @param len Length of the data.
- * @param value_size Size of each element.
- * @return Pointer to the new stack or NULL if allocation fails.
- */
-stack *stack_new_(const void *data, size_t len, size_t value_size);
-
-/**
- * @brief Gets the capacity of the stack.
- *
- * @param stk Pointer to the stack.
- * @return Capacity of the stack.
- */
-size_t stack_capacity(const stack *stk);
-
-/**
- * @brief Resets `stk->length` to `0`.
- *
- * @param stk Pointer to the stack.
- */
-void stack_reset(stack *stk);
-
-/**
- * @brief Resets the stack and sets all elements to zero.
- *
- * @param stk Pointer to the stack.
- */
-void stack_clear(stack *stk);
-
-/**
- * @brief Deletes the stack and frees memory.
+ * @brief Deletes a stack.
  *
  * @param stk Pointer to the stack to be deleted.
  */
-void stack_delete(stack *stk);
+void stack_delete_(const stack *stk);
 
 /**
  * @brief Expands the memory used by `stk->data`, thereby increasing its
  * capacity.
  *
  * @param stk Pointer to the stack.
- * @return Pointer to the expanded stack or NULL if reallocation fails.
+ * @return `true` if the stack was expanded. `false` otherwise.
  */
-stack *stack_expand(stack *stk);
+bool stack_expand_(stack *stk);
 
 /**
  * @brief Creates a new empty stack.
  *
  * @param num_elems Number of elements.
  * @param value_size Size of each element.
- * @return Pointer to the new stack or NULL if allocation fails.
+ * @return A stack capable of containing `capacity` values of size `value_size`.
  */
-stack *stack_empty_new(size_t num_elems, size_t value_size);
+stack stack_init_(size_t value_size, size_t capacity);
 
 /**
- * @brief Creates a stack header which interfaces upon the contents of `data`.
+ * @brief Creates a stack header for the contents of `data`.
  *
  * @param data Pointer to the data.
- * @param len Length of the data.
+ * @param length Length of the data.
  * @param value_size Size of each element.
- * @return Pointer to the stack header or NULL if allocation fails.
+ * @return A stack whose contents are that of `data`.
  * @note Any operations carried out on the stack may affect the contents stored
- * at `data`. This is in contrast to the standard stack which allocates distinct
- * memory for its contents. An example of such an operation would be
- * `stack_interface_push()`.
+ * at `data`.
  */
-stack *stack_interface_new_(void *data, size_t len, size_t value_size);
+stack stack_interface_(void *data, size_t length, size_t value_size);
+
+bool stack_is_empty_(const stack *stk);
+
+/**
+ * @brief Creates a stack based off the elements in `data`.
+ *
+ * @param data Pointer to the data.
+ * @param length Length of the data.
+ * @param value_size Size of each element.
+ * @return A new stack whose contents are a copy of `length` values at `data`.
+ */
+stack stack_new_(const void *data, size_t length, size_t value_size);
+
+/**
+ * @brief Resets `stk->length` to `0`.
+ *
+ * @param stk Pointer to the stack.
+ */
+void stack_reset_(stack *stk);
 
 /**
  * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity`
@@ -105,53 +132,50 @@ stack *stack_interface_new_(void *data, size_t len, size_t value_size);
  *
  * @param stk Pointer to the stack.
  * @param new_capacity New capacity of the stack.
- * @return Pointer to the resized stack or NULL if reallocation fails.
+ * @return `true` if the stack was resized. `false` otherwise.
  */
-stack *stack_resize(stack *stk, size_t new_capacity);
+bool stack_resize_(stack *stk, size_t new_capacity);
 
 /**
  * @brief Shrinks the memory used by `stk->data` to `stk->used_capacity`.
  *
  * @param stk Pointer to the stack.
- * @return Pointer to the resized stack or NULL if reallocation fails.
+ * @return `true` if the stack was shrunk. `false` otherwise.
  */
-stack *stack_shrink_to_fit(stack *stk);
+bool stack_shrink_(stack *stk);
 
 /**
  * @brief Returns, but does not remove, the top element of `stk`.
  *
  * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the end of the
- * stack was reached.
+ * @return Pointer to the top element in `stk` or NULL if the stack is empty.
  */
-void *stack_peek(stack *stk);
+void *stack_peek_(const stack *stk);
 
 /**
  * @brief Returns and removes the top element from `stk`.
  *
  * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the end of the
- * stack was reached.
+ * @return Pointer to the top element in `stk` or NULL if the stack is empty.
  */
-void *stack_pop(stack *stk);
+void *stack_pop_(stack *stk);
 
 /**
  * @brief Adds `elem` to `stk`, expanding if necessary. `elem` will then be the
- * new top element and will be returned by functions such as `stack_peek()`.
+ * new top element and will be returned by functions such as `stack_peek_()`.
  *
  * @param stk Pointer to the stack.
  * @param elem Pointer to the element to push.
- * @return Pointer to the stack or NULL if reallocation fails.
  */
-stack *stack_push(stack *stk, const void *elem);
+void stack_push_(stack *stk, const void *elem);
 
-#include <string.h>  // For memcpy().
+#include <string.h> /* For memcpy(). */
 
-// Ensures that each stack's allocation gets a unique name.
-#define GET_STACK_NAME(id) _stk_data_##id
+/* Ensures that each stack's allocation gets a unique name. */
+#define GET_STACK_DATA_NAME(id) _stk_data_##id
 
 /**
- * @brief Creates a stack with automatic storage duration.
+ * @brief Creates a stack of automatic storage duration.
  *
  * @param stk_id The identifier for the stack being assigned.
  * @param num_elems The maximum number of elements the stack will contain.
@@ -159,15 +183,13 @@ stack *stack_push(stack *stk, const void *elem);
  * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define stack_heapless_empty_new(stk_id, num_elems, _elem_size) \
-  {.allocation = ((num_elems) * (_elem_size)) + sizeof(stack),  \
-   .value_size = (_elem_size),                                   \
-   .length = 0};                                                \
-  byte GET_STACK_NAME(stk_id)[(num_elems) * (_elem_size)];      \
-  (stk_id).data = GET_STACK_NAME(stk_id)
+#define stack_auto_empty_new(stk_ident, capacity, type)           \
+  {NULL, capacity, 0, sizeof(type)};                              \
+  byte GET_STACK_DATA_NAME(stk_ident)[sizeof(type) * (capacity)]; \
+  (stk_ident).data = GET_STACK_DATA_NAME(stk_ident)
 
 /**
- * @brief Creates a stack with automatic storage duration whose contents are a
+ * @brief Creates a stack of automatic storage duration whose contents are a
  * copy of the contents of `data`.
  *
  * @param stk_id The identifier for the stack being assigned.
@@ -176,49 +198,41 @@ stack *stack_push(stack *stk, const void *elem);
  * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define stack_heapless_new(stk_id, data)                          \
-  stack_heapless_empty_new(stk_id, sizeof(data) / sizeof *(data), \
-                           sizeof *(data));                       \
-  (stk_id).length = sizeof(data) / sizeof *(data);                \
-  memcpy(GET_STACK_NAME(stk_id), data, sizeof(data));
+#define stack_auto_new(stk_ident, data)                          \
+  stack_auto_empty_new(stk_ident, sizeof(data) / sizeof *(data), \
+                       sizeof *(data));                          \
+  (stk_ident).length = sizeof(data) / sizeof *(data);            \
+  memcpy(GET_STACK_DATA_NAME(stk_ident), data, sizeof(data));
 
 /**
  * @brief Creates a stack of automatic storage duration which allocates memory
  * solely for the stack header (that is, the data members of `stack`).
- * `stack->data` will take the value of the pointer, `data`.
+ * `stack->data` will take the value of the pointer, `_data`.
  *
  * @param _data A pointer to the data to be interfaced.
  * @param num_elems The number of elements in `_data`.
  * @param _elem_size The size of each element in bytes.
- *
- * @note This stack will not modify the allocation of memory at `data`,
- * however it can modify the contents of `data` through `heapless_stack_pop()`
- * and `heapless_stack_push()`.
  */
-#define stack_heapless_interface_new_(_data, num_elems, _elem_size) \
-  {.data = (byte *)(_data),                                         \
-   .allocation = ((num_elems) * (_elem_size)) + sizeof(stack),      \
-   .value_size = (_elem_size),                                       \
-   .length = (num_elems)}
+#define stack_auto_interface_new_(_data, length, type) \
+  {(_data), length, length, sizeof(type)}
 
 /**
- * @brief Convenience macro equivalent to `heapless_new_interface_stack_()`.
+ * @brief Convenience macro equivalent to `stack_auto_interface_new_()`.
  *
  * @param _data Pointer to an array.
  */
-#define stack_heapless_interface_new(_data)                             \
-  stack_heapless_interface_new_(_data, sizeof(_data) / sizeof *(_data), \
-                                sizeof *(_data))
+#define stack_auto_interface_new(_data)                             \
+  stack_auto_interface_new_(_data, sizeof(_data) / sizeof *(_data), \
+                            *(_data))
 
 /**
  * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new top
- * element and will be returned by functions such as `heapless_stack_peek()`.
+ * element and will be returned by functions such as `stack_peek_()`.
  *
  * @param stk Pointer to the stack.
  * @param elem Pointer to the element to push.
- * @return `stk` if the element was added successfully or `NULL` upon failure.
+ * @note The word `auto` in this function corresponds to the storage duration of
+ * the pointed-to stack.
  */
-stack *stack_heapless_push(stack *stk, const void *elem);
-
-stack *stack_interface_push(stack *stk, const void *elem);
+void stack_auto_push(stack *stk, const void *elem);
 #endif

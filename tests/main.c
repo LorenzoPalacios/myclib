@@ -1,7 +1,6 @@
-#include "tests.h"
-
 #include <assert.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +12,12 @@
 #include "../stack/stack.h"
 #include "../strext/strext.h"
 #include "../vector/vector.h"
+
+// - DEFINITIONS -
+
+#define RUN_ALL_TESTS_KEYWORD "all"  // Should be lowercase.
+
+typedef void (*test)(void);
 
 #define ARR_LEN(arr) (sizeof(arr) / sizeof *(arr))
 
@@ -26,30 +31,32 @@
 #define TEST_DATA_LEN (ARR_LEN(TEST_DATA))
 #define TEST_DATA_STR_LEN (TEST_DATA_LEN - 1)
 
+// - GENERIC TEST OPERATIONS -
+
 // For any feature that defines a for-each operation.
-static void for_each_operation(void *const elem) { assert(elem != NULL); }
+static bool for_each_operation(void *const elem) {
+  assert(elem != NULL);
+  return true;
+}
 
 // - TEST FUNCTIONS -
 
 static void test_array(void) {
-  array *arr = array_new(TEST_DATA);
-  assert(arr != NULL);
-  assert(arr->length == ARR_LEN(TEST_DATA));
-  assert(arr->capacity == arr->length);
-  assert(arr->elem_size == sizeof *(TEST_DATA));
+  array arr = array_new(TEST_DATA);
+  assert(arr.length == ARR_LEN(TEST_DATA));
+  assert(arr.elem_size == sizeof *(TEST_DATA));
 
-  for (size_t i = 0; i < arr->length; i++) {
+  for (size_t i = 0; i < arr.length; i++) {
     const char *const elem = array_get(arr, i);
     assert(elem != NULL);
     assert(*elem == TEST_DATA[i]);
   }
-  assert(array_get(arr, arr->length) == NULL);
+  assert(array_get(arr, arr.length) == NULL);
 
   array_for_each(arr, for_each_operation);
 
   array_clear(arr);
-  assert(arr->length == 0);
-  assert(array_get(arr, 0) == NULL);
+  assert(*(char *)array_get(arr, 0) == 0);
 
   array_delete(arr);
 }
@@ -69,70 +76,13 @@ static void test_random(void) {
          ITERATIONS);
 }
 
-static void test_stack(void) {
-  {
-    stack *stk = stack_new(TEST_DATA);
-    assert(stk != NULL);
-    assert(stk->length == TEST_DATA_LEN);
-    assert(stk->elem_size == sizeof *(TEST_DATA));
-
-    while (stk->length != 0) {
-      const char *const elem = stack_pop(stk);
-      assert(elem != NULL);
-      assert(*elem == TEST_DATA[stk->length]);
-    }
-    assert(stack_peek(stk) == NULL);
-
-    {
-      const char new_elem = 'e';
-      stk = stack_push(stk, &new_elem);
-      assert(stk != NULL);
-      const char *const peeked_elem = stack_peek(stk);
-      assert(peeked_elem != NULL);
-      assert(*peeked_elem == new_elem);
-    }
-    stack_clear(stk);
-    assert(stack_peek(stk) == NULL);
-
-    stack_delete(stk);
-  }
-
-  {
-    stack stk = stack_heapless_new(stk, TEST_DATA);
-
-    assert(stk.length == TEST_DATA_LEN);
-    assert(stk.elem_size == sizeof *(TEST_DATA));
-    {
-      const char elem_cannot_fit = 'u';
-      assert(stack_heapless_push(&stk, &elem_cannot_fit) == NULL);
-    }
-
-    while (stk.length != 0) {
-      const char *const elem = stack_pop(&stk);
-      assert(elem != NULL);
-      assert(*elem == TEST_DATA[stk.length]);
-    }
-    assert(stack_peek(&stk) == NULL);
-
-    {
-      const char new_elem = 'e';
-      assert(stack_heapless_push(&stk, &new_elem) != NULL);
-      const char *const peeked_elem = stack_peek(&stk);
-      assert(peeked_elem != NULL);
-      assert(*peeked_elem == new_elem);
-    }
-    stack_clear(&stk);
-    assert(stack_peek(&stk) == NULL);
-  }
-}
-
 static void test_strext(void) {
   string *str = string_new(TEST_DATA);
   assert(str != NULL);
   assert(strcmp(str->data, TEST_DATA) == 0);
   assert(str->length == TEST_DATA_STR_LEN);
 
-  string_clear_s(str);
+  string_clear(str);
   assert(str->length == 0);
   assert(str->data[0] == 0);
   {
@@ -165,35 +115,33 @@ static void test_strext(void) {
 }
 
 static void test_vector(void) {
-  vector *vec = vector_new(TEST_DATA);
-  assert(vec != NULL);
-  assert(vec->length == ARR_LEN(TEST_DATA));
-  assert(vec->elem_size == sizeof *(TEST_DATA));
-
-  for (size_t i = 0; i < vec->length; i++) {
-    const char *const elem = vector_get(vec, i);
-    assert(elem != NULL);
-    assert(*elem == TEST_DATA[i]);
+  {
+    const vector vec = vector_new(TEST_DATA);
+    assert(vec.length == ARR_LEN(TEST_DATA));
+    for (size_t i = 0; i < vec.length; i++) {
+      const char *const elem = vector_get(vec, i);
+      assert(elem != NULL);
+      assert(*elem == TEST_DATA[i]);
+    }
+    assert(vector_get(vec, vec.length) == NULL);
+    vector_delete(vec);
   }
-  assert(vector_get(vec, vec->length) == NULL);
+  {
+    vector vec = vector_init(size_t, 10);
+    for (size_t i = 0; i < ARR_LEN(TEST_DATA); i++) vector_insert(vec, &i, i);
 
-  for (size_t i = 0; i < ARR_LEN(TEST_DATA); i++) {
-    const char elem = TEST_DATA[i];
-    vec = vector_insert(vec, &elem, i);
-    assert(vec != NULL);
+    assert(vec.length == ARR_LEN(TEST_DATA));
+    vector_for_each(vec, for_each_operation);
+
+    vector_delete(vec);
   }
-  assert(vec->length == 2 * ARR_LEN(TEST_DATA));
-  vector_for_each(vec, for_each_operation);
-
-  vector_delete(vec);
 }
 
 // - INTERNAL -
 
-#define TESTS \
-  ((test[]){test_array, test_random, test_stack, test_strext, test_vector})
+#define TESTS ((test[]){test_array, test_random, test_strext, test_vector})
 #define TEST_NAMES \
-  ((const char *const[]){"array", "random", "stack", "strext", "vector"})
+  ((const char *const[]){"array", "random", "strext", "vector"})
 
 #define NUM_TESTS (sizeof(TESTS) / sizeof(*TESTS))
 #define NUM_TEST_NAMES (sizeof(TEST_NAMES) / sizeof(*TEST_NAMES))
@@ -211,7 +159,7 @@ static inline void prompt_user(void) {
   puts("Your test choices are:");
   for (size_t i = 0; i < NUM_TESTS; i++) printf("%zu. %s\n", i, TEST_NAMES[i]);
   puts(
-      "\nEnter the number(s) of the tests you want to run, or "
+      "\nEnter the number(s) corresponding to the tests you want to run, or "
       "\"" RUN_ALL_TESTS_KEYWORD
       "\" to run all tests.\n"
       "Press the enter/return key to complete your selection and begin running "
@@ -226,8 +174,7 @@ static void str_lower(char *str) {
 }
 
 // Helper function used by `get_test_selection`.
-// The capacity of `str` is assumed to account for a null terminator, meaning
-// `str` should be capable of holding `str_cap - 1` characters and a null
+// `str` should be capable of holding `str_cap + 1` characters and a null
 // terminator.
 static void get_line_from_stdin(char *const str, const size_t str_cap) {
   for (size_t i = 0; i < str_cap; i++) {

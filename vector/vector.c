@@ -48,14 +48,11 @@ vector vector_init_(const size_t elem_size, const size_t length) {
 
 void vector_insert_(vector *const vec, const void *const elem,
                     const size_t index) {
-  if (index > vec->length) return;
-  if (index == vec->length) {
-    vector_expand_(vec);
-    vector_set_(vec, elem, index);
-  }
-  const size_t ELEM_SIZE = vec->elem_size;
-  const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index);
+  if (index >= vec->length) vector_set_(vec, elem, index);
   byte *const insertion_pos = internal_vector_get(vec, index);
+  if (insertion_pos == elem) return;
+  const size_t ELEM_SIZE = vec->elem_size;
+  const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index - 1);
   byte *const shift_pos = insertion_pos + ELEM_SIZE;
   memmove(shift_pos, insertion_pos, SHIFT_SIZE);
   memcpy(insertion_pos, elem, ELEM_SIZE);
@@ -63,14 +60,14 @@ void vector_insert_(vector *const vec, const void *const elem,
 
 vector vector_new_(const void *const data, const size_t elem_size,
                    const size_t length) {
-  const vector vec = vector_init(elem_size, length);
+  const vector vec = vector_init_(elem_size, length);
   memcpy(vec.data, data, vec.elem_size * vec.length);
   return vec;
 }
 
 bool vector_resize_(vector *const vec, const size_t new_length) {
   if (vec->length == new_length) return false;
-  if (new_length > vec->capacity) {
+  if (new_length < vec->capacity || new_length > vec->capacity) {
     const size_t ALLOCATION = new_length * vec->elem_size;
     byte *const new_data = realloc(vec->data, ALLOCATION);
     if (new_data == NULL) return false;
@@ -81,11 +78,12 @@ bool vector_resize_(vector *const vec, const size_t new_length) {
   return true;
 }
 
-void vector_set_(const vector *const vec, const void *const elem,
+void vector_set_(vector *const vec, const void *const elem,
                  const size_t index) {
-  if (index >= vec->length) return;
+  if (index >= vec->length) vector_resize_(vec, index + 1);
   byte *const target = internal_vector_get(vec, index);
-  if (elem != target) memcpy(target, elem, vec->elem_size);
+  if (elem == target) return;
+  memcpy(target, elem, vec->elem_size);
 }
 
 bool vector_shrink_to_fit_(vector *const vec) {

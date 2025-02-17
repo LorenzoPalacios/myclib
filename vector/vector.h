@@ -35,12 +35,14 @@
 
 // - DEFINITIONS -
 
-/* - STRUCTURE DETAILS -
+/*
  * `data` - A pointer to an allocated region of memory to be used for the
  * storage of elements.
  * `length` - The maximum number of elements that can be held in a vector before
  * resizing is necessary.
  * `capacity` - The number of elements the vector has allocated for.
+ * `last_defined_index` - The last index of the array that was set by
+ * `vector_insert()` or `vector_set()`.
  * `elem_size` - The size of each element in the vector.
  */
 typedef struct vector {
@@ -124,7 +126,7 @@ vector vector_new_(const void *data, size_t elem_size, size_t length);
  */
 bool vector_resize_(vector *vec, size_t new_length);
 
-void vector_set_(const vector *vec, const void *elem, size_t index);
+void vector_set_(vector *vec, const void *elem, size_t index);
 
 /**
  * @brief Shrinks the vector's capacity to fit its capacity.

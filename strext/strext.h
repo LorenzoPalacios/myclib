@@ -173,16 +173,6 @@ size_t string_capacity(const string *str);
 void string_clear(string *str);
 
 /**
- * @brief Securely clears the contents of the string.
- *
- * This function sets all characters in the string data to the `NULL` terminator
- * and sets the length of the string to 0.
- *
- * @param str A pointer to the string to be securely cleared.
- */
-void string_clear_s(string *str);
-
-/**
  * @brief Deletes the string and frees its memory.
  *
  * This function frees the memory allocated for the string and sets the

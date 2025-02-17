@@ -167,7 +167,7 @@ static inline bt_node *right_node(binary_tree *const tree,
 
 // Helper function used by `get_unalloc_node()`.
 static inline bt_node *get_deleted_node(binary_tree *const tree) {
-  const size_t *const node_index = (size_t *)stack_pop(tree->deleted_nodes);
+  const size_t *const node_index = (size_t *)stack_pop_(tree->deleted_nodes);
   return (node_index == NULL) ? NULL : node_from_index(tree, *node_index);
 }
 
@@ -313,7 +313,7 @@ binary_tree *bt_resize(binary_tree *tree, const size_t new_capacity) {
   if (new_capacity == 0) {
     tree->root_index = NULL_INDEX;
     tree->allocation = NEW_ALLOCATION;
-    stack_reset(tree->deleted_nodes);
+    stack_reset_(tree->deleted_nodes);
   } else {
     bt_node *const old_nodes_region = get_nodes(tree);
     tree->allocation = NEW_ALLOCATION;
@@ -377,7 +377,7 @@ void bt_traverse(binary_tree *const tree, bt_node *const from,
     } else if (right != NULL) {
       next_node = right;
     } else {
-      bt_node **const next_divergence = (bt_node **)stack_pop(divergent_nodes);
+      bt_node **const next_divergence = (bt_node **)stack_pop_(divergent_nodes);
       // If there are no divergent nodes in the traversed path, we're done.
       if (next_divergence == NULL) break;
       next_node = right_node(tree, *next_divergence);
