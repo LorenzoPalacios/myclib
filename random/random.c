@@ -123,22 +123,19 @@ void random_destroy_caches(void) {
 #endif
 
 static inline seed_t generate_seed(void) {
+  const size_t PROGRAM_TIME =
+      (size_t)clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ == 201112L)
   struct timespec t_spec;
   (void)timespec_get(&t_spec, TIME_UTC);
-  {
-    const long UTC_NANOSEC =
-        t_spec.tv_nsec >> (CHAR_BIT * (sizeof(long) - sizeof(seed_t)));
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L)
-    const long long PROGRAM_TIME =
-        clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+  const size_t UTC_NANOSEC =
+      (size_t)t_spec.tv_nsec >> (CHAR_BIT * (sizeof(size_t) - sizeof(seed_t)));
+  seed_t SEED = (seed_t)(UTC_NANOSEC ^ PROGRAM_TIME);
 #else
-    const long PROGRAM_TIME =
-        clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+  seed_t SEED = (seed_t)PROGRAM_TIME;
 #endif
-    seed_t SEED = (seed_t)((UTC_NANOSEC ^ PROGRAM_TIME));
-    SEED = (SEED & 1) ? -SEED : SEED;
-    return SEED;
-  }
+  SEED = (SEED & 1) ? -SEED : SEED;
+  return SEED;
 }
 
 seed_t random_init(void) {
@@ -152,8 +149,7 @@ seed_t random_init(void) {
    */
   {
     size_t index = 0;
-    for (; index < NUM_CONSTRUCTORS; index++)
-      cache_constructors[index]();
+    for (; index < NUM_CONSTRUCTORS; index++) cache_constructors[index]();
   }
   /*
    * The first call to this function finds the highest bit in `RAND_MAX`, which

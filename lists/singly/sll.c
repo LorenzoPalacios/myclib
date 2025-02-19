@@ -1,7 +1,14 @@
 #include "sll.h"
 
+/* For alignof. */
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
+#if (__STDC_VERSION__ < 202311L)
 #include <stdalign.h>
-#include <stdbool.h>
+#endif
+#else
+#define alignof(type)
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,14 +21,14 @@ typedef unsigned char byte;
 
 #define NULL_INDEX (SIZE_MAX)
 
-// - STRUCTS -
+/* - STRUCTS - */
 
-// singly-linked list node (typedef in associated header file)
+/* singly-linked list node (typedef in associated header file) */
 struct sl_node {
   size_t next_index;
 };
 
-// singly-linked list (typedef in associated header file)
+/* singly-linked list (typedef in associated header file) */
 struct sl_list {
   size_t head_index;
   size_t tail_index;
@@ -31,7 +38,7 @@ struct sl_list {
   stack *deleted_nodes;
 };
 
-// - INTERNAL -
+/* - INTERNAL - */
 
 static inline size_t data_allocation(const sl_list *const list) {
   return list->allocation - sizeof(sl_list);
@@ -79,9 +86,11 @@ static inline sl_node *get_nodes(sl_list *const list) {
 
 static inline size_t node_index(const sl_list *const list,
                                 const sl_node *const node) {
-  // This function calculates the start of the nodes region so that `list` can
-  // retain its `const` qualifier. It is equivalent to an inline expansion of
-  // `get_nodes()`.
+  /*
+   * This function calculates the start of the nodes region so that `list` can
+   * retain its `const` qualifier. It is equivalent to an inline expansion of
+   * `get_nodes()`.
+   */
   const sl_node *const NODES =
       (const void *)((const byte *)(list + 1) + values_alloc(list) +
                      padding_bytes(list));
