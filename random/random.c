@@ -1,23 +1,24 @@
 #include "random.h"
 
 #include <limits.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-// - INTERNAL IMPLEMENTATION -
-
 #if (CACHE_ALLOWED)
+
+/* - DEFINITIONS - */
 
 typedef void *cache;
 typedef cache *(*cache_constructor)(void);
 
 #define INT_CACHE_SIZE (CACHED_ELEMS * sizeof(int))
-// We use `INT_CACHE_SIZE` because `rand()` returns an int.
+/*
+ * We can use `INT_CACHE_SIZE` because the `bool` cache is generated from
+ * `rand()`, which returns an `int`.
+ */
 #define BOOL_CACHE_SIZE (INT_CACHE_SIZE)
 
-// - CACHE STOCKERS -
+/* - CACHE STOCKERS - */
 
 /**
  * @brief Stocks the integer cache with random values.
@@ -28,7 +29,8 @@ typedef cache *(*cache_constructor)(void);
  */
 static void stock_int_cache(void *const cache) {
   int *const int_cache = cache;
-  for (size_t i = 0; i < CACHED_ELEMS; i++) int_cache[i] = rand();
+  size_t index = 0;
+  for (; index < CACHED_ELEMS; index++) int_cache[index] = rand();
 }
 
 /**
@@ -42,7 +44,7 @@ static inline void stock_bool_cache(void *const cache) {
   stock_int_cache(cache);
 }
 
-// - CACHE CONSTRUCTORS -
+/* - CACHE CONSTRUCTORS - */
 
 /**
  * @brief Retrieves the integer cache.
@@ -88,29 +90,31 @@ static cache *get_bool_cache(void) {
 static inline size_t rand_max_highest_bit_index(void) {
   static size_t HIGHEST_BIT_INDEX = 0;
   if (HIGHEST_BIT_INDEX == 0) {
-    // Although `RAND_MAX` is guaranteed to be at least `32767` and at most
-    // `INT_MAX`, two's complement is not guaranteed, so we cannot initialize
-    // `bit` with `15`.
+    /*
+     * Although `RAND_MAX` is guaranteed to be at least `32767` and at most
+     * `INT_MAX`, two's complement is not guaranteed, so we cannot initialize
+     * `bit` with `15` before running the loop.
+     */
     size_t bit = 0;
-    while ((RAND_MAX >> bit) != 0) {
-      bit++;
-    }
+    while ((RAND_MAX >> bit) != 0) bit++;
     HIGHEST_BIT_INDEX = bit;
   }
   return HIGHEST_BIT_INDEX;
 }
 
-// Cache constructors go here
-#define cache_constructors \
-  ((cache_constructor[]){get_bool_cache, get_int_cache})
+/* Cache constructors go here */
+
+static const cache_constructor cache_constructors[] = {get_bool_cache,
+                                                       get_int_cache};
 #define NUM_CONSTRUCTORS \
   (sizeof(cache_constructors) / sizeof *(cache_constructors))
 
-// - PUBLIC CACHE-RELATED FUNCTIONS -
+/* - MISCELLANEOUS - */
 
 void random_destroy_caches(void) {
-  for (size_t i = 0; i < NUM_CONSTRUCTORS; i++) {
-    cache *const cache = cache_constructors[i]();
+  size_t index = 0;
+  for (; index < NUM_CONSTRUCTORS; index++) {
+    cache *const cache = cache_constructors[index]();
     free(*cache);
     *cache = NULL;
   }
@@ -121,13 +125,20 @@ void random_destroy_caches(void) {
 static inline seed_t generate_seed(void) {
   struct timespec t_spec;
   (void)timespec_get(&t_spec, TIME_UTC);
-  const long UTC_NANOSEC =
-      t_spec.tv_nsec >> (CHAR_BIT * (sizeof(long) - sizeof(seed_t)));
-  const long long PROGRAM_TIME =
-      clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
-  seed_t SEED = (seed_t)((UTC_NANOSEC ^ PROGRAM_TIME));
-  SEED = (SEED & 1) ? -SEED : SEED;
-  return SEED;
+  {
+    const long UTC_NANOSEC =
+        t_spec.tv_nsec >> (CHAR_BIT * (sizeof(long) - sizeof(seed_t)));
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L)
+    const long long PROGRAM_TIME =
+        clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+#else
+    const long PROGRAM_TIME =
+        clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+#endif
+    seed_t SEED = (seed_t)((UTC_NANOSEC ^ PROGRAM_TIME));
+    SEED = (SEED & 1) ? -SEED : SEED;
+    return SEED;
+  }
 }
 
 seed_t random_init(void) {
@@ -135,22 +146,26 @@ seed_t random_init(void) {
   srand(SEED);
 
 #if (CACHE_ALLOWED)
-  // The first call to the cache constructors will allocate and stock the
-  // caches.
-  for (size_t i = 0; i < NUM_CONSTRUCTORS; i++) {
-    void *const cache = *cache_constructors[i]();
-    if (cache == NULL)
-      (void)fprintf(stderr, "random_init(): Failed to create cache %zu\n", i);
+  /*
+   * The first call to the cache constructors will allocate and stock the
+   * caches.
+   */
+  {
+    size_t index = 0;
+    for (; index < NUM_CONSTRUCTORS; index++)
+      cache_constructors[index]();
   }
-  // The first call to this function finds the highest bit in `RAND_MAX`, which
-  // will be returned by any subsequent calls.
+  /*
+   * The first call to this function finds the highest bit in `RAND_MAX`, which
+   * will be returned by any subsequent calls.
+   */
   rand_max_highest_bit_index();
 #endif
 
   return SEED;
 }
 
-// - RANDOM GENERATORS -
+/* - RANDOM GENERATORS - */
 
 #if (CACHE_ALLOWED)
 
@@ -167,11 +182,9 @@ seed_t random_init(void) {
  */
 bool random_bool(void) {
   int *const cache = *get_bool_cache();
-
-  if (cache == NULL) return rand() & 1;
-
   static size_t cache_index = 0;
   static size_t bit_index = 0;
+  if (cache == NULL) return rand() & 1;
 
   if (cache_index == CACHED_ELEMS) {
     bit_index++;
@@ -179,16 +192,16 @@ bool random_bool(void) {
     /*
      * The highest bit is unlikely to show up with `rand()`, so we reset
      * `bit_index` despite the highest bit technically being valid. If we did
-     * not reset `bit_index`, a majority of the returned values will be `false`,
-     * since many of the cache elements will not have this bit set by due to
-     * being less than `RAND_MAX`.
+     * not reset `bit_index`, a majority of the returned values will be
+     * `false`, since many of the cache elements will not have this bit set by
+     * due to being less than `RAND_MAX`.
      */
     if (bit_index == rand_max_highest_bit_index()) {
       bit_index = 0;
       stock_bool_cache(cache);
     }
   }
-  return cache[cache_index++] & (1 << bit_index);
+  return (bool)(cache[cache_index++] & (1 << bit_index));
 }
 
 /**
@@ -201,10 +214,8 @@ bool random_bool(void) {
  */
 int random_int(void) {
   int *const cache = *get_int_cache();
-
-  if (cache == NULL) return rand();
-
   static size_t cache_index = 0;
+  if (cache == NULL) return rand();
 
   if (cache_index == CACHED_ELEMS) {
     cache_index = 0;
@@ -217,6 +228,5 @@ int random_int(void) {
 
 bool random_bool(void) { return rand() & 1; }
 
-// This function will need revising to deal with the variable range of `rand()`.
 int random_int(void) { return rand(); }
 #endif

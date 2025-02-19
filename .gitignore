@@ -7,8 +7,10 @@
 
 # Specific Files
 CMakeCache.txt
+.clangd
 
 # Folders
 .vscode
 build
 CMakeFiles
+.cache

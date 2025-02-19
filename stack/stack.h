@@ -1,19 +1,18 @@
 #ifndef STACK_H
 #define STACK_H
 
-#ifdef __STDC_VERSION__
-#if (__STDC_VERSION__ >= 199901L)
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+#if (__STDC_VERSION__ < 202311L)
+/* For C99 to C17. */
 #include <stdbool.h>
-#else
-typedef unsigned char bool;
-#define true (1)
-#define false (0)
-#define inline
 #endif
 #else
+/* For C95 and below. */
+#if (!(defined true || defined false))
 typedef unsigned char bool;
 #define true (1)
 #define false (0)
+#endif
 #define inline
 #endif
 
@@ -45,7 +44,7 @@ typedef struct {
 /**
  * @brief Convenience macro for creating a new stack interface from data.
  *
- * @param data Pointer to the data.
+ * @param arr Pointer to the data.
  */
 #define stack_interface(data) \
   stack_interface_(data, sizeof(data) / sizeof *(data), sizeof *(data))
@@ -60,7 +59,7 @@ typedef struct {
 
 #define stack_reset(stk) stack_reset_(&(stk))
 
-#define stack_resize(stk) stack_resize_(&(stk))
+#define stack_resize(stk, new_capacity) stack_resize_(&(stk), new_capacity)
 
 #define stack_shrink(stk) stack_shrink_(&(stk))
 
@@ -68,7 +67,9 @@ typedef struct {
 
 #define stack_pop(stk) stack_pop_(&(stk))
 
-#define stack_push(stk, elem) stack_push_(&(stk))
+#define stack_push(stk, value) stack_push_(&(stk), value)
+
+#define stack_auto_push(stk, elem) stack_auto_push_(&(stk), elem)
 
 /**
  * @brief Deletes a stack.
@@ -89,7 +90,7 @@ bool stack_expand_(stack *stk);
 /**
  * @brief Creates a new empty stack.
  *
- * @param num_elems Number of elements.
+ * @param capacity Number of elements.
  * @param value_size Size of each element.
  * @return A stack capable of containing `capacity` values of size `value_size`.
  */
@@ -171,38 +172,39 @@ void stack_push_(stack *stk, const void *elem);
 
 #include <string.h> /* For memcpy(). */
 
+#define PREPROC_CONCAT(x, y, z) x##y##z
+#define PREPROC_EVAL(x, y, z) PREPROC_CONCAT(x, y, z)
 /* Ensures that each stack's allocation gets a unique name. */
-#define GET_STACK_DATA_NAME(id) _stk_data_##id
+#define STACK_AUTO_DATA_NAME(identifier) \
+  PREPROC_EVAL(_stk_data_, identifier, __LINE__)
 
 /**
  * @brief Creates a stack of automatic storage duration.
  *
- * @param stk_id The identifier for the stack being assigned.
  * @param num_elems The maximum number of elements the stack will contain.
  * @param _elem_size The size of each element in the stack.
  * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define stack_auto_empty_new(stk_ident, capacity, type)           \
-  {NULL, capacity, 0, sizeof(type)};                              \
-  byte GET_STACK_DATA_NAME(stk_ident)[sizeof(type) * (capacity)]; \
-  (stk_ident).data = GET_STACK_DATA_NAME(stk_ident)
+#define stack_auto_init(stk_ident, type, capacity)                          \
+  {NULL, 0, capacity, sizeof(type)};                                        \
+  unsigned char STACK_AUTO_DATA_NAME(stk_ident)[sizeof(type) * (capacity)]; \
+  (stk_ident).data = STACK_AUTO_DATA_NAME(stk_ident)
 
 /**
  * @brief Creates a stack of automatic storage duration whose contents are a
  * copy of the contents of `data`.
  *
- * @param stk_id The identifier for the stack being assigned.
+ * @param stk_ident The identifier for the stack being assigned.
  * @param num_elems The maximum number of elements the stack will contain.
  * @param _elem_size The size of each element in the stack.
  * @note This is a macro. Use with caution if any of the arguments have side
  * effects.
  */
-#define stack_auto_new(stk_ident, data)                          \
-  stack_auto_empty_new(stk_ident, sizeof(data) / sizeof *(data), \
-                       sizeof *(data));                          \
-  (stk_ident).length = sizeof(data) / sizeof *(data);            \
-  memcpy(GET_STACK_DATA_NAME(stk_ident), data, sizeof(data));
+#define stack_auto_new(stk_ident, data)                                      \
+  stack_auto_init(stk_ident, sizeof(data) / sizeof *(data), sizeof *(data)); \
+  (stk_ident).length = sizeof(data) / sizeof *(data);                        \
+  memcpy(STACK_AUTO_DATA_NAME(stk_ident), data, sizeof(data));
 
 /**
  * @brief Creates a stack of automatic storage duration which allocates memory
@@ -214,25 +216,24 @@ void stack_push_(stack *stk, const void *elem);
  * @param _elem_size The size of each element in bytes.
  */
 #define stack_auto_interface_new_(_data, length, type) \
-  {(_data), length, length, sizeof(type)}
+  {_data, length, length, sizeof(type)}
 
 /**
  * @brief Convenience macro equivalent to `stack_auto_interface_new_()`.
  *
  * @param _data Pointer to an array.
  */
-#define stack_auto_interface_new(_data)                             \
-  stack_auto_interface_new_(_data, sizeof(_data) / sizeof *(_data), \
-                            *(_data))
+#define stack_auto_interface_new(_data) \
+  stack_auto_interface_new_(_data, sizeof(_data) / sizeof *(_data), *(_data))
 
 /**
- * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new top
- * element and will be returned by functions such as `stack_peek_()`.
+ * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new
+ * top element and will be returned by functions such as `stack_peek_()`.
  *
  * @param stk Pointer to the stack.
  * @param elem Pointer to the element to push.
- * @note The word `auto` in this function corresponds to the storage duration of
- * the pointed-to stack.
+ * @note The word `auto` in this function corresponds to the storage
+ * duration of the pointed-to stack.
  */
-void stack_auto_push(stack *stk, const void *elem);
+void stack_auto_push_(stack *stk, const void *elem);
 #endif

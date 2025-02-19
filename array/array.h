@@ -2,7 +2,22 @@
 #define ARRAY_H
 
 #include <stddef.h>
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+#if (__STDC_VERSION__ < 202311L)
+/* For C99 to C17. */
 #include <stdbool.h>
+#endif
+#else
+/* For C95 and below. */
+#if (!(defined true || defined false))
+typedef unsigned char bool;
+#define true (1)
+#define false (0)
+#endif
+#define inline
+#endif
+
+/* - CONVENIENCE MACROS - */
 
 #define array_new(data) \
   array_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
@@ -21,11 +36,22 @@
 
 #define array_insert(arr, elem) array_insert_(&(arr), elem)
 
+/* DEFINITIONS */
+
+/*
+ *   `data`    - The contents of the array.
+ *  `length`   - The number of elements in the array.
+ * `elem_size` - The size of any given element in the array.
+ */
 typedef struct {
-  void *const data;
-  const size_t length;
-  const size_t elem_size;
+  void *data;
+  size_t length;
+  size_t elem_size;
 } array;
+
+typedef bool (*for_each_op)(void *);
+
+/* - LIBRARY FUNCTIONS -*/
 
 /**
  * @brief Clears an array, setting all elements to zero.
@@ -47,7 +73,7 @@ void array_delete_(const array *arr);
  * @param arr The array to iterate over.
  * @param operation The function to apply to each element.
  */
-void array_for_each_(array *arr, bool (*operation)(void *elem));
+void array_for_each_(array *arr, for_each_op operation);
 
 /**
  * @brief Gets an element from an array by index.

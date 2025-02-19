@@ -1,6 +1,5 @@
 #include "vector.h"
 
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,8 +14,6 @@ void vector_clear_(const vector *const vec) {
   memset(vec->data, 0, vec->elem_size * vec->length);
 }
 
-byte *vector_contents(const vector *const vec) { return vec->data; }
-
 void vector_delete_(const vector *const vec) { free(vec->data); }
 
 bool vector_expand_(vector *const vec) {
@@ -27,11 +24,10 @@ bool vector_expand_(vector *const vec) {
   return EXPANSION_SUCCESS;
 }
 
-void vector_for_each_(vector *const vec, bool (*const operation)(void *elem)) {
+void vector_for_each_(vector *const vec, const for_each_op operation) {
   const size_t LEN = vec->length;
-  const size_t ELEM_SIZE = vec->elem_size;
-  byte *const contents = vec->data;
-  for (size_t i = 0; i < LEN && operation(contents + (i * ELEM_SIZE)); i++);
+  size_t index = 0;
+  while (index < LEN && operation(internal_vector_get(vec, index))) index++;
 }
 
 void *vector_get_(const vector *const vec, const size_t index) {
@@ -40,22 +36,24 @@ void *vector_get_(const vector *const vec, const size_t index) {
 }
 
 vector vector_init_(const size_t elem_size, const size_t length) {
-  return (vector){.data = malloc(elem_size * length),
-                  .length = length,
-                  .capacity = length,
-                  .elem_size = elem_size};
+  vector vec;
+  vec.data = malloc(elem_size * length);
+  vec.length = vec.capacity = length;
+  vec.elem_size = elem_size;
+  return vec;
 }
 
 void vector_insert_(vector *const vec, const void *const elem,
                     const size_t index) {
   if (index >= vec->length) vector_set_(vec, elem, index);
-  byte *const insertion_pos = internal_vector_get(vec, index);
-  if (insertion_pos == elem) return;
-  const size_t ELEM_SIZE = vec->elem_size;
-  const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index - 1);
-  byte *const shift_pos = insertion_pos + ELEM_SIZE;
-  memmove(shift_pos, insertion_pos, SHIFT_SIZE);
-  memcpy(insertion_pos, elem, ELEM_SIZE);
+  if (internal_vector_get(vec, index) != elem) {
+    byte *const insertion_pos = internal_vector_get(vec, index);
+    const size_t ELEM_SIZE = vec->elem_size;
+    const size_t SHIFT_SIZE = ELEM_SIZE * (vec->length - index - 1);
+    byte *const shift_pos = insertion_pos + ELEM_SIZE;
+    memmove(shift_pos, insertion_pos, SHIFT_SIZE);
+    memcpy(insertion_pos, elem, ELEM_SIZE);
+  }
 }
 
 vector vector_new_(const void *const data, const size_t elem_size,
@@ -81,9 +79,8 @@ bool vector_resize_(vector *const vec, const size_t new_length) {
 void vector_set_(vector *const vec, const void *const elem,
                  const size_t index) {
   if (index >= vec->length) vector_resize_(vec, index + 1);
-  byte *const target = internal_vector_get(vec, index);
-  if (elem == target) return;
-  memcpy(target, elem, vec->elem_size);
+  if (elem != internal_vector_get(vec, index))
+    memcpy(internal_vector_get(vec, index), elem, vec->elem_size);
 }
 
 bool vector_shrink_to_fit_(vector *const vec) {

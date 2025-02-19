@@ -7,9 +7,10 @@
 #include <string.h>
 #include <time.h>
 
+#include "teststack/teststack.h"
+
 #include "../array/array.h"
 #include "../random/random.h"
-#include "../stack/stack.h"
 #include "../strext/strext.h"
 #include "../vector/vector.h"
 
@@ -63,17 +64,18 @@ static void test_array(void) {
 
 static void test_random(void) {
   static const size_t ITERATIONS = 1000000;
+  size_t cnt_true = 0;
   {
     const seed_t SEED = random_init();
     printf("test_random: SEED = %u\n", SEED);
   }
-
-  size_t cnt_true = 0;
   for (size_t i = 0; i < ITERATIONS; i++) cnt_true += random_bool();
 
-  const double PERCENT_TRUE = (double)cnt_true / (double)ITERATIONS;
-  printf("test_random: %g%% true over %zu iterations.\n", PERCENT_TRUE,
-         ITERATIONS);
+  {
+    const double PERCENT_TRUE = (double)cnt_true / (double)ITERATIONS;
+    printf("test_random: %g%% true over %zu iterations.\n", PERCENT_TRUE,
+           ITERATIONS);
+  }
 }
 
 static void test_strext(void) {

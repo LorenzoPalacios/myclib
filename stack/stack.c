@@ -93,7 +93,7 @@ void stack_push_(stack *const stk, const void *const elem) {
 
 /* - AUTOMATIC STORAGE DURATION STACK - */
 
-void stack_auto_push(stack *const stk, const void *const elem) {
+void stack_auto_push_(stack *const stk, const void *const elem) {
   const size_t LENGTH = stk->length;
   if (LENGTH == stk->capacity) return;
   memcpy(get_value(stk, LENGTH), elem, stk->value_size);

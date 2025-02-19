@@ -1,10 +1,24 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+#if (__STDC_VERSION__ < 202311L)
+/* For C99 to C17. */
 #include <stdbool.h>
+#endif
+#else
+/* For C95 and below. */
+#if (!(defined true || defined false))
+typedef unsigned char bool;
+#define true (1)
+#define false (0)
+#endif
+#define inline
+#endif
+
 #include <stddef.h>
 
-// - CONVENIENCE MACROS -
+/* - CONVENIENCE MACROS - */
 
 #define vector_clear(vec) vector_clear_(&(vec))
 
@@ -33,26 +47,25 @@
 
 #define vector_shrink_to_fit(vec) vector_shrink_to_fit_(&(vec))
 
-// - DEFINITIONS -
+/* - DEFINITIONS - */
 
 /*
- * `data` - A pointer to an allocated region of memory to be used for the
- * storage of elements.
- * `length` - The maximum number of elements that can be held in a vector before
- * resizing is necessary.
- * `capacity` - The number of elements the vector has allocated for.
- * `last_defined_index` - The last index of the array that was set by
- * `vector_insert()` or `vector_set()`.
+ *   `data`    - The contents of the vector.
+ *  `length`   - The maximum number of elements that can be held by the vector
+ * until expansion is necessary.
+ * `capacity`  - The number of elements the vector has allocated for.
  * `elem_size` - The size of each element in the vector.
  */
 typedef struct vector {
   void *data;
   size_t length;
   size_t capacity;
-  const size_t elem_size;
+  size_t elem_size;
 } vector;
 
-// - FUNCTIONS -
+typedef bool (*for_each_op)(void *);
+
+/* - FUNCTIONS - */
 
 void vector_clear_(const vector *vec);
 
@@ -78,7 +91,7 @@ bool vector_expand_(vector *vec);
  * @param vec The vector to iterate over.
  * @param operation The function to apply to each element.
  */
-void vector_for_each_(vector *vec, bool (*operation)(void *elem));
+void vector_for_each_(vector *vec, for_each_op operation);
 
 /**
  * @brief Returns a pointer to the element at the specified index.
@@ -93,7 +106,7 @@ void *vector_get_(const vector *vec, size_t index);
  * @brief Creates a new vector with the specified element size and length.
  *
  * @param elem_size The size of each element.
- * @param capacity The initial capacity of the vector.
+ * @param length The initial length of the vector.
  * @return An empty vector containing at
  */
 vector vector_init_(size_t elem_size, size_t length);
@@ -121,7 +134,7 @@ vector vector_new_(const void *data, size_t elem_size, size_t length);
  * @brief Resizes the vector to the specified capacity.
  *
  * @param vec The vector to resize.
- * @param new_capacity The new capacity of the vector.
+ * @param new_length The new capacity of the vector.
  * @return `true` if the vector was resized; `false` otherwise.
  */
 bool vector_resize_(vector *vec, size_t new_length);
