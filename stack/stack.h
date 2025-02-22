@@ -168,7 +168,7 @@ void *stack_pop_(stack *stk);
  * @param stk Pointer to the stack.
  * @param elem Pointer to the element to push.
  */
-void stack_push_(stack *stk, const void *elem);
+bool stack_push_(stack *stk, const void *elem);
 
 #include <string.h> /* For memcpy(). */
 

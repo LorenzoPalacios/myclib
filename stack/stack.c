@@ -84,11 +84,13 @@ void *stack_pop_(stack *const stk) {
              : (byte *)stk->data + (--stk->length * stk->value_size);
 }
 
-void stack_push_(stack *const stk, const void *const elem) {
+bool stack_push_(stack *const stk, const void *const elem) {
   const size_t LENGTH = stk->length;
-  if (LENGTH == stk->capacity) stack_expand_(stk);
+  if (LENGTH == stk->capacity)
+    if (!stack_expand_(stk)) return false;
   memcpy(get_value(stk, LENGTH), elem, stk->value_size);
   stk->length++;
+  return true;
 }
 
 /* - AUTOMATIC STORAGE DURATION STACK - */
