@@ -2,79 +2,136 @@
 #define VECTOR_H
 
 #if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+
 #if (__STDC_VERSION__ < 202311L)
-/* For C99 to C17. */
-#include <stdbool.h>
+#include <stdbool.h> /* For C99 to C17. */
 #endif
+
 #else
-/* For C95 and below. */
-#if (!(defined true || defined false))
+
+#define inline /* `inline` keyword is not standardized prior to C99. */
+/* Boolean type for C95 and below. */
 typedef unsigned char bool;
+#ifndef true
 #define true (1)
+#endif
+#ifndef false
 #define false (0)
 #endif
-#define inline
+
 #endif
 
 #include <stddef.h>
 
+/* - DEFINITIONS - */
+
+typedef struct vector *vector;
+
+typedef bool (*for_each_op)(void *);
+
 /* - CONVENIENCE MACROS - */
 
-#define vector_clear(vec) vector_clear_(&(vec))
+#define vector_init(type, capacity) \
+  vector_init_(sizeof((type)((unsigned char)0)), (size_t)(1 * (capacity)))
 
-#define vector_delete(vec) vector_delete_(&(vec))
+/* Using `_Generic` to enforce more type safety in macros. */
+#if (__STDC_VERSION__ >= 201112L)
+#define vector_add(vec, elem) _Generic(vec, vector: vector_add_)(&(vec), elem)
 
-#define vector_expand(vec) vector_expand(&(vec))
+#define vector_clear(vec) _Generic(vec, vector: vector_clear_)(&(vec))
 
-#define vector_for_each(vec, op) vector_for_each_(&(vec), op)
+#define vector_copy(vec) _Generic(vec, vector: vector_copy_)(vec)
 
-#define vector_get(vec, index) vector_get_(&(vec), index)
+#define vector_data(vec) _Generic(vec, vector: vector_data_)(vec)
 
-#define vector_insert(vec, elem, index) vector_insert_(&(vec), elem, index)
+#define vector_delete(vec) _Generic(vec, vector: vector_delete_)(&(vec))
 
-#define vector_init(type, length) vector_init_(sizeof(type), length)
+#define vector_expand(vec) _Generic(vec, vector: vector_expand_)(&(vec))
 
-#define vector_is_full(vec) vector_is_full_(&(vec))
+#define vector_for_each(vec, op) _Generic(vec, vector: vector_for_each_)(vec)
 
-#define vector_length(vec) vector_length_(&(vec))
+#define vector_get(vec, index) \
+  _Generic(vec, vector: vector_get_)(vec, (size_t)(1 * (index)))
+
+#define vector_insert(vec, elem, index) \
+  _Generic(vec, vector: vector_insert_)(&(vec), elem, (size_t)(1 * (index)))
+
+#define vector_length(vec) _Generic(vec, vector: vector_length_)(vec)
 
 #define vector_new(data) \
   vector_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
 
-#define vector_resize(vec, new_capacity) vector_resize_(&(vec), new_capacity)
+#define vector_resize(vec, new_capacity) \
+  _Generic(vec, vector: vector_resize_)(vec, (size_t)(1 * (new_capacity)))
 
-#define vector_set(vec, elem, index) vector_set_(&(vec), elem, index)
+#define vector_set(vec, elem, index) \
+  _Generic(vec, vector: vector_set_)(vec, elem, (size_t)(1 * (index)))
+
+#define vector_set_range(vec, elem, start, end)                              \
+  _Generic(vec, vector: vector_set_range_)(vec, elem, (size_t)(1 * (start)), \
+                                           (size_t)(1 * (end)))
 
 #define vector_shrink_to_fit(vec) vector_shrink_to_fit_(&(vec))
+#else
 
-/* - DEFINITIONS - */
+#define vector_add(vec, elem) vector_add_(&(vec), elem)
 
-/*
- *   `data`    - The contents of the vector.
- *  `length`   - The maximum number of elements that can be held by the vector
- * until expansion is necessary.
- * `capacity`  - The number of elements the vector has allocated for.
- * `elem_size` - The size of each element in the vector.
- */
-typedef struct vector {
-  void *data;
-  size_t length;
-  size_t capacity;
-  size_t elem_size;
-} vector;
+#define vector_clear(vec) vector_clear_(vec)
 
-typedef bool (*for_each_op)(void *);
+#define vector_copy(vec) vector_copy(vec)
+
+#define vector_data(vec) vector_data_(vec)
+
+#define vector_delete(vec) vector_delete_(&(vec))
+
+#define vector_expand(vec) vector_expand_(&(vec))
+
+#define vector_get(vec, index) vector_get_(vec, (size_t)(1 * index))
+
+#define vector_insert(vec, elem, index) \
+  vector_insert_(&(vec), elem, (size_t)(1 * (index)))
+
+#define vector_length(vec) vector_length_(vec)
+
+#define vector_new(data) \
+  vector_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
+
+#define vector_resize(vec, new_capacity) \
+  vector_resize_(&(vec), (size_t)(new_capacity))
+
+#define vector_set(vec, elem, index) vector_set_(vec, elem, (size_t)(1 * index))
+
+#define vector_set_range(vec, elem, start, end) \
+  vector_set_range_(vec, elem, (size_t)(1 * start), (size_t)(1 * end))
+
+#define vector_shrink_to_fit(vec) vector_shrink_to_fit_(&(vec))
+#endif
 
 /* - FUNCTIONS - */
 
-void vector_clear_(const vector *vec);
+bool vector_add_(vector *vec, const void *elem);
+
+void vector_clear_(vector vec);
+
+vector vector_copy_(vector vec);
+
+/**
+ * @brief The contents of a vector.
+ *
+ * @param vec The vector whose contents are to be retrieved.
+ * @note
+ * - Writes made to the contents of a vector through this pointer will not be
+ * tracked by the implementation.
+ * - The contents of the vector are only well-defined within its length.
+ */
+void *vector_data_(vector vec);
 
 /**
  * @brief Deletes a vector.
  *
  * @param vec The vector to be deleted.
  */
-void vector_delete_(const vector *vec);
+void vector_delete_(vector *vec);
 
 /**
  * @brief Expands the capacity of the vector.
@@ -91,7 +148,7 @@ bool vector_expand_(vector *vec);
  * @param vec The vector to iterate over.
  * @param operation The function to apply to each element.
  */
-void vector_for_each_(vector *vec, for_each_op operation);
+void vector_for_each_(vector vec, for_each_op operation);
 
 /**
  * @brief Returns a pointer to the element at the specified index.
@@ -100,16 +157,17 @@ void vector_for_each_(vector *vec, for_each_op operation);
  * @param index The index of the element.
  * @return A pointer to the element at the specified index.
  */
-void *vector_get_(const vector *vec, size_t index);
+void *vector_get_(vector vec, size_t index);
 
 /**
  * @brief Creates a new vector with the specified element size and length.
  *
  * @param elem_size The size of each element.
- * @param length The initial length of the vector.
- * @return An empty vector containing at
+ * @param capacity The initial capacity of the vector.
+ * @return An empty vector capable of containing `capacity` elements of size
+ * `elem_size`.
  */
-vector vector_init_(size_t elem_size, size_t length);
+vector vector_init_(size_t elem_size, size_t capacity);
 
 /**
  * @brief Inserts an element at the specified index in the vector.
@@ -118,7 +176,9 @@ vector vector_init_(size_t elem_size, size_t length);
  * @param elem The element to insert.
  * @param index The index at which to insert the element.
  */
-void vector_insert_(vector *vec, const void *elem, size_t index);
+bool vector_insert_(vector *vec, const void *elem, size_t index);
+
+size_t vector_length_(vector vec);
 
 /**
  * @brief Creates a new vector from an array.
@@ -139,7 +199,9 @@ vector vector_new_(const void *data, size_t elem_size, size_t length);
  */
 bool vector_resize_(vector *vec, size_t new_length);
 
-void vector_set_(vector *vec, const void *elem, size_t index);
+void vector_set_(vector vec, const void *elem, size_t index);
+
+void vector_set_range_(vector vec, const void *elem, size_t start, size_t end);
 
 /**
  * @brief Shrinks the vector's capacity to fit its capacity.
@@ -148,5 +210,4 @@ void vector_set_(vector *vec, const void *elem, size_t index);
  * @return `true` if the vector was shrunk; `false` otherwise.
  */
 bool vector_shrink_to_fit_(vector *vec);
-
 #endif
