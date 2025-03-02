@@ -35,7 +35,7 @@ typedef bool (*for_each_op)(void *);
   vector_init_(sizeof((type)((unsigned char)0)), (size_t)(1 * (capacity)))
 
 /* Using `_Generic` to enforce more type safety in macros. */
-#if (__STDC_VERSION__ >= 201112L)
+#if (defined __STDC_VERSION && __STDC_VERSION__ >= 201112L)
 #define vector_add(vec, elem) _Generic(vec, vector: vector_add_)(&(vec), elem)
 
 #define vector_clear(vec) _Generic(vec, vector: vector_clear_)(&(vec))

@@ -29,8 +29,7 @@ static inline byte *internal_vector_get(struct vector *const vec,
 bool vector_add_(struct vector **const vec, const void *const elem) {
   if ((*vec)->length == (*vec)->capacity)
     if (!vector_expand_(vec)) return false;
-  void *dst = internal_vector_get(*vec, (*vec)->length);
-  memcpy(dst, elem, (*vec)->elem_size);
+  memcpy(internal_vector_get(*vec, (*vec)->length), elem, (*vec)->elem_size);
   (*vec)->length++;
   return true;
 }
@@ -129,11 +128,11 @@ void vector_set_(struct vector *const vec, const void *const elem,
 }
 
 void vector_set_range_(struct vector *const vec, const void *const elem,
-                       const size_t start, const size_t end) {
+                       size_t start, const size_t end) {
   if (end <= vec->length) {
     const size_t ELEM_SIZE = vec->elem_size;
     void *const data = vector_data_(vec);
-    for (size_t i = start; i < end; i++) memcpy(data, elem, ELEM_SIZE);
+    for (; start < end; start++) memcpy(data, elem, ELEM_SIZE);
   }
 }
 
