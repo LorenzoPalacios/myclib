@@ -1,6 +1,8 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#include <stddef.h>
+
 #if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
 
 #if (__STDC_VERSION__ < 202311L)
@@ -20,8 +22,6 @@ typedef unsigned char bool;
 #endif
 
 #endif
-
-#include <stddef.h>
 
 /* - DEFINITIONS - */
 

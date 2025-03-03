@@ -6,10 +6,10 @@
 typedef unsigned char byte;
 
 /*
- *  `length`   - The maximum number of elements that can be held by the vector
+ *  `length`   - The maximum number of elements that can be held by a vector
  * until expansion is necessary.
- * `capacity`  - The number of elements the vector has allocated for.
- * `elem_size` - The size of each element in the vector.
+ * `capacity`  - The number of elements a vector has allocated for.
+ * `elem_size` - The size of each element in a vector.
  */
 struct vector {
   size_t length;
