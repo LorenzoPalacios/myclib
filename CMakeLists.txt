@@ -1,17 +1,27 @@
-cmake_minimum_required(VERSION 3.11)
+# This version is subject to change as we figure out what standards we will use.
+cmake_minimum_required(VERSION 3.10)
+
+include_guard(GLOBAL)
+
 project(myclib)
 
-set(CMAKE_COMPILE_WARNING_AS_ERROR true)
 set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
-add_compile_options(-O3 -pedantic -std=c89 -Wabi -Wall -Wcast-align -Wcast-qual -Wconversion -Werror -Wextra -Wformat=2 -Wshadow -Wstrict-overflow=5 -Wundef -Wunreachable-code -Wwrite-strings -march=native -mtune=native)
-add_library(myclib STATIC array/array.c lists/singly/sll.c random/random.c stack/stack.c str/str.c vector/vector.c)
+add_compile_options(
+  -O3 -pedantic -Wabi -Wall -Wcast-align -Wcast-qual -Wconversion -Werror
+  -Wextra -Wformat=2 -Wshadow -Wstrict-overflow=5 -Wundef -Wunreachable-code
+  -Wwrite-strings -march=native -mtune=native
+  )
 
-target_include_directories(myclib PUBLIC
-  "${PROJECT_SOURCE_DIR}/array"
-  "${PROJECT_SOURCE_DIR}/lists/singly"
-  "${PROJECT_SOURCE_DIR}/random"
-  "${PROJECT_SOURCE_DIR}/stack"
-  "${PROJECT_SOURCE_DIR}/str"
-  "${PROJECT_SOURCE_DIR}/trees"
-  "${PROJECT_SOURCE_DIR}/vector")
+set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_COMPILE_WARNING_AS_ERROR true)
+
+add_subdirectory("lists")
+add_subdirectory("random")
+add_subdirectory("stack")
+add_subdirectory("str")
+add_subdirectory("tests")
+#add_subdirectory("trees")
+add_subdirectory("vector")
