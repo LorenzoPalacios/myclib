@@ -9,12 +9,11 @@
 
 #include "teststack/teststack.h"
 
-#include "../array/array.h"
 #include "../random/random.h"
-#include "../strext/strext.h"
+#include "../str/str.h"
 #include "../vector/vector.h"
 
-// - DEFINITIONS -
+/* - DEFINITIONS - */
 
 #define RUN_ALL_TESTS_KEYWORD "all"  // Should be lowercase.
 
