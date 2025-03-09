@@ -5,13 +5,15 @@ include_guard(GLOBAL)
 
 project(myclib)
 
+set(BUILD_TESTS OFF)
+
 set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 add_compile_options(
   -O3 -pedantic -Wabi -Wall -Wcast-align -Wcast-qual -Wconversion -Werror
   -Wextra -Wformat=2 -Wshadow -Wstrict-overflow=5 -Wundef -Wunreachable-code
   -Wwrite-strings -march=native -mtune=native
-  )
+)
 
 set(CMAKE_C_STANDARD 90)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -22,6 +24,23 @@ add_subdirectory("lists")
 add_subdirectory("random")
 add_subdirectory("stack")
 add_subdirectory("str")
-add_subdirectory("tests")
 #add_subdirectory("trees")
 add_subdirectory("vector")
+
+if (BUILD_TESTS)
+set(TESTS_DIR "${PROJECT_SOURCE_DIR}/tests")
+set(STACK_TEST_DIR "${TESTS_DIR}/teststack")
+
+function(init_stack_test target)
+  target_sources(${target}
+    PUBLIC
+    "${STACK_TEST_DIR}/teststack.h"
+    PRIVATE
+    "${STACK_TEST_DIR}/teststack.c"
+  )
+endfunction()
+
+add_executable(tests "${TESTS_DIR}/main.c")
+target_link_libraries(tests stack)
+init_stack_test(tests)
+endif()
