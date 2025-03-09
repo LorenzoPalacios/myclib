@@ -19,14 +19,14 @@ typedef struct stack {
 typedef unsigned char byte;
 
 /* The factor by which to expand a stack's capacity. */
-#define EXPANSION_FACTOR (2)
+#define EXPANSION_FACTOR ((size_t)2)
 
 inline void stack_delete_(void **const stk) {
   free(stack_header(*stk));
   *stk = NULL;
 }
-/*
-bool stack_expand_(void **const stk) {*/
+
+bool stack_expand_(void **const stk, const size_t value_size) {
   /*
    * Reallocation may fail because the requested memory is too large. In this
    * case, we fall back to the safer, yet generally less efficient option of
@@ -35,13 +35,14 @@ bool stack_expand_(void **const stk) {*/
    * This has the side effect of potentially requiring more later reallocations,
    * but is more likely to ensure stability. Of course, if this also fails, then
    * chances are the system is out of memory, so it's fine to return `NULL`.
-   */ /*
+   */
   const bool EXPANSION_SUCCESS =
-      stack_resize_(stk, EXPANSION_FACTOR * stack_capacity(*stk));
-  if (!EXPANSION_SUCCESS) return stack_resize_(stk, stack_capacity(*stk) + 1);
+      stack_resize_(stk, EXPANSION_FACTOR * stack_capacity(*stk), value_size);
+  if (!EXPANSION_SUCCESS)
+    return stack_resize_(stk, stack_capacity(*stk) + 1, value_size);
   return true;
 }
-*/
+
 inline void *stack_header(void *const stk) { return (stack *)stk - 1; }
 
 void *stack_new_(const void *const data, const size_t length,
@@ -59,26 +60,26 @@ void *stack_init_(const size_t value_size, const size_t capacity) {
   return stk + 1;
 }
 
-/*
-bool stack_resize_(void **const stk, const size_t new_capacity) {
-  stack *stk_actual = stack_header(*stk);
-  if (new_capacity == stk_actual->capacity) return false;
+bool stack_resize_(void **const stk, const size_t new_capacity,
+                   const size_t value_size) {
+  stack *stk_header = stack_header(*stk);
+  if (new_capacity == stack_capacity(stk)) return false;
   {
-    const size_t ALLOCATION = new_capacity * stk_actual->value_size;
-    stack new_stk = realloc(stk_actual, ALLOCATION);
+    const size_t ALLOCATION = (new_capacity * value_size) + sizeof(stack);
+    stack *const new_stk = realloc(stk_header, ALLOCATION);
     if (new_stk == NULL) return false;
-    stk_actual = new_stk;
-    stk_actual->data = stk_actual + 1;
+    stk_header = new_stk;
+    *stk = stk_header + 1;
   }
-  stk_actual->capacity = new_capacity;
-  if (new_capacity < stk_actual->height) stk_actual->height = new_capacity;
+  stk_header->capacity = new_capacity;
+  if (new_capacity < stk_header->height) stk_header->height = new_capacity;
   return true;
 }
 
-bool stack_shrink_(void **const stk) {
-  return stack_resize_(stk, stack_height(*stk));
+bool stack_shrink_(void **const stk, const size_t value_size) {
+  return stack_resize_(stk, stack_height(*stk), value_size);
 }
-*/
+
 inline void *stack_peek_untyped(void *const stk, const size_t value_size) {
   return stack_is_empty(stk)
              ? NULL
@@ -89,33 +90,27 @@ inline void *stack_pop_untyped(void *const stk, const size_t value_size) {
   return stack_is_empty(stk) ? NULL
                              : (byte *)stk + (--stack_height(stk) * value_size);
 }
-/*
 
-bool stack_push_(void **const stk, const void *const value) {
-  const size_t HEIGHT = (*stk)->height;
-  if (HEIGHT == (*stk)->capacity)
-    if (!stack_expand_(stk)) return false;
-  memcpy(get_value(*stk, HEIGHT), value, (*stk)->value_size);
-  (*stk)->height++;
+static inline void *get_value(void *const stk, const size_t index,
+                              const size_t value_size) {
+  return (byte *)stk + (value_size * index);
+}
+
+bool stack_push_(void **const stk, const void *const value,
+                 const size_t value_size) {
+  const size_t HEIGHT = stack_height(*stk);
+  if (HEIGHT == stack_capacity(*stk))
+    if (!stack_expand_(stk, value_size)) return false;
+  memcpy(get_value(*stk, HEIGHT, value_size), value, value_size);
+  stack_height(*stk)++;
   return true;
 }
-
-bool stack_push_no_resize_(void *const stk, const void *const value) {
-  if (stk->height != stk->capacity) {
-    memcpy(get_value(stk, stk->height), value, stk->value_size);
-    stk->height++;
-    return true;
-  }
-  return false;
-}
-*/
 
 #include <stdio.h>
 
 int main(void) {
-  const int data[] = {1, 2, 3};
+  int data[] = {1, 2, 3};
   stack(int) stk = stack_new(data);
-  while (!stack_is_empty(stk))
-    printf("%d ", *stack_pop(stk));
+  stack_push(stk, data);
   return 0;
 }

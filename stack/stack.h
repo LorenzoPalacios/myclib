@@ -25,22 +25,23 @@ typedef unsigned char bool;
 
 /* - CONVENIENCE MACROS - */
 
-/*
- * A note on `stack_capacity` and `stack_height`:
- * The casts to `unsigned char` are deliberate. This avoids undefined behavior
- * by strict aliasing.
- */
-
-#define stack_capacity(stk) (*((unsigned char *)(stk) - sizeof(size_t)))
+#define stack_capacity(stk) (((size_t *)stack_header(stk))[1])
 
 #define stack_delete(stk) stack_delete_(&(stk))
 
-#define stack_expand(stk) stack_expand_(&(stk))
+#define stack_expand(stk)                                  \
+  stack_resize(stk, EXPANSION_FACTOR * stack_capacity(stk)) \
+      ? true                                               \
+      : stack_resize(stk, stack_capacity(stk) + 1);
 
-#define stack_height(stk) (*((unsigned char *)(stk) - (2 * sizeof(size_t))))
+#define stack_expand_s(stk) stack_expand_(&(stk), sizeof *(stk))
+
+#define stack_height(stk) (((size_t *)stack_header(stk))[0])
 
 #define stack_init(type, capacity) \
-  stack_init_(sizeof((type)((unsigned char)0)), (size_t)(capacity))
+  stack_init_(sizeof*((type *)NULL), (size_t)(capacity))
+
+#define stack_is_full(stk) (stack_height(stk) == stack_capacity(stk))
 
 #define stack_is_empty(stk) (stack_height(stk) == 0)
 
@@ -50,9 +51,11 @@ typedef unsigned char bool;
 #define stack_reset(stk) (stack_height(stk) = 0)
 
 #define stack_resize(stk, new_capacity) \
-  stack_resize_(&(stk), (size_t)(new_capacity))
+  stack_resize_(&(stk), (size_t)(new_capacity), sizeof *(stk))
 
-#define stack_shrink(stk) stack_shrink_(&(stk))
+#define stack_shrink(stk) stack_resize(stk, stack_height(stk))
+
+#define stack_shrink_s(stk) stack_shrink_(&(stk), sizeof(*(stk)))
 
 #define stack_peek(stk) \
   (stack_is_empty(stk) ? NULL : (stk) + (stack_height(stk) - 1))
@@ -64,7 +67,15 @@ typedef unsigned char bool;
 
 #define stack_pop_s(stk) stack_pop_untyped(stk, sizeof(*(stk)))
 
-#define stack_push(stk, value) stack_push_(&(stk), value)
+/* clang-format off */
+#define stack_push(stk, value)                                        \
+  ((stack_height(stk) == stack_capacity(stk) &&                        \
+   !stack_expand_(stk, value_size))                                   \
+      ? false                                                         \
+      : (!((stk)[stack_height(stk)++] = *(value))) | true)
+/* clang-format on */
+
+#define stack_push_s(stk, value) stack_push_(&(stk), value)
 
 /* - DEFINITIONS - */
 
@@ -86,7 +97,7 @@ void stack_delete_(void **stk);
  * @return `true` if the stack was successfully expanded.
  * `false` otherwise.
  */
-bool stack_expand_(void **stk);
+bool stack_expand_(void **stk, size_t value_size);
 
 void *stack_header(void *stk);
 
@@ -125,7 +136,7 @@ inline void *stack_pop_untyped(void *stk, size_t value_size);
  * @return `true` if the stack was successfully resized.
  * `false` otherwise.
  */
-bool stack_resize_(void **stk, size_t new_capacity);
+bool stack_resize_(void **stk, size_t new_capacity, size_t value_size);
 
 /**
  * @brief Shrinks the memory used by a stack to the minimum
@@ -135,7 +146,7 @@ bool stack_resize_(void **stk, size_t new_capacity);
  * @return `true` if the stack was successfully shrunk.
  * `false` otherwise.
  */
-bool stack_shrink_(void **stk);
+bool stack_shrink_(void **stk, size_t value_size);
 
 /**
  * @brief Pushes `value` onto the top of a stack.
@@ -145,5 +156,5 @@ bool stack_shrink_(void **stk);
  * @return `true` if the value was successfully pushed onto
  * the stack. `false` otherwise.
  */
-bool stack_push_(void **stk, const void *value);
+bool stack_push_(void **stk, const void *value, size_t value_size);
 #endif
