@@ -1,19 +1,32 @@
 #include "stack.h"
 
-#include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* - DEFINITIONS -*/
+
+/*
+ *   `height`   - The current height of a stack.
+ *  `capacity`  - The maximum number of values a stack can store before
+ *                expansion is necessary.
+ */
+typedef struct stack {
+  size_t height;
+  size_t capacity;
+} stack;
 
 typedef unsigned char byte;
 
 /* The factor by which to expand a stack's capacity. */
 #define EXPANSION_FACTOR (2)
 
-void stack_reset_(stack *const stk) { stk->length = 0; }
-
-void stack_delete_(const stack *const stk) { free(stk->data); }
-
-bool stack_expand_(stack *const stk) {
+inline void stack_delete_(void **const stk) {
+  free(stack_header(*stk));
+  *stk = NULL;
+}
+/*
+bool stack_expand_(void **const stk) {*/
   /*
    * Reallocation may fail because the requested memory is too large. In this
    * case, we fall back to the safer, yet generally less efficient option of
@@ -22,93 +35,87 @@ bool stack_expand_(stack *const stk) {
    * This has the side effect of potentially requiring more later reallocations,
    * but is more likely to ensure stability. Of course, if this also fails, then
    * chances are the system is out of memory, so it's fine to return `NULL`.
-   */
+   */ /*
   const bool EXPANSION_SUCCESS =
-      stack_resize_(stk, EXPANSION_FACTOR * stk->capacity);
-  if (!EXPANSION_SUCCESS) return stack_resize_(stk, stk->capacity + 1);
-  return EXPANSION_SUCCESS;
+      stack_resize_(stk, EXPANSION_FACTOR * stack_capacity(*stk));
+  if (!EXPANSION_SUCCESS) return stack_resize_(stk, stack_capacity(*stk) + 1);
+  return true;
 }
+*/
+inline void *stack_header(void *const stk) { return (stack *)stk - 1; }
 
-static inline byte *get_value(stack *const stk, const size_t index) {
-  return (byte *)stk->data + (index * stk->value_size);
-}
-
-stack stack_new_(const void *const data, const size_t length,
+void *stack_new_(const void *const data, const size_t length,
                  const size_t value_size) {
-  stack stk;
-  stk.data = malloc(value_size * length);
-  stk.length = stk.capacity = length;
-  stk.value_size = value_size;
-  memcpy(stk.data, data, value_size * length);
-  return stk;
+  stack *const stk = malloc((value_size * length) + sizeof(stack));
+  stk->height = stk->capacity = length;
+  memcpy(stk + 1, data, value_size * length);
+  return stk + 1;
 }
 
-stack stack_init_(const size_t value_size, const size_t capacity) {
-  stack stk;
-  stk.data = malloc(value_size * capacity);
-  stk.length = 0;
-  stk.capacity = capacity;
-  stk.value_size = value_size;
-  return stk;
+void *stack_init_(const size_t value_size, const size_t capacity) {
+  stack *const stk = malloc((value_size * capacity) + sizeof(stack));
+  stk->height = 0;
+  stk->capacity = capacity;
+  return stk + 1;
 }
 
-bool stack_is_empty_(const stack *const stk) { return stk->length == 0; }
-
-bool stack_resize_(stack *const stk, const size_t new_capacity) {
-  if (new_capacity == stk->capacity) return false;
+/*
+bool stack_resize_(void **const stk, const size_t new_capacity) {
+  stack *stk_actual = stack_header(*stk);
+  if (new_capacity == stk_actual->capacity) return false;
   {
-    const size_t ALLOCATION = new_capacity * stk->value_size;
-    void *const new_data = realloc(stk->data, ALLOCATION);
-    if (new_data == NULL) return false;
-    stk->data = new_data;
+    const size_t ALLOCATION = new_capacity * stk_actual->value_size;
+    stack new_stk = realloc(stk_actual, ALLOCATION);
+    if (new_stk == NULL) return false;
+    stk_actual = new_stk;
+    stk_actual->data = stk_actual + 1;
   }
-  stk->capacity = new_capacity;
-  if (new_capacity < stk->length) stk->length = new_capacity;
+  stk_actual->capacity = new_capacity;
+  if (new_capacity < stk_actual->height) stk_actual->height = new_capacity;
   return true;
 }
 
-bool stack_shrink_(stack *const stk) { return stack_resize_(stk, stk->length); }
-
-void *stack_peek_(const stack *const stk) {
-  if (stk->length == 0) return NULL;
-  /*
-   * Subtracting by one since `stk->length` is equivalent to the number of
-   * elements within `stk`.
-   */
-  return (byte *)stk->data + ((stk->length - 1) * stk->value_size);
+bool stack_shrink_(void **const stk) {
+  return stack_resize_(stk, stack_height(*stk));
 }
-
-void *stack_pop_(stack *const stk) {
-  return stk->length == 0
+*/
+inline void *stack_peek_untyped(void *const stk, const size_t value_size) {
+  return stack_is_empty(stk)
              ? NULL
-             : (byte *)stk->data + (--stk->length * stk->value_size);
+             : (byte *)stk + ((stack_height(stk) - 1) * value_size);
 }
 
-bool stack_push_(stack *const stk, const void *const elem) {
-  const size_t LENGTH = stk->length;
-  if (LENGTH == stk->capacity)
+inline void *stack_pop_untyped(void *const stk, const size_t value_size) {
+  return stack_is_empty(stk) ? NULL
+                             : (byte *)stk + (--stack_height(stk) * value_size);
+}
+/*
+
+bool stack_push_(void **const stk, const void *const value) {
+  const size_t HEIGHT = (*stk)->height;
+  if (HEIGHT == (*stk)->capacity)
     if (!stack_expand_(stk)) return false;
-  memcpy(get_value(stk, LENGTH), elem, stk->value_size);
-  stk->length++;
+  memcpy(get_value(*stk, HEIGHT), value, (*stk)->value_size);
+  (*stk)->height++;
   return true;
 }
 
-/* - AUTOMATIC STORAGE DURATION STACK - */
-
-void stack_auto_push_(stack *const stk, const void *const elem) {
-  const size_t LENGTH = stk->length;
-  if (LENGTH == stk->capacity) return;
-  memcpy(get_value(stk, LENGTH), elem, stk->value_size);
-  stk->length++;
+bool stack_push_no_resize_(void *const stk, const void *const value) {
+  if (stk->height != stk->capacity) {
+    memcpy(get_value(stk, stk->height), value, stk->value_size);
+    stk->height++;
+    return true;
+  }
+  return false;
 }
+*/
 
-/* - INTERFACE STACKS - */
+#include <stdio.h>
 
-stack stack_interface_(void *const data, const size_t length,
-                       const size_t value_size) {
-  stack stk;
-  stk.data = data;
-  stk.length = stk.capacity = length;
-  stk.value_size = value_size;
-  return stk;
+int main(void) {
+  const int data[] = {1, 2, 3};
+  stack(int) stk = stack_new(data);
+  while (!stack_is_empty(stk))
+    printf("%d ", *stack_pop(stk));
+  return 0;
 }

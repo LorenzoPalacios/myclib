@@ -1,114 +1,105 @@
 #ifndef STACK_H
 #define STACK_H
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
-#if (__STDC_VERSION__ < 202311L)
-/* For C99 to C17. */
-#include <stdbool.h>
-#endif
-#else
-/* For C95 and below. */
-#if (!(defined true || defined false))
-typedef unsigned char bool;
-#define true (1)
-#define false (0)
-#endif
-#define inline
-#endif
-
 #include <stddef.h>
 
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+
+#if (__STDC_VERSION__ < 202311L)
+#include <stdbool.h> /* For C99 to C17. */
+#endif
+
+#else
+
+#define inline /* `inline` keyword is not standardized prior to C99. */
+/* Boolean type for C95 and below. */
+typedef unsigned char bool;
+#ifndef true
+#define true (1)
+#endif
+#ifndef false
+#define false (0)
+#endif
+
+#endif
+
+/* - CONVENIENCE MACROS - */
+
 /*
- * `data` - Pointer to the contents of a stack.
- * `length` - The current length of the stack.
- * `capacity` - The number of values the stack can store before expansion is
- * necessary.
- * `value_size` - The size of each member value within the contents of the
- * stack.
+ * A note on `stack_capacity` and `stack_height`:
+ * The casts to `unsigned char` are deliberate. This avoids undefined behavior
+ * by strict aliasing.
  */
-typedef struct {
-  void *data;
-  size_t length;
-  size_t capacity;
-  size_t value_size;
-} stack;
+
+#define stack_capacity(stk) (*((unsigned char *)(stk) - sizeof(size_t)))
 
 #define stack_delete(stk) stack_delete_(&(stk))
 
-#define stack_expand(stk) stack_expand(&(stk))
+#define stack_expand(stk) stack_expand_(&(stk))
 
-#define stack_init(type, capacity) stack_init_(sizeof(type), capacity)
+#define stack_height(stk) (*((unsigned char *)(stk) - (2 * sizeof(size_t))))
 
-#define stack_is_empty(stk) stack_is_empty_(&(stk))
+#define stack_init(type, capacity) \
+  stack_init_(sizeof((type)((unsigned char)0)), (size_t)(capacity))
 
-/**
- * @brief Convenience macro for creating a new stack interface from data.
- *
- * @param arr Pointer to the data.
- */
-#define stack_interface(data) \
-  stack_interface_(data, sizeof(data) / sizeof *(data), sizeof *(data))
+#define stack_is_empty(stk) (stack_height(stk) == 0)
 
-/**
- * @brief Convenience macro for creating a new stack from data.
- *
- * @param data Pointer to the data.
- */
-#define stack_new(data) \
-  stack_new_(data, sizeof(data) / sizeof *(data), sizeof *(data))
+#define stack_new(arr) \
+  stack_new_(arr, sizeof(arr) / sizeof *(arr), sizeof *(arr))
 
-#define stack_reset(stk) stack_reset_(&(stk))
+#define stack_reset(stk) (stack_height(stk) = 0)
 
-#define stack_resize(stk, new_capacity) stack_resize_(&(stk), new_capacity)
+#define stack_resize(stk, new_capacity) \
+  stack_resize_(&(stk), (size_t)(new_capacity))
 
 #define stack_shrink(stk) stack_shrink_(&(stk))
 
-#define stack_peek(stk) stack_peek_(&(stk))
+#define stack_peek(stk) \
+  (stack_is_empty(stk) ? NULL : (stk) + (stack_height(stk) - 1))
 
-#define stack_pop(stk) stack_pop_(&(stk))
+#define stack_peek_s(stk) stack_peek_untyped(stk, sizeof(*(stk)))
+
+#define stack_pop(stk) \
+  (stack_is_empty(stk) ? NULL : (stk) + (--stack_height(stk)))
+
+#define stack_pop_s(stk) stack_pop_untyped(stk, sizeof(*(stk)))
 
 #define stack_push(stk, value) stack_push_(&(stk), value)
 
-#define stack_auto_push(stk, elem) stack_auto_push_(&(stk), elem)
+/* - DEFINITIONS - */
+
+#define stack(type) type *
+
+/* - FUNCTIONS - */
 
 /**
  * @brief Deletes a stack.
  *
- * @param stk Pointer to the stack to be deleted.
+ * @param stk The stack to be deleted.
  */
-void stack_delete_(const stack *stk);
+void stack_delete_(void **stk);
 
 /**
- * @brief Expands the memory used by `stk->data`, thereby increasing its
- * capacity.
+ * @brief Expands the capacity of a stack.
  *
- * @param stk Pointer to the stack.
- * @return `true` if the stack was expanded. `false` otherwise.
+ * @param stk The stack to be expanded.
+ * @return `true` if the stack was successfully expanded.
+ * `false` otherwise.
  */
-bool stack_expand_(stack *stk);
+bool stack_expand_(void **stk);
+
+void *stack_header(void *stk);
 
 /**
- * @brief Creates a new empty stack.
+ * @brief Creates a new and empty stack.
  *
- * @param capacity Number of elements.
- * @param value_size Size of each element.
- * @return A stack capable of containing `capacity` values of size `value_size`.
+ * @param capacity The number of values the stack should be
+ * capable of holding.
+ * @param value_size The size of each value in the stack.
+ * @return A stack capable of containing `capacity` values
+ * of size `value_size`.
  */
-stack stack_init_(size_t value_size, size_t capacity);
-
-/**
- * @brief Creates a stack header for the contents of `data`.
- *
- * @param data Pointer to the data.
- * @param length Length of the data.
- * @param value_size Size of each element.
- * @return A stack whose contents are that of `data`.
- * @note Any operations carried out on the stack may affect the contents stored
- * at `data`.
- */
-stack stack_interface_(void *data, size_t length, size_t value_size);
-
-bool stack_is_empty_(const stack *stk);
+void *stack_init_(size_t value_size, size_t capacity);
 
 /**
  * @brief Creates a stack based off the elements in `data`.
@@ -116,124 +107,43 @@ bool stack_is_empty_(const stack *stk);
  * @param data Pointer to the data.
  * @param length Length of the data.
  * @param value_size Size of each element.
- * @return A new stack whose contents are a copy of `length` values at `data`.
+ * @return A new stack whose contents are a copy of `length`
+ * values at `data`.
  */
-stack stack_new_(const void *data, size_t length, size_t value_size);
+void *stack_new_(const void *data, size_t length, size_t value_size);
+
+inline void *stack_peek_untyped(void *stk, size_t value_size);
+
+inline void *stack_pop_untyped(void *stk, size_t value_size);
 
 /**
- * @brief Resets `stk->length` to `0`.
+ * @brief Resizes the memory used by a stack to accommodate
+ * `new_capacity` elements.
  *
- * @param stk Pointer to the stack.
+ * @param stk The stack to be resized.
+ * @param new_capacity The new capacity of the stack.
+ * @return `true` if the stack was successfully resized.
+ * `false` otherwise.
  */
-void stack_reset_(stack *stk);
+bool stack_resize_(void **stk, size_t new_capacity);
 
 /**
- * @brief Resizes the memory used by `stk->data` to accommodate `new_capacity`
- * elements.
+ * @brief Shrinks the memory used by a stack to the minimum
+ * necessary to preserve data.
  *
- * @param stk Pointer to the stack.
- * @param new_capacity New capacity of the stack.
- * @return `true` if the stack was resized. `false` otherwise.
+ * @param stk The stack to be shrunk.
+ * @return `true` if the stack was successfully shrunk.
+ * `false` otherwise.
  */
-bool stack_resize_(stack *stk, size_t new_capacity);
+bool stack_shrink_(void **stk);
 
 /**
- * @brief Shrinks the memory used by `stk->data` to `stk->used_capacity`.
+ * @brief Pushes `value` onto the top of a stack.
  *
- * @param stk Pointer to the stack.
- * @return `true` if the stack was shrunk. `false` otherwise.
+ * @param stk The stack to push an element upon.
+ * @param value Pointer to the value to be pushed.
+ * @return `true` if the value was successfully pushed onto
+ * the stack. `false` otherwise.
  */
-bool stack_shrink_(stack *stk);
-
-/**
- * @brief Returns, but does not remove, the top element of `stk`.
- *
- * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the stack is empty.
- */
-void *stack_peek_(const stack *stk);
-
-/**
- * @brief Returns and removes the top element from `stk`.
- *
- * @param stk Pointer to the stack.
- * @return Pointer to the top element in `stk` or NULL if the stack is empty.
- */
-void *stack_pop_(stack *stk);
-
-/**
- * @brief Adds `elem` to `stk`, expanding if necessary. `elem` will then be the
- * new top element and will be returned by functions such as `stack_peek_()`.
- *
- * @param stk Pointer to the stack.
- * @param elem Pointer to the element to push.
- */
-bool stack_push_(stack *stk, const void *elem);
-
-#include <string.h> /* For memcpy(). */
-
-#define PREPROC_CONCAT(x, y, z) x##y##z
-#define PREPROC_EVAL(x, y, z) PREPROC_CONCAT(x, y, z)
-/* Ensures that each stack's allocation gets a unique name. */
-#define STACK_AUTO_DATA_NAME(identifier) \
-  PREPROC_EVAL(_stk_data_, identifier, __LINE__)
-
-/**
- * @brief Creates a stack of automatic storage duration.
- *
- * @param num_elems The maximum number of elements the stack will contain.
- * @param _elem_size The size of each element in the stack.
- * @note This is a macro. Use with caution if any of the arguments have side
- * effects.
- */
-#define stack_auto_init(stk_ident, type, capacity)                          \
-  {NULL, 0, capacity, sizeof(type)};                                        \
-  unsigned char STACK_AUTO_DATA_NAME(stk_ident)[sizeof(type) * (capacity)]; \
-  (stk_ident).data = STACK_AUTO_DATA_NAME(stk_ident)
-
-/**
- * @brief Creates a stack of automatic storage duration whose contents are a
- * copy of the contents of `data`.
- *
- * @param stk_ident The identifier for the stack being assigned.
- * @param num_elems The maximum number of elements the stack will contain.
- * @param _elem_size The size of each element in the stack.
- * @note This is a macro. Use with caution if any of the arguments have side
- * effects.
- */
-#define stack_auto_new(stk_ident, data)                                      \
-  stack_auto_init(stk_ident, sizeof(data) / sizeof *(data), sizeof *(data)); \
-  (stk_ident).length = sizeof(data) / sizeof *(data);                        \
-  memcpy(STACK_AUTO_DATA_NAME(stk_ident), data, sizeof(data));
-
-/**
- * @brief Creates a stack of automatic storage duration which allocates memory
- * solely for the stack header (that is, the data members of `stack`).
- * `stack->data` will take the value of the pointer, `_data`.
- *
- * @param _data A pointer to the data to be interfaced.
- * @param num_elems The number of elements in `_data`.
- * @param _elem_size The size of each element in bytes.
- */
-#define stack_auto_interface_new_(_data, length, type) \
-  {_data, length, length, sizeof(type)}
-
-/**
- * @brief Convenience macro equivalent to `stack_auto_interface_new_()`.
- *
- * @param _data Pointer to an array.
- */
-#define stack_auto_interface_new(_data) \
-  stack_auto_interface_new_(_data, sizeof(_data) / sizeof *(_data), *(_data))
-
-/**
- * @brief Adds `elem` to `stk` if space permits. `elem` will then be the new
- * top element and will be returned by functions such as `stack_peek_()`.
- *
- * @param stk Pointer to the stack.
- * @param elem Pointer to the element to push.
- * @note The word `auto` in this function corresponds to the storage
- * duration of the pointed-to stack.
- */
-void stack_auto_push_(stack *stk, const void *elem);
+bool stack_push_(void **stk, const void *value);
 #endif
