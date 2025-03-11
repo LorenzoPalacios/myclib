@@ -23,65 +23,79 @@ typedef unsigned char bool;
 
 #endif
 
-/* - CONVENIENCE MACROS - */
-
-#define stack_capacity(stk) (((size_t *)stack_header(stk))[1])
-
-#define stack_delete(stk) stack_delete_(&(stk))
-
-#define stack_expand(stk)                                  \
-  stack_resize(stk, EXPANSION_FACTOR * stack_capacity(stk)) \
-      ? true                                               \
-      : stack_resize(stk, stack_capacity(stk) + 1);
-
-#define stack_expand_s(stk) stack_expand_(&(stk), sizeof *(stk))
-
-#define stack_height(stk) (((size_t *)stack_header(stk))[0])
-
-#define stack_init(type, capacity) \
-  stack_init_(sizeof*((type *)NULL), (size_t)(capacity))
-
-#define stack_is_full(stk) (stack_height(stk) == stack_capacity(stk))
-
-#define stack_is_empty(stk) (stack_height(stk) == 0)
-
-#define stack_new(arr) \
-  stack_new_(arr, sizeof(arr) / sizeof *(arr), sizeof *(arr))
-
-#define stack_reset(stk) (stack_height(stk) = 0)
-
-#define stack_resize(stk, new_capacity) \
-  stack_resize_(&(stk), (size_t)(new_capacity), sizeof *(stk))
-
-#define stack_shrink(stk) stack_resize(stk, stack_height(stk))
-
-#define stack_shrink_s(stk) stack_shrink_(&(stk), sizeof(*(stk)))
-
-#define stack_peek(stk) \
-  (stack_is_empty(stk) ? NULL : (stk) + (stack_height(stk) - 1))
-
-#define stack_peek_s(stk) stack_peek_untyped(stk, sizeof(*(stk)))
-
-#define stack_pop(stk) \
-  (stack_is_empty(stk) ? NULL : (stk) + (--stack_height(stk)))
-
-#define stack_pop_s(stk) stack_pop_untyped(stk, sizeof(*(stk)))
-
-/* clang-format off */
-#define stack_push(stk, value)                                        \
-  ((stack_height(stk) == stack_capacity(stk) &&                        \
-   !stack_expand_(stk, value_size))                                   \
-      ? false                                                         \
-      : (!((stk)[stack_height(stk)++] = *(value))) | true)
-/* clang-format on */
-
-#define stack_push_s(stk, value) stack_push_(&(stk), value)
-
 /* - DEFINITIONS - */
 
 #define stack(type) type *
 
+extern const size_t STK_HEADER_SIZE;
+
+/* - CONVENIENCE MACROS - */
+
+#define stack_capacity(stk) stack_capacity_((void *)(stk))
+
+#define stack_copy(stk) stack_new_(stk, *stack_capacity(stk), sizeof*(stk))
+
+#define stack_delete(stk)  \
+  free(stack_header(stk)); \
+  (stk) = NULL
+
+#define stack_delete_s(stk) stack_delete_((void **)&(stk))
+
+#define stack_expand(stk)                                     \
+  (stack_resize(stk, *stack_capacity(stk) * EXPANSION_FACTOR) \
+       ? true                                                 \
+       : stack_resize(stk, *stack_capacity(stk) + 1))
+
+#define stack_expand_s(stk) stack_expand_((void **)&(stk), sizeof *(stk))
+
+#define stack_header(stk) stack_header_((void *)(stk))
+
+#define stack_height(stk) stack_height_((void *)(stk))
+
+#define stack_init(type, capacity) \
+  ((type *)stack_init_(sizeof *((type *)NULL), (size_t)(capacity)))
+
+#define stack_is_full(stk) (*stack_height(stk) == *stack_capacity(stk))
+
+#define stack_is_full_s(stk) stack_is_full_((void *)(stk))
+
+#define stack_is_empty(stk) (*stack_height(stk) == 0)
+
+#define stack_new(arr) \
+  stack_new_(arr, sizeof(arr) / sizeof *(arr), sizeof *(arr))
+
+#define stack_peek(stk) \
+  (stack_is_empty(stk) ? NULL : (stk) + (*stack_height(stk) - 1))
+
+#define stack_peek_s(stk) stack_peek_untyped(stk, sizeof *(stk))
+
+#define stack_pop(stk) \
+  (stack_is_empty(stk) ? NULL : (stk) + (--(*stack_height(stk))))
+
+#define stack_pop_s(stk) stack_pop_untyped(stk, sizeof *(stk))
+
+#define stack_push(stk, value)                                      \
+  (*stack_height(stk) == *stack_capacity(stk) && !stack_expand(stk) \
+       ? false                                                      \
+       : !((stk)[(*stack_height(stk))++] = (value)) | true)
+
+#define stack_push_s(stk, value) \
+  stack_push_((void **)&(stk), value, sizeof *(stk))
+
+#define stack_reset(stk) (*stack_height(stk) = 0)
+
+#define stack_reset_s(stk) stack_reset_(stk)
+
+#define stack_resize(stk, new_capacity) \
+  stack_resize_((void **)&(stk), (size_t)(new_capacity), sizeof *(stk))
+
+#define stack_shrink(stk) stack_resize(stk, *stack_height(stk))
+
+#define stack_shrink_s(stk) stack_shrink_((void **)&(stk), sizeof *(stk))
+
 /* - FUNCTIONS - */
+
+size_t *stack_capacity_(void *stk);
 
 /**
  * @brief Deletes a stack.
@@ -99,7 +113,9 @@ void stack_delete_(void **stk);
  */
 bool stack_expand_(void **stk, size_t value_size);
 
-void *stack_header(void *stk);
+void *stack_header_(void *stk);
+
+size_t *stack_height_(void *stk);
 
 /**
  * @brief Creates a new and empty stack.
@@ -123,9 +139,9 @@ void *stack_init_(size_t value_size, size_t capacity);
  */
 void *stack_new_(const void *data, size_t length, size_t value_size);
 
-inline void *stack_peek_untyped(void *stk, size_t value_size);
+void *stack_peek_untyped(void *stk, size_t value_size);
 
-inline void *stack_pop_untyped(void *stk, size_t value_size);
+void *stack_pop_untyped(void *stk, size_t value_size);
 
 /**
  * @brief Resizes the memory used by a stack to accommodate
