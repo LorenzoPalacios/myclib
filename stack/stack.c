@@ -17,11 +17,6 @@ typedef struct stack {
 
 typedef unsigned char byte;
 
-const size_t STK_HEADER_SIZE = sizeof(stack);
-
-/* The factor by which to expand a stack's capacity. */
-#define EXPANSION_FACTOR ((size_t)2)
-
 inline size_t *stack_capacity_(void *const stk) {
   return &((stack *)stack_header(stk))->capacity;
 }
@@ -41,10 +36,10 @@ bool stack_expand_(void **const stk, const size_t value_size) {
    * is more likely to ensure stability. Of course, if this also fails, then
    * chances are the system is out of memory, so it's fine to return `false`.
    */
-  const bool EXPANSION_SUCCESS =
-      stack_resize_(stk, *stack_capacity(*stk) * EXPANSION_FACTOR, value_size);
+  const bool EXPANSION_SUCCESS = stack_resize_(
+      stk, stack_capacity(*stk) * STK_EXPANSION_FACTOR, value_size);
   if (!EXPANSION_SUCCESS)
-    return stack_resize_(stk, *stack_capacity(*stk) + 1, value_size);
+    return stack_resize_(stk, stack_capacity(*stk) + 1, value_size);
   return true;
 }
 
@@ -72,12 +67,12 @@ void *stack_init_(const size_t value_size, const size_t capacity) {
   return stk + 1;
 }
 
-inline void stack_reset_(void *const stk) { *stack_height(stk) = 0; }
+inline void stack_reset_(void *const stk) { stack_height(stk) = 0; }
 
 bool stack_resize_(void **const stk, const size_t new_capacity,
                    const size_t value_size) {
   stack *stk_header = stack_header(*stk);
-  if (new_capacity == *stack_capacity(*stk)) return false;
+  if (new_capacity == stack_capacity(*stk)) return false;
   {
     const size_t ALLOCATION = (new_capacity * value_size) + sizeof(stack);
     stack *const new_stk = realloc(stk_header, ALLOCATION);
@@ -91,19 +86,19 @@ bool stack_resize_(void **const stk, const size_t new_capacity,
 }
 
 bool stack_shrink_(void **const stk, const size_t value_size) {
-  return stack_resize_(stk, *stack_height(*stk), value_size);
+  return stack_resize_(stk, stack_height(*stk), value_size);
 }
 
 inline void *stack_peek_untyped(void *const stk, const size_t value_size) {
   return stack_is_empty(stk)
              ? NULL
-             : (byte *)stk + ((*stack_height(stk) - 1) * value_size);
+             : (byte *)stk + ((stack_height(stk) - 1) * value_size);
 }
 
 inline void *stack_pop_untyped(void *const stk, const size_t value_size) {
   return stack_is_empty(stk)
              ? NULL
-             : (byte *)stk + (--(*stack_height(stk)) * value_size);
+             : (byte *)stk + (--(stack_height(stk)) * value_size);
 }
 
 static inline void *get_value(void *const stk, const size_t index,
@@ -113,10 +108,10 @@ static inline void *get_value(void *const stk, const size_t index,
 
 bool stack_push_(void **const stk, const void *const value,
                  const size_t value_size) {
-  const size_t HEIGHT = *stack_height(*stk);
-  if (HEIGHT == *stack_capacity(*stk))
+  const size_t HEIGHT = stack_height(*stk);
+  if (HEIGHT == stack_capacity(*stk))
     if (!stack_expand_(stk, value_size)) return false;
   memcpy(get_value(*stk, HEIGHT, value_size), value, value_size);
-  (*stack_height(*stk))++;
+  (stack_height(*stk))++;
   return true;
 }
