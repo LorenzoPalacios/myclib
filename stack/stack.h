@@ -59,9 +59,9 @@
 
 #define stack_pop_s(stk) stack_pop_untyped((void *)(stk), sizeof *(stk))
 
-#define stack_push(stk, value)                                     \
+#define stack_push(stk, value)                                    \
   (stack_height(stk) == stack_capacity(stk) && !stack_expand(stk) \
-       ? false                                                     \
+       ? false                                                    \
        : ((void)((stk)[(stack_height(stk))++] = *(value)), true))
 
 #define stack_push_s(stk, value) \
@@ -77,6 +77,36 @@
 #define stack_shrink(stk) stack_resize(stk, stack_height(stk))
 
 #define stack_shrink_s(stk) stack_shrink_((void **)&(stk), sizeof *(stk))
+
+/*
+ * Some of the provided macros rely upon a function that operates with pointers
+ * to void type, which may cause linter warnings or compilation errors depending
+ * on usage.
+ *
+ * These pointers can be casted to appropriate types under the C23 standard with
+ * the `typeof` operator, which is the purpose of the following preprocessor
+ * section.
+ */
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 202311)
+#undef stack_copy
+#define stack_copy(stk)                                             \
+  (typeof(stk))stack_new_((const void *)(stk), stack_capacity(stk), \
+                          sizeof *(stk))
+
+#undef stack_new
+#define stack_new(arr)                  \
+  ((typeof_unqual(*(arr)) *)stack_new_( \
+      (const void *)(arr), sizeof(arr) / sizeof *(arr), sizeof *(arr)))
+
+#undef stack_peek_s
+#define stack_peek_s(stk) \
+  (typeof(stk))stack_peek_untyped((void *)(stk), sizeof *(stk))
+
+#undef stack_pop_s
+#define stack_pop_s(stk) \
+  (typeof(stk))stack_pop_untyped((void *)(stk), sizeof *(stk))
+
+#endif
 
 /* - FUNCTIONS - */
 
