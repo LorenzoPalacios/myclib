@@ -1,4 +1,4 @@
-#include "teststack.h"
+#include "stacktests.h"
 
 #include <assert.h>
 #include <stddef.h>
@@ -8,41 +8,42 @@
 #define ARR_LEN(arr) (sizeof(arr) / sizeof *(arr))
 
 void test_stack_copy(void) {
-  const int data[] = {1, 2, 3, 4, 5};
-  stack(int) stk1 = stack_new(data);
-  stack(int) stk1_copy = stack_copy(stk1);
-  /*
-   * These next two declarations may elicit warnings or errors related to usage
-   * of`sizeof` with a pointer operand. They are benign.
-   */
-  stack(stack(int)) stk2 = stack_new(stk1_copy);
-  stack(stack(int)) stk2_copy = stack_copy(stk2);
+  const int arr[] = {1, 2, 3, 4, 5};
+  stack(stack(int)) stk1 = stack_init(stack(int), 3);
+  stack(stack(int)) stk1_copy;
+
+  stack_push_s(stk1, stack_new(arr));
+  stack_push_s(stk1, stack_new(arr));
+  stack_push_s(stk1, stack_new(arr));
+
+  stk1_copy = stack_copy(stk1);
 
   assert(stack_capacity(stk1) == stack_capacity(stk1_copy));
   assert(stack_height(stk1) == stack_height(stk1_copy));
-  assert(stack_capacity(stk2) == stack_capacity(stk2_copy));
-  assert(stack_height(stk2) == stack_height(stk2_copy));
+  assert(stack_height(stk1) == ARR_LEN(arr));
 
-  assert(*stack_peek(stk2) == stk1_copy);
-  assert(*stack_peek(stk2) == *stack_peek(stk2_copy));
+  while (!stack_is_empty(stk1)) {
+    stack(int) int_stk = *stack_pop(stk1);
+    stack(int) int_stk_copy = *stack_pop(stk1_copy);
+    size_t i = ARR_LEN(arr) - 1;
 
-  assert(stack_height(stk1) == ARR_LEN(data));
-  /* Verifying the contents of `stk1`. */
-  {
-    size_t i = ARR_LEN(data) - 1;
-    for (; !stack_is_empty(stk1); i--) {
-      const int original_val = data[i];
-      const int stk1_val = *stack_pop(stk1);
-      const int stk1_copy_val = *stack_pop(stk1_copy);
-      assert(original_val == stk1_val);
-      assert(stk1_val == stk1_copy_val);
+    /*
+     * This is a pointer comparison; `stack_copy` does not perform a deep
+     * copy.
+     */
+    assert(int_stk == int_stk_copy);
+
+    for (; !stack_is_empty(int_stk); i++) {
+      const int int_original_val = arr[i];
+      const int int_stk_val = *stack_pop(int_stk);
+      const int int_stk_copy_val = *stack_pop(int_stk_copy);
+      assert(int_original_val == int_stk_val);
+      assert(int_stk_val == int_stk_copy_val);
     }
   }
 
   stack_delete(stk1);
   stack_delete(stk1_copy);
-  stack_delete(stk2);
-  stack_delete(stk2_copy);
 }
 
 void test_stack_delete(void) {
