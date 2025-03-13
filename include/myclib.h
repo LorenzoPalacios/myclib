@@ -1,7 +1,11 @@
 #ifndef MYCLIB_H
 #define MYCLIB_H
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+#ifdef __cplusplus
+
+#define restrict /* `restrict` keyword is not present in C++. */
+
+#elif (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L)
 
 #if (__STDC_VERSION__ < 202311L)
 #include <stdbool.h> /* For C99 to C17. */
@@ -10,7 +14,9 @@
 #else
 
 #define inline /* `inline` keyword is not standardized prior to C99. */
-/* Boolean type for C95 and below. */
+#define restrict /* `restrict` keyword is not standardized prior to C99. */
+
+/* Boolean type for standards prior to C99. */
 typedef unsigned char bool;
 #ifndef true
 #define true (1)
@@ -20,4 +26,5 @@ typedef unsigned char bool;
 #endif
 
 #endif
+
 #endif
