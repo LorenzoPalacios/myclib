@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "../include/myclib.h"
+#include "../include/compat.h"
+#include "../include/boolmyclib.h"
 
 /* - DEFINITIONS - */
 
