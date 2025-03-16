@@ -144,6 +144,8 @@ size_t *stack_height_(void *stk);
  */
 void *stack_init_(size_t value_size, size_t capacity);
 
+bool stack_is_full_(void *stk);
+
 /**
  * @brief Creates a stack based off the elements in `data`.
  *
@@ -169,6 +171,8 @@ void *stack_pop_untyped(void *stk, size_t value_size);
  * `false` otherwise.
  */
 bool stack_resize_(void **stk, size_t new_capacity, size_t value_size);
+
+void stack_reset_(void *stk);
 
 /**
  * @brief Shrinks the memory used by a stack to the minimum

@@ -63,7 +63,7 @@ void *stack_new_(const void *const data, const size_t length,
 
 void *stack_init_(const size_t value_size, const size_t capacity) {
   stack *const stk = malloc((value_size * capacity) + sizeof(stack));
-  stk->height = 0, stk->capacity = capacity;
+  (void)(stk->height = 0), stk->capacity = capacity;
   return stk + 1;
 }
 
