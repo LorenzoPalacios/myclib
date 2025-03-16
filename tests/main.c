@@ -1,119 +1,112 @@
-#include <ctype.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "../include/myclib.h"
+#include "../include/compat.h"
 #include "framework.h"
 
 /* - DEFINITIONS - */
 
-/* Keywords should be entirely lowercase. */
-static const char *const KEYWORDS[] = {
-    "all", "skip", "unskip"
+typedef enum MAIN_MENU_STATUS {
+  RUN_TESTS = 0x0,
+  RUN_TESTS_NO_FAIL = 0x1,
+  CONFIG_TESTS = 0x2,
+  EXIT = 0x3
+} MAIN_MENU_STATUS;
+
+#define BUFFER_SIZE (128)
+
+static const char *const MAIN_MENU_OPTIONS[] = {
+    "Run Tests",
+    "Run Tests (ignore test failure)",
+    "Configure Tests",
+    "Exit",
 };
 
-#define NUM_KEYWORDS (sizeof(KEYWORDS) / sizeof *(KEYWORDS))
+#define NUM_MAIN_MENU_OPTIONS \
+  (sizeof(MAIN_MENU_OPTIONS) / sizeof *(MAIN_MENU_OPTIONS))
 
-typedef enum keyword_status {
-  NO_KEYWORD = 0,
-  RUN_ALL = 1,
-} keyword_status;
+/* - FUNCTIONS - */
 
-#define INT_TO_CHAR(c) ((char)((unsigned char)(c)))
-
-/*
- * This should be enough to hold a string representation of `SIZE_MAX`,
- * any defined keywords, and a null terminator.
- */
-#define BUFFER_SIZE (64)
-
-/* - HELPER FUNCTIONS - */
-
-static inline void str_lower(char *str) {
-  for (; *str != '\0'; str++) *str = INT_TO_CHAR(tolower(*str));
-}
-
-static inline keyword_status is_keyword(const char *str) {
-  keyword_status i = 0;
-  for (; i < NUM_KEYWORDS; i++) {
-    const char *keyword = KEYWORDS[i];
-    while (*str == *keyword)
-      if (*(str++) == '\0' && *(keyword++) == '\0') return i + 1;
-  }
-  return NO_KEYWORD;
-}
-
-static inline void discard_line(void) { while (getchar() != '\n'); }
-
-/*
- * @returns `NO_KEYWORD`
- */
-static keyword_status get_input(size_t *const index_output) {
+static inline size_t count_digits(size_t num) {
   size_t i = 0;
-  int chr = getchar();
-  char buf[BUFFER_SIZE];
-  for (; i < sizeof(buf) && chr != '\n' && chr != EOF; i++) {
-    buf[i] = INT_TO_CHAR(chr);
-    chr = getchar();
-  }
-  buf[i] = '\0';
-  str_lower(buf);
-  if (chr != '\n') discard_line();
-
-  if (sscanf(buf, "%zu", index_output) == 0) *index_output = SIZE_MAX;
-  return is_keyword(buf);
+  while (i++, num /= 10);
+  return i;
 }
 
-/* - DRIVER FUNCTIONS - */
-
-/* This is intended to be used in tandem with a display function. */
-static inline void selection_prompt(void) {
-  puts(
-      "Select from the following list:\n"
-      "0. Return");
-}
-
-static inline void prompt_legend(void) {
+static inline void display_legend(void) {
   puts(
       "- Legend -\n"
       "(*) - An active item.\n"
       "(x) - A skipped item.");
 }
 
-static const test *select_tests(const test_suite *const suite) {}
-
-static const test_suite *select_test_suite(void) {
-  test_suite *const selection = test_suite_new(NUM_TEST_SUITES);
-  puts("- Test Suite List -");
-  display_all_suites();
-  while (true) {
-    size_t index;
-    const keyword_status keyword = get_input(&index);
-    if (keyword == NO_KEYWORD) {
-      if (index == 0) {
-        free(selection);
-        return NULL;
-      }
-      if (index < NUM_TEST_SUITES) TEST_SUITES + index;
+static void print_buffered(const char *const *strings, const size_t STR_CNT) {
+  char buf[BUFFER_SIZE];
+  size_t buf_i = 0;
+  size_t str_i = 0;
+  for (; str_i < STR_CNT; str_i++) {
+    size_t chr_i = 0;
+    char chr;
+    if (buf_i + count_digits(str_i) + 2 >= sizeof(buf) - 1) {
+      (void)fputs(buf, stdout);
+      buf_i = 0;
     }
+    buf_i += (size_t)sprintf(buf + buf_i, "%zu. ", str_i);
+    do {
+      chr = strings[str_i][chr_i];
+      if (buf_i == sizeof(buf) - 1) {
+        (void)fputs(buf, stdout);
+        buf_i = 0;
+      }
+      buf[buf_i] = chr;
+      buf_i++, chr_i++;
+    } while (chr != '\0');
+    buf[buf_i - 1] = '\n';
+    buf[buf_i] = '\0';
   }
-  return selection;
+  (void)fputs(buf, stdout);
 }
 
 static inline void display_menu(void) {
-  puts(
-"- myclib Tests -\n"
-      "0. run tests\n"
-      "1. run tests (ignore test failure)\n"
-      "2. configure tests\n"
-      "3. exit");
+  puts(" - Testing Menu -");
+  print_buffered(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
+}
+
+static inline void parse_main_menu_option(const size_t option) {
+  switch (option) {
+    case RUN_TESTS: {
+      run_all_suites();
+      break;
+    }
+    case RUN_TESTS_NO_FAIL: {
+      break;
+    }
+    case CONFIG_TESTS: {
+      puts("\n- Suites -");
+      display_suites();
+      display_legend();
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static size_t get_menu_option(void) {
+  size_t option;
+  while (get_input(&option) != STATUS_INDEX ||
+         option > NUM_MAIN_MENU_OPTIONS - 1) {
+    puts("Unrecognized input.");
+  }
+  return option;
 }
 
 int main(void) {
   display_menu();
+  {
+    const size_t option = get_menu_option();
+    parse_main_menu_option(option);
+  }
 
   return 0;
 }

@@ -4,9 +4,19 @@
 #include <stddef.h>
 #include <time.h>
 
-#include "../include/myclib.h"
+#include "../include/boolmyclib.h"
+#include "../include/compat.h"
 
 /* - DEFINITIONS - */
+
+typedef enum input_status {
+  STATUS_KEYWORD_ALL = 0x0,
+  STATUS_KEYWORD_EXIT = 0x1,
+  STATUS_KEYWORD_SKIP = 0x2,
+  STATUS_NO_KEYWORD = 0x3,
+  STATUS_BAD_INPUT = 0x10,
+  STATUS_INDEX = 0x20
+} input_status;
 
 typedef void (*test_func_t)(void);
 
@@ -28,27 +38,29 @@ typedef struct test_suite {
 
 extern test_suite TEST_SUITES[];
 
+extern const size_t NUM_KEYWORDS;
+
 extern const size_t NUM_TEST_SUITES;
 
 /* - FUNCTIONS - */
 
-void display_all_suites(void);
+void display_suites(void);
 
-void display_all_tests(void);
+void display_tests(void);
 
 void display_suite(const test_suite *suite);
 
 void display_test(const test *test);
 
-void display_tests_in_suite(const test_suite *suite);
+void display_suite_tests(const test_suite *suite);
+
+input_status get_input(size_t *index_output);
+
+void run_all_suites(void);
+
+void run_suite(test_suite *suite);
 
 void run_test(test *test);
 
-void skip_test(test *test);
-
-test_suite *test_suite_new(size_t test_capacity);
-
 void toggle_skip(test *test);
-
-void unskip_test(test *test);
 #endif
