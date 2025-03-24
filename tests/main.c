@@ -9,8 +9,7 @@
 typedef enum MAIN_MENU_STATUS {
   RUN_TESTS = 0x0,
   RUN_TESTS_NO_FAIL = 0x1,
-  CONFIG_TESTS = 0x2,
-  EXIT = 0x3
+  CONFIG_TESTS = 0x2
 } MAIN_MENU_STATUS;
 
 #define BUFFER_SIZE (128)
@@ -19,7 +18,6 @@ static const char *const MAIN_MENU_OPTIONS[] = {
     "Run Tests",
     "Run Tests (ignore test failure)",
     "Configure Tests",
-    "Exit",
 };
 
 #define NUM_MAIN_MENU_OPTIONS \
@@ -27,19 +25,20 @@ static const char *const MAIN_MENU_OPTIONS[] = {
 
 /* - FUNCTIONS - */
 
-static inline size_t count_digits(size_t num) {
+static size_t count_digits(size_t num) {
   size_t i = 0;
-  while (i++, num /= 10);
+  while ((void)i++, num /= 10);
   return i;
 }
 
 static inline void display_legend(void) {
   puts(
-      "- Legend -\n"
-      "(*) - An active item.\n"
-      "(x) - A skipped item.");
+      "\n- Legend -\n"
+      "(*) - An unskipped item.\n"
+      "(x) - A skipped item.\n");
 }
 
+/* REWRITE */
 static void print_buffered(const char *const *strings, const size_t STR_CNT) {
   char buf[BUFFER_SIZE];
   size_t buf_i = 0;
@@ -59,7 +58,7 @@ static void print_buffered(const char *const *strings, const size_t STR_CNT) {
         buf_i = 0;
       }
       buf[buf_i] = chr;
-      buf_i++, chr_i++;
+      (void)buf_i++, chr_i++;
     } while (chr != '\0');
     buf[buf_i - 1] = '\n';
     buf[buf_i] = '\0';
@@ -68,45 +67,126 @@ static void print_buffered(const char *const *strings, const size_t STR_CNT) {
 }
 
 static inline void display_menu(void) {
-  puts(" - Testing Menu -");
+  puts("\n - Testing Menu -");
   print_buffered(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
 }
 
+static inline void warn_unrecognized_input(void) {
+  puts("Unrecognized input.");
+}
+
+static inline void warn_index_out_of_bounds(void) { puts("Invalid index."); }
+
+/* - OPTION GETTERS - */
+
+static void get_test_option(test_suite *const suite) {
+  const size_t NUM_TESTS = suite->num_tests;
+  display_suite_tests(suite);
+  display_legend();
+  while (true) {
+    size_t option;
+    const input_status status = parse_input(&option);
+    switch (status) {
+      case STATUS_KEYWORD_EXIT:
+        return;
+      case STATUS_SKIP_ALL:
+        skip_all_tests(suite);
+        display_suite_tests(suite);
+        display_legend();
+        break;
+      case STATUS_SKIP_INDEX:
+        if (option >= NUM_TESTS) {
+          warn_index_out_of_bounds();
+          break;
+        }
+        skip_test(suite->tests + option);
+        display_suite_tests(suite);
+        display_legend();
+        break;
+      default:
+        warn_unrecognized_input();
+        break;
+    }
+  }
+}
+
+static void get_suite_option(void) {
+  display_suites();
+  display_legend();
+  while (true) {
+    size_t option;
+    const input_status status = parse_input(&option);
+    switch (status) {
+      case STATUS_KEYWORD_EXIT:
+        return;
+      case STATUS_SKIP_ALL:
+        skip_all_suites();
+        display_suites();
+        display_legend();
+        break;
+      case STATUS_SKIP_INDEX:
+        if (option >= NUM_TEST_SUITES) {
+          warn_index_out_of_bounds();
+          break;
+        }
+        skip_suite(TEST_SUITES + option);
+        display_suites();
+        display_legend();
+        break;
+      case STATUS_INDEX:
+        if (option >= NUM_TEST_SUITES) {
+          warn_index_out_of_bounds();
+          break;
+        }
+        get_test_option(TEST_SUITES + option);
+        display_suites();
+        display_legend();
+        break;
+      default:
+        warn_unrecognized_input();
+        break;
+    }
+  }
+}
+
+/* - OPTION PARSERS - */
+
 static inline void parse_main_menu_option(const size_t option) {
   switch (option) {
-    case RUN_TESTS: {
+    case RUN_TESTS:
       run_all_suites();
       break;
-    }
-    case RUN_TESTS_NO_FAIL: {
+    case RUN_TESTS_NO_FAIL:
+      /* TBD */
       break;
-    }
-    case CONFIG_TESTS: {
-      puts("\n- Suites -");
-      display_suites();
-      display_legend();
+    case CONFIG_TESTS:
+      get_suite_option();
       break;
-    }
     default:
+      warn_unrecognized_input();
       break;
   }
 }
 
-static size_t get_menu_option(void) {
+static void main_menu_loop(void) {
   size_t option;
-  while (get_input(&option) != STATUS_INDEX ||
-         option > NUM_MAIN_MENU_OPTIONS - 1) {
-    puts("Unrecognized input.");
+  display_menu();
+  while (true) {
+    const input_status status = parse_input(&option);
+    switch (status) {
+      case STATUS_KEYWORD_EXIT:
+        return;
+      case STATUS_INDEX:
+        parse_main_menu_option(option);
+        display_menu();
+        break;
+      default:
+        warn_unrecognized_input();
+    }
   }
-  return option;
 }
 
 int main(void) {
-  display_menu();
-  {
-    const size_t option = get_menu_option();
-    parse_main_menu_option(option);
-  }
-
+  main_menu_loop();
   return 0;
 }

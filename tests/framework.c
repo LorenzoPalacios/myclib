@@ -6,7 +6,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "../include/boolmyclib.h"
 #include "../include/compat.h"
 #include "stacktests/stacktests.h"
 
@@ -20,25 +19,16 @@
 #define CONSTRUCT_TEST(test_func) \
   {STRINGIFY(test_func), test_func, sizeof(STRINGIFY(test_func)) - 1, -1, false}
 
-#define DISPLAY_NUMBERED_WRITE_SIZE(named_obj, index)           \
-  count_digits(index) + (sizeof(DISPLAY_NUMBERED_FORMAT) - 7) + \
-      (named_obj).name_len
+#define DISPLAY_WRITE_SIZE(named_obj, index) \
+  count_digits(index) + (sizeof(DISPLAY_FORMAT) - 7) + (named_obj).name_len
 
 #define INT_TO_CHAR(c) ((char)((unsigned char)(c)))
 
+#define SKIP_STATUS_CHR(skippable) ((skippable).skip ? 'x' : '*')
+
 #define STRINGIFY(x) #x
 
-/* - EXTERNAL DEFINITIONS - */
-
-/*
- * Keywords should be entirely lowercase.
- * Order matters. See `is_keyword()` and the `input_status` constants.
- */
-static const char *const KEYWORDS[] = {
-    "all",
-    "exit",
-    "skip",
-};
+/* - TESTS - */
 
 static test STACK_TESTS[] = {
     CONSTRUCT_TEST(test_stack_copy),   CONSTRUCT_TEST(test_stack_delete),
@@ -49,12 +39,13 @@ static test STACK_TESTS[] = {
     CONSTRUCT_TEST(test_stack_shrink),
 };
 
+/* - EXTERNAL DEFINITIONS - */
+
 test_suite TEST_SUITES[] = {
     CONSTRUCT_SUITE(STACK_TESTS),
 };
 
 const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
-const size_t NUM_KEYWORDS = (sizeof(KEYWORDS) / sizeof *(KEYWORDS));
 
 /* - INTERNAL DEFINITIONS - */
 
@@ -64,31 +55,73 @@ const size_t NUM_KEYWORDS = (sizeof(KEYWORDS) / sizeof *(KEYWORDS));
  */
 #define INPUT_BUF_SIZE (64)
 
-#define DISPLAY_BUF_SIZE (1024)
-#define DISPLAY_FORMAT "(%c) %s\n"
-#define DISPLAY_NUMBERED_FORMAT "%zu. (%c) %s\n"
-#define SKIP_STATUS_CHR(skippable) ((skippable).skip ? 'x' : '*')
+#define INPUT_SEPARATOR (' ')
 
-const char a[] = "%zu. (%c) %s\n";
+#define DISPLAY_BUF_SIZE (1024)
+#define DISPLAY_FORMAT "%zu. (%c) %s\n"
+
+/*
+ * Keywords should be entirely lowercase.
+ * Order matters. See `is_keyword()` and the `input_status` constants.
+ */
+static const char *const INPUT_KEYWORDS[] = {
+    "all",
+    "exit",
+    "skip",
+};
+
+#define NUM_KEYWORDS (sizeof(INPUT_KEYWORDS) / sizeof *(INPUT_KEYWORDS))
 
 /* - INTERNAL FUNCTIONS - */
 
-static inline size_t count_digits(size_t num) {
+static size_t count_digits(size_t num) {
   size_t i = 0;
-  while (i++, num /= 10);
+  while ((void)i++, num /= 10);
   return i;
 }
 
 static inline void discard_line(void) { while (getchar() != '\n'); }
 
-static input_status is_keyword(const char *str) {
-  input_status i = 0;
-  for (; i < NUM_KEYWORDS; i++) {
-    const char *keyword = KEYWORDS[i];
-    while (*str == *keyword)
-      if (*(str++) == '\0' && *(keyword++) == '\0') return i;
+/*
+ * @returns If a keyword is found in `str` possible return values include the
+ * keyword statuses defined in `enum input_status`.
+ * Otherwise, `STATUS_NO_KEYWORD`.
+ */
+static input_status parse_keywords(const char *str) {
+  input_status status = STATUS_NO_KEYWORD;
+  const char *str_checkpoint = str;
+  size_t i = 0;
+  while (i < NUM_KEYWORDS) {
+    const char *keyword = INPUT_KEYWORDS[i];
+    while (*str == *keyword && *keyword != '\0') (void)(str++), keyword++;
+    if ((*str == INPUT_SEPARATOR || *str == '\0') && *keyword == '\0') {
+      /*
+       * The following line is dependent on the ordering of the `input_status`
+       * enum.
+       * The cast is present to undo any implicit promotions from the left
+       * shift operator.
+       */
+      status |= (input_status)(STATUS_KEYWORD_ALL << i);
+      if (*str == '\0') return status;
+      str_checkpoint = ++str;
+      i = 0;
+    } else {
+      str = str_checkpoint;
+      i++;
+    }
   }
-  return STATUS_NO_KEYWORD;
+  return status;
+}
+
+/*
+ * @returns `STATUS_INDEX` upon a successful write to `index_output`.
+ * Otherwise, `STATUS_INVALID`.
+ */
+static input_status parse_index(const char *str, size_t *const index_output) {
+  while (!isdigit(*str) && *str != '\0') str++;
+  if (*str == '\0') return STATUS_INVALID;
+  if (sscanf(str, "%zu", index_output) != 1) return STATUS_INVALID;
+  return STATUS_INDEX;
 }
 
 static inline void str_lower(char *str) {
@@ -98,17 +131,17 @@ static inline void str_lower(char *str) {
 /* - EXTERNAL FUNCTIONS - */
 
 void display_suites(void) {
-  char buf[DISPLAY_BUF_SIZE];
-  size_t buf_i = 0;
+  char buf[DISPLAY_BUF_SIZE] = "\n - Suites -\n";
+  size_t buf_i = 13; /* This is the length of the initial string at `buf`. */
   size_t suite_i = 0;
   for (; suite_i < NUM_TEST_SUITES; suite_i++) {
     const test_suite CUR_SUITE = TEST_SUITES[suite_i];
-    const size_t WRITE_SIZE = DISPLAY_NUMBERED_WRITE_SIZE(CUR_SUITE, suite_i);
+    const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_SUITE, suite_i);
     if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
       (void)fputs(buf, stdout);
       buf_i = 0;
     }
-    (void)sprintf(buf + buf_i, DISPLAY_NUMBERED_FORMAT, suite_i,
+    (void)sprintf(buf + buf_i, DISPLAY_FORMAT, suite_i,
                   SKIP_STATUS_CHR(CUR_SUITE), CUR_SUITE.name);
     buf_i += WRITE_SIZE;
   }
@@ -130,25 +163,17 @@ void display_tests(void) {
     size_t test_i = 0;
     for (; test_i < CUR_SUITE.num_tests; test_i++) {
       const test CUR_TEST = CUR_SUITE.tests[test_i];
-      const size_t WRITE_SIZE = DISPLAY_NUMBERED_WRITE_SIZE(CUR_TEST, test_i);
+      const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_TEST, test_i);
       if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
         (void)fputs(buf, stdout);
         buf_i = 0;
       }
-      (void)sprintf(buf + buf_i, DISPLAY_NUMBERED_FORMAT, test_i,
+      (void)sprintf(buf + buf_i, DISPLAY_FORMAT, test_i,
                     SKIP_STATUS_CHR(CUR_TEST), CUR_TEST.name);
       buf_i += WRITE_SIZE;
     }
   }
   (void)fputs(buf, stdout);
-}
-
-inline void display_suite(const test_suite *const suite) {
-  printf(DISPLAY_FORMAT, SKIP_STATUS_CHR(*suite), suite->name);
-}
-
-inline void display_test(const test *const test) {
-  printf(DISPLAY_FORMAT, SKIP_STATUS_CHR(*test), test->name);
 }
 
 void display_suite_tests(const test_suite *const suite) {
@@ -160,55 +185,51 @@ void display_suite_tests(const test_suite *const suite) {
   size_t tests_i = 0;
   for (; tests_i < TEST_CNT; tests_i++) {
     const test CUR_TEST = tests[tests_i];
-    const size_t WRITE_SIZE = DISPLAY_NUMBERED_WRITE_SIZE(CUR_TEST, tests_i);
+    const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_TEST, tests_i);
     if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
       (void)fputs(buf, stdout);
       buf_i = 0;
     }
-    (void)sprintf(buf + buf_i, DISPLAY_NUMBERED_FORMAT, tests_i,
+    (void)sprintf(buf + buf_i, DISPLAY_FORMAT, tests_i,
                   SKIP_STATUS_CHR(CUR_TEST), CUR_TEST.name);
     buf_i += WRITE_SIZE;
   }
   (void)fputs(buf, stdout);
 }
 
-input_status get_input(size_t *const index_output) {
-  char buf[INPUT_BUF_SIZE];
-  input_status keyword;
-  {
-    size_t i = 0;
-    int chr = getchar();
-    while (i < sizeof(buf) - 1 && chr != '\n' && chr != EOF) {
+static void get_input(char *const buf, const size_t buf_size) {
+  size_t i = 0;
+  int chr = getchar();
+  while (i < buf_size && chr != '\n' && chr != EOF) {
+    if (isalnum(chr))
       buf[i++] = INT_TO_CHAR(chr);
-      chr = getchar();
+    else if (buf[i - 1] != INPUT_SEPARATOR)
+      buf[i++] = INPUT_SEPARATOR;
+    chr = getchar();
+  }
+  buf[i] = '\0';
+  str_lower(buf);
+  if (chr != '\n') discard_line();
+}
+
+input_status parse_input(size_t *const index_output) {
+  char buf[INPUT_BUF_SIZE];
+  get_input(buf, sizeof(buf) - 1);
+  {
+    const input_status keyword_status = parse_keywords(buf);
+    const input_status index_status = parse_index(buf, index_output);
+    if (index_status == STATUS_INVALID) {
+      switch (keyword_status) {
+        case STATUS_SKIP_ALL:
+        case STATUS_KEYWORD_EXIT:
+        case STATUS_KEYWORD_ALL:
+          return keyword_status;
+        default:
+          break;
+      }
     }
-    buf[i] = '\0';
-    str_lower(buf);
-    if (chr != '\n') discard_line();
+    return keyword_status | index_status;
   }
-  keyword = is_keyword(buf);
-  if (keyword == STATUS_NO_KEYWORD) {
-    if (sscanf(buf, "%zu", index_output) == 1) return STATUS_INDEX;
-    return STATUS_BAD_INPUT;
-  }
-  return keyword;
-}
-
-input_status get_selected_suite(const test_suite **const suite_output) {
-  size_t suite_index;
-  const input_status status = get_input(&suite_index);
-  if (status == STATUS_INDEX)
-    if (suite_index < NUM_TEST_SUITES)
-      *suite_output = TEST_SUITES + suite_index;
-  return status;
-}
-
-input_status get_selected_test(const test_suite *const suite,
-                               const test **const test_output) {
-  size_t suite_index;
-  const input_status status = get_input(&suite_index);
-  if (status == STATUS_INDEX) *test_output = suite->tests + suite_index;
-  return status;
 }
 
 void run_all_suites(void) {
@@ -231,4 +252,17 @@ void run_test(test *const test) {
   }
 }
 
-inline void toggle_skip(test *const test) { test->skip = !test->skip; }
+void skip_all_suites(void) {
+  size_t i = 0;
+  for (; i < NUM_TEST_SUITES; i++) TEST_SUITES[i].skip = !TEST_SUITES[i].skip;
+}
+
+void skip_all_tests(test_suite *const suite) {
+  size_t i = 0;
+  for (; i < suite->num_tests; i++)
+    suite->tests[i].skip = !suite->tests[i].skip;
+}
+
+inline void skip_suite(test_suite *const suite) { suite->skip = !suite->skip; }
+
+inline void skip_test(test *const test) { test->skip = !test->skip; }

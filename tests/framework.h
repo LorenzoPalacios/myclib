@@ -5,17 +5,23 @@
 #include <time.h>
 
 #include "../include/boolmyclib.h"
-#include "../include/compat.h"
+
+#define TOGGLE_SKIP(skippable) (skippable).skip = !(skippable).skip
 
 /* - DEFINITIONS - */
 
 typedef enum input_status {
-  STATUS_KEYWORD_ALL = 0x0,
-  STATUS_KEYWORD_EXIT = 0x1,
-  STATUS_KEYWORD_SKIP = 0x2,
-  STATUS_NO_KEYWORD = 0x3,
-  STATUS_BAD_INPUT = 0x10,
-  STATUS_INDEX = 0x20
+  /* - Single Flags - */
+  STATUS_NO_KEYWORD = 0,
+  STATUS_KEYWORD_ALL = 1,
+  STATUS_KEYWORD_EXIT = STATUS_KEYWORD_ALL << 1,
+  STATUS_KEYWORD_SKIP = STATUS_KEYWORD_EXIT << 1,
+  STATUS_INDEX = STATUS_KEYWORD_SKIP << 1,
+  STATUS_INVALID = STATUS_INDEX << 1,
+
+  /* - Multiple Flags - */
+  STATUS_SKIP_ALL = STATUS_KEYWORD_SKIP | STATUS_KEYWORD_ALL,
+  STATUS_SKIP_INDEX = STATUS_KEYWORD_SKIP | STATUS_INDEX
 } input_status;
 
 typedef void (*test_func_t)(void);
@@ -38,8 +44,6 @@ typedef struct test_suite {
 
 extern test_suite TEST_SUITES[];
 
-extern const size_t NUM_KEYWORDS;
-
 extern const size_t NUM_TEST_SUITES;
 
 /* - FUNCTIONS - */
@@ -48,13 +52,9 @@ void display_suites(void);
 
 void display_tests(void);
 
-void display_suite(const test_suite *suite);
-
-void display_test(const test *test);
-
 void display_suite_tests(const test_suite *suite);
 
-input_status get_input(size_t *index_output);
+input_status parse_input(size_t *index_output);
 
 void run_all_suites(void);
 
@@ -62,5 +62,11 @@ void run_suite(test_suite *suite);
 
 void run_test(test *test);
 
-void toggle_skip(test *test);
+void skip_all_suites(void);
+
+void skip_all_tests(test_suite *suite);
+
+void skip_suite(test_suite *suite);
+
+void skip_test(test *test);
 #endif
