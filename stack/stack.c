@@ -43,7 +43,7 @@ bool stack_expand_(void **const stk, const size_t value_size) {
   return true;
 }
 
-inline void *stack_header_(void *const stk) { return (stack *)stk - 1; }
+inline void *stack_header_(void *const stk) { return (byte *)stk - sizeof(stack); }
 
 inline size_t *stack_height_(void *const stk) {
   return &((stack *)stack_header(stk))->height;
