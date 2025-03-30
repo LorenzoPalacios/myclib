@@ -203,7 +203,7 @@ static void get_input(char *const buf, const size_t buf_size) {
   while (i < buf_size && chr != '\n' && chr != EOF) {
     if (isalnum(chr))
       buf[i++] = INT_TO_CHAR(chr);
-    else if (buf[i - 1] != INPUT_SEPARATOR)
+    else if (i > 0 && buf[i - 1] != INPUT_SEPARATOR)
       buf[i++] = INPUT_SEPARATOR;
     chr = getchar();
   }
