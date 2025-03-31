@@ -24,13 +24,14 @@ typedef enum input_status {
   STATUS_SKIP_INDEX = STATUS_KEYWORD_SKIP | STATUS_INDEX
 } input_status;
 
-typedef void (*test_func_t)(void);
+typedef bool (*test_func_t)(void);
 
 typedef struct test {
   const char *const name;
   const test_func_t test;
   const size_t name_len;
   clock_t elapsed;
+  bool passed;
   bool skip;
 } test;
 
@@ -47,6 +48,7 @@ extern test_suite TEST_SUITES[];
 extern const size_t NUM_TEST_SUITES;
 
 /* - FUNCTIONS - */
+void display_legend(void);
 
 void display_suites(void);
 

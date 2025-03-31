@@ -31,51 +31,70 @@ static size_t count_digits(size_t num) {
   return i;
 }
 
-static inline void display_legend(void) {
-  puts(
-      "\n- Legend -\n"
-      "(*) - An unskipped item.\n"
-      "(x) - A skipped item.\n");
+#define LIST_FORMAT "%zu. "
+
+/*
+ * @returns The number of bytes that would be used to write a number as per
+ * `LIST_FORMAT`.
+ */
+#define LIST_FORMAT_WRITE_SIZE(n) (count_digits(n) + sizeof(LIST_FORMAT) - 3)
+
+static inline size_t print_list_strcat(char *const buf, size_t buf_i,
+                                       const size_t buf_capacity,
+                                       const char *src) {
+  while (*src != '\0') {
+    if (buf_i == buf_capacity - 1) {
+      buf[buf_i] = '\0';
+      (void)fputs(buf, stdout);
+      buf_i = 0;
+    }
+    buf[buf_i++] = *(src++);
+  }
+  buf[buf_i] = '\n';
+  return buf_i;
 }
 
-/* REWRITE */
-static void print_buffered(const char *const *strings, const size_t STR_CNT) {
+static inline size_t print_list_number(char *const buf, size_t buf_i,
+                                       const size_t buf_capacity,
+                                       const size_t num) {
+  if (buf_i + LIST_FORMAT_WRITE_SIZE(num) >= buf_capacity) {
+    buf[buf_i] = '\0';
+    (void)fputs(buf, stdout);
+    buf_i = 0;
+  }
+  return buf_i + (size_t)sprintf(buf + buf_i, LIST_FORMAT, num);
+}
+
+static void print_list(const char *const *strings, const size_t STR_CNT) {
   char buf[BUFFER_SIZE];
   size_t buf_i = 0;
   size_t str_i = 0;
   for (; str_i < STR_CNT; str_i++) {
-    size_t chr_i = 0;
-    char chr;
-    if (buf_i + count_digits(str_i) + 2 >= sizeof(buf) - 1) {
-      (void)fputs(buf, stdout);
-      buf_i = 0;
-    }
-    buf_i += (size_t)sprintf(buf + buf_i, "%zu. ", str_i);
-    do {
-      chr = strings[str_i][chr_i];
-      if (buf_i == sizeof(buf) - 1) {
-        (void)fputs(buf, stdout);
-        buf_i = 0;
-      }
-      buf[buf_i] = chr;
-      (void)buf_i++, chr_i++;
-    } while (chr != '\0');
-    buf[buf_i - 1] = '\n';
-    buf[buf_i] = '\0';
+    /*
+     * `print_list_number()` calls `sprintf()` which appends a null terminator
+     * that is to be overwritten by `print_list_strcat()`, which itself appends
+     * a newline that is NOT to be overwritten, hence why `buf_i` is finally
+     * incremented by one despite both helper functions returning the index of
+     * their last written character.
+     */
+    buf_i = print_list_number(buf, buf_i, sizeof(buf) - buf_i, str_i);
+    buf_i = print_list_strcat(buf, buf_i, sizeof(buf) - buf_i, strings[str_i]);
+    buf_i++;
   }
+  buf[buf_i] = '\0';
   (void)fputs(buf, stdout);
 }
 
 static inline void display_menu(void) {
   puts("\n - Testing Menu -");
-  print_buffered(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
+  print_list(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
 }
 
 static inline void warn_unrecognized_input(void) {
   puts("Unrecognized input.");
 }
 
-static inline void warn_index_out_of_bounds(void) { puts("Invalid index."); }
+static inline void warn_index(void) { puts("Invalid index."); }
 
 /* - OPTION GETTERS - */
 
@@ -96,7 +115,7 @@ static void get_test_option(test_suite *const suite) {
         break;
       case STATUS_SKIP_INDEX:
         if (option >= NUM_TESTS) {
-          warn_index_out_of_bounds();
+          warn_index();
           break;
         }
         skip_test(suite->tests + option);
@@ -126,7 +145,7 @@ static void get_suite_option(void) {
         break;
       case STATUS_SKIP_INDEX:
         if (option >= NUM_TEST_SUITES) {
-          warn_index_out_of_bounds();
+          warn_index();
           break;
         }
         skip_suite(TEST_SUITES + option);
@@ -135,7 +154,7 @@ static void get_suite_option(void) {
         break;
       case STATUS_INDEX:
         if (option >= NUM_TEST_SUITES) {
-          warn_index_out_of_bounds();
+          warn_index();
           break;
         }
         get_test_option(TEST_SUITES + option);
@@ -178,11 +197,11 @@ static void main_menu_loop(void) {
         return;
       case STATUS_INDEX:
         parse_main_menu_option(option);
-        display_menu();
         break;
       default:
         warn_unrecognized_input();
     }
+    display_menu();
   }
 }
 

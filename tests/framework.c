@@ -17,7 +17,7 @@
   {STRINGIFY(tests), tests, sizeof(STRINGIFY(tests)) - 1, ARR_LEN(tests), false}
 
 #define CONSTRUCT_TEST(test_func) \
-  {STRINGIFY(test_func), test_func, sizeof(STRINGIFY(test_func)) - 1, -1, false}
+  {STRINGIFY(test_func), test_func, sizeof(STRINGIFY(test_func)) - 1, -1, false, false}
 
 #define DISPLAY_WRITE_SIZE(named_obj, index) \
   count_digits(index) + (sizeof(DISPLAY_FORMAT) - 7) + (named_obj).name_len
@@ -74,6 +74,9 @@ static const char *const INPUT_KEYWORDS[] = {
 
 /* - INTERNAL FUNCTIONS - */
 
+/* This declaration exists for `get_input()`. */
+static void str_lower(char *str);
+
 static size_t count_digits(size_t num) {
   size_t i = 0;
   while ((void)i++, num /= 10);
@@ -81,6 +84,28 @@ static size_t count_digits(size_t num) {
 }
 
 static inline void discard_line(void) { while (getchar() != '\n'); }
+
+static void get_input(char *const buf, const size_t buf_size) {
+  size_t i = 0;
+  int chr = getchar();
+  while (i < buf_size && chr != '\n' && chr != EOF) {
+    if (isalnum(chr) || chr == INPUT_SEPARATOR) {
+      buf[i++] = INT_TO_CHAR(chr);
+    } else {
+      /* Discard the rest of the input until the next token. */
+      while (!isspace(chr = getchar()));
+      /*
+       * Once the above loop breaks, `chr` will be some character beginning the
+       * next token, so we continue instead of allowing normal control flow.
+       */
+      continue;
+    }
+    chr = getchar();
+  }
+  buf[i] = '\0';
+  str_lower(buf);
+  if (chr != '\n') discard_line();
+}
 
 /*
  * @returns If a keyword is found in `str` possible return values include the
@@ -113,11 +138,16 @@ static input_status parse_keywords(const char *str) {
   return status;
 }
 
+static inline bool is_special_keyword(const input_status keyword) {
+  return keyword == STATUS_SKIP_ALL || keyword == STATUS_KEYWORD_EXIT ||
+         keyword == STATUS_KEYWORD_ALL;
+}
+
 /*
  * @returns `STATUS_INDEX` upon a successful write to `index_output`.
  * Otherwise, `STATUS_INVALID`.
  */
-static input_status parse_index(const char *str, size_t *const index_output) {
+static bool parse_index(const char *str, size_t *const index_output) {
   while (!isdigit(*str) && *str != '\0') str++;
   if (*str == '\0') return STATUS_INVALID;
   if (sscanf(str, "%zu", index_output) != 1) return STATUS_INVALID;
@@ -129,6 +159,13 @@ static inline void str_lower(char *str) {
 }
 
 /* - EXTERNAL FUNCTIONS - */
+
+inline void display_legend(void) {
+  puts(
+      "\n- Legend -\n"
+      "(x) - A skipped item.\n"
+      "(*) - An unskipped item.\n");
+}
 
 void display_suites(void) {
   char buf[DISPLAY_BUF_SIZE] = "\n - Suites -\n";
@@ -197,38 +234,13 @@ void display_suite_tests(const test_suite *const suite) {
   (void)fputs(buf, stdout);
 }
 
-static void get_input(char *const buf, const size_t buf_size) {
-  size_t i = 0;
-  int chr = getchar();
-  while (i < buf_size && chr != '\n' && chr != EOF) {
-    if (isalnum(chr))
-      buf[i++] = INT_TO_CHAR(chr);
-    else if (i > 0 && buf[i - 1] != INPUT_SEPARATOR)
-      buf[i++] = INPUT_SEPARATOR;
-    chr = getchar();
-  }
-  buf[i] = '\0';
-  str_lower(buf);
-  if (chr != '\n') discard_line();
-}
-
 input_status parse_input(size_t *const index_output) {
   char buf[INPUT_BUF_SIZE];
   get_input(buf, sizeof(buf) - 1);
   {
-    const input_status keyword_status = parse_keywords(buf);
+    const input_status keyword = parse_keywords(buf);
     const input_status index_status = parse_index(buf, index_output);
-    if (index_status == STATUS_INVALID) {
-      switch (keyword_status) {
-        case STATUS_SKIP_ALL:
-        case STATUS_KEYWORD_EXIT:
-        case STATUS_KEYWORD_ALL:
-          return keyword_status;
-        default:
-          break;
-      }
-    }
-    return keyword_status | index_status;
+    return is_special_keyword(keyword) ? keyword : keyword | index_status;
   }
 }
 
