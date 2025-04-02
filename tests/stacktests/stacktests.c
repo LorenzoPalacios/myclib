@@ -4,8 +4,7 @@
 #include <stdio.h>
 
 #include "../../stack/stack.h"
-
-#define TEST_SUITE_ASSERT(expr) if (expr) return false
+#include "../framework.h"
 
 static const int TEST_ARR[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
@@ -156,7 +155,8 @@ bool test_stack_resize(void) {
   TEST_SUITE_ASSERT(stack_capacity(stk) == NEW_CAPACITY);
   {
     int i = 0;
-    for (; (size_t)i < NEW_CAPACITY; i++) TEST_SUITE_ASSERT(stack_push_s(stk, &i));
+    for (; (size_t)i < NEW_CAPACITY; i++)
+      TEST_SUITE_ASSERT(stack_push_s(stk, &i));
   }
 
   stack_delete(stk);
