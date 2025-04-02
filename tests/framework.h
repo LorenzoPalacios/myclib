@@ -8,7 +8,12 @@
 
 #define TOGGLE_SKIP(skippable) (skippable).skip = !(skippable).skip
 
+#define TEST_SUITE_ASSERT(expr) \
+  if (expr) return false
+
 /* - DEFINITIONS - */
+
+typedef enum legend { LEGEND_SKIPPED = 'x', LEGEND_UNSKIPPED = '*' } legend;
 
 typedef enum input_status {
   /* - Single Flags - */
@@ -19,7 +24,7 @@ typedef enum input_status {
   STATUS_INDEX = STATUS_KEYWORD_SKIP << 1,
   STATUS_INVALID = STATUS_INDEX << 1,
 
-  /* - Multiple Flags - */
+  /* - Amalgamate Flags - */
   STATUS_SKIP_ALL = STATUS_KEYWORD_SKIP | STATUS_KEYWORD_ALL,
   STATUS_SKIP_INDEX = STATUS_KEYWORD_SKIP | STATUS_INDEX
 } input_status;
@@ -52,9 +57,7 @@ void display_legend(void);
 
 void display_suites(void);
 
-void display_tests(void);
-
-void display_suite_tests(const test_suite *suite);
+void display_tests(const test_suite *suite);
 
 input_status parse_input(size_t *index_output);
 

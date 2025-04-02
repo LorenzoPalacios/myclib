@@ -16,15 +16,21 @@
 #define CONSTRUCT_SUITE(tests) \
   {STRINGIFY(tests), tests, sizeof(STRINGIFY(tests)) - 1, ARR_LEN(tests), false}
 
-#define CONSTRUCT_TEST(test_func) \
-  {STRINGIFY(test_func), test_func, sizeof(STRINGIFY(test_func)) - 1, -1, false, false}
+#define CONSTRUCT_TEST(test_func)    \
+  {STRINGIFY(test_func),             \
+   test_func,                        \
+   sizeof(STRINGIFY(test_func)) - 1, \
+   -1,                               \
+   false,                            \
+   false}
 
 #define DISPLAY_WRITE_SIZE(named_obj, index) \
   count_digits(index) + (sizeof(DISPLAY_FORMAT) - 7) + (named_obj).name_len
 
-#define INT_TO_CHAR(c) ((char)((unsigned char)(c)))
+#define INT_TO_CHAR(c) ((char)(unsigned char)(c))
 
-#define SKIP_STATUS_CHR(skippable) ((skippable).skip ? 'x' : '*')
+#define SKIP_STATUS_CHR(skippable) \
+  ((skippable).skip ? LEGEND_SKIPPED : LEGEND_UNSKIPPED)
 
 #define STRINGIFY(x) #x
 
@@ -57,7 +63,6 @@ const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
 
 #define INPUT_SEPARATOR (' ')
 
-#define DISPLAY_BUF_SIZE (1024)
 #define DISPLAY_FORMAT "%zu. (%c) %s\n"
 
 /*
@@ -76,12 +81,6 @@ static const char *const INPUT_KEYWORDS[] = {
 
 /* This declaration exists for `get_input()`. */
 static void str_lower(char *str);
-
-static size_t count_digits(size_t num) {
-  size_t i = 0;
-  while ((void)i++, num /= 10);
-  return i;
-}
 
 static inline void discard_line(void) { while (getchar() != '\n'); }
 
@@ -161,77 +160,32 @@ static inline void str_lower(char *str) {
 /* - EXTERNAL FUNCTIONS - */
 
 inline void display_legend(void) {
-  puts(
+  printf(
       "\n- Legend -\n"
-      "(x) - A skipped item.\n"
-      "(*) - An unskipped item.\n");
+      "(%c) - A skipped item.\n"
+      "(%c) - An unskipped item.\n\n",
+      LEGEND_SKIPPED, LEGEND_UNSKIPPED);
+  fflush(stdout);
 }
 
 void display_suites(void) {
-  char buf[DISPLAY_BUF_SIZE] = "\n - Suites -\n";
-  size_t buf_i = 13; /* This is the length of the initial string at `buf`. */
-  size_t suite_i = 0;
-  for (; suite_i < NUM_TEST_SUITES; suite_i++) {
-    const test_suite CUR_SUITE = TEST_SUITES[suite_i];
-    const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_SUITE, suite_i);
-    if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
-      (void)fputs(buf, stdout);
-      buf_i = 0;
-    }
-    (void)sprintf(buf + buf_i, DISPLAY_FORMAT, suite_i,
-                  SKIP_STATUS_CHR(CUR_SUITE), CUR_SUITE.name);
-    buf_i += WRITE_SIZE;
+  size_t i;
+  puts("\n - Suites -");
+  for (i = 0; i < NUM_TEST_SUITES; i++) {
+    const test_suite CUR_SUITE = TEST_SUITES[i];
+    printf(DISPLAY_FORMAT, i, SKIP_STATUS_CHR(CUR_SUITE), CUR_SUITE.name);
   }
-  (void)fputs(buf, stdout);
+  (void)fflush(stdout);
 }
 
-/*
- * Although `display_suite_tests()` could be used to simplify this function,
- * doing so would cause inefficient buffer handling which may cause visible
- * slowness during output.
- */
-void display_tests(void) {
-  char buf[DISPLAY_BUF_SIZE];
-  size_t buf_i = 0;
-  size_t suite_i = 0;
-  for (; suite_i < NUM_TEST_SUITES; suite_i++) {
-    const test_suite CUR_SUITE = TEST_SUITES[suite_i];
-
-    size_t test_i = 0;
-    for (; test_i < CUR_SUITE.num_tests; test_i++) {
-      const test CUR_TEST = CUR_SUITE.tests[test_i];
-      const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_TEST, test_i);
-      if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
-        (void)fputs(buf, stdout);
-        buf_i = 0;
-      }
-      (void)sprintf(buf + buf_i, DISPLAY_FORMAT, test_i,
-                    SKIP_STATUS_CHR(CUR_TEST), CUR_TEST.name);
-      buf_i += WRITE_SIZE;
-    }
+void display_tests(const test_suite *const suite) {
+  size_t i;
+  printf("\n - %s -\n", suite->name);
+  for (i = 0; i < suite->num_tests; i++) {
+    const test CUR_TEST = suite->tests[i];
+    printf(DISPLAY_FORMAT, i, SKIP_STATUS_CHR(CUR_TEST), CUR_TEST.name);
   }
-  (void)fputs(buf, stdout);
-}
-
-void display_suite_tests(const test_suite *const suite) {
-  const size_t TEST_CNT = suite->num_tests;
-  const test *const tests = suite->tests;
-
-  char buf[DISPLAY_BUF_SIZE];
-  size_t buf_i = 0;
-  size_t tests_i = 0;
-  for (; tests_i < TEST_CNT; tests_i++) {
-    const test CUR_TEST = tests[tests_i];
-    const size_t WRITE_SIZE = DISPLAY_WRITE_SIZE(CUR_TEST, tests_i);
-    if (buf_i + WRITE_SIZE >= DISPLAY_BUF_SIZE) {
-      (void)fputs(buf, stdout);
-      buf_i = 0;
-    }
-    (void)sprintf(buf + buf_i, DISPLAY_FORMAT, tests_i,
-                  SKIP_STATUS_CHR(CUR_TEST), CUR_TEST.name);
-    buf_i += WRITE_SIZE;
-  }
-  (void)fputs(buf, stdout);
+  (void)fflush(stdout);
 }
 
 input_status parse_input(size_t *const index_output) {
@@ -259,7 +213,7 @@ void run_suite(test_suite *const suite) {
 void run_test(test *const test) {
   if (!test->skip) {
     const clock_t START_TIME = clock();
-    test->test();
+    test->passed = test->test();
     test->elapsed = clock() - START_TIME;
   }
 }
