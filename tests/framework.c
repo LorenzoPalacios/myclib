@@ -1,5 +1,6 @@
 #include "framework.h"
 
+#include <_mingw_mac.h>
 #include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -13,21 +14,25 @@
 
 #define ARR_LEN(test_arr) (sizeof(test_arr) / sizeof *(test_arr))
 
-#define CONSTRUCT_SUITE(tests) \
-  {STRINGIFY(tests), tests, sizeof(STRINGIFY(tests)) - 1, ARR_LEN(tests), false}
+#define BOOL_AS_CHAR(b) ((b) ? 1 : 0)
 
-#define CONSTRUCT_TEST(test_func)    \
-  {STRINGIFY(test_func),             \
-   test_func,                        \
-   sizeof(STRINGIFY(test_func)) - 1, \
-   -1,                               \
-   false,                            \
-   false}
+#define CLOCK_TO_MS(n) ((n) / (double)CLOCKS_PER_SEC)
+
+#define CONSTRUCT_SUITE(tests) {STRINGIFY(tests), tests, ARR_LEN(tests), false}
+
+#define CONSTRUCT_TEST(test_func) \
+  {STRINGIFY(test_func), test_func, -1, false, false}
 
 #define DISPLAY_WRITE_SIZE(named_obj, index) \
   count_digits(index) + (sizeof(DISPLAY_FORMAT) - 7) + (named_obj).name_len
 
 #define INT_TO_CHAR(c) ((char)(unsigned char)(c))
+
+/* Suite index, skip status. */
+#define SUITE_CONFIG_FILE_FORMAT "%zu %d\n"
+
+/* Suite index, test index, skip status. */
+#define TEST_CONFIG_FILE_FORMAT "%zu %zu %d\n"
 
 #define SKIP_STATUS_CHR(skippable) \
   ((skippable).skip ? LEGEND_SKIPPED : LEGEND_UNSKIPPED)
@@ -55,15 +60,17 @@ const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
 
 /* - INTERNAL DEFINITIONS - */
 
+#define CONFIG_FILENAME "test.config"
+
+#define DISPLAY_FORMAT "%zu. (%c) %s\n"
+
+#define RESULTS_SUFFIX "test.results"
+
 /*
  * This should be enough to hold a string representation of `SIZE_MAX`,
  * any defined keywords, and a null terminator.
  */
 #define INPUT_BUF_SIZE (64)
-
-#define INPUT_SEPARATOR (' ')
-
-#define DISPLAY_FORMAT "%zu. (%c) %s\n"
 
 /*
  * Keywords should be entirely lowercase.
@@ -74,6 +81,8 @@ static const char *const INPUT_KEYWORDS[] = {
     "exit",
     "skip",
 };
+
+#define INPUT_SEPARATOR (' ')
 
 #define NUM_KEYWORDS (sizeof(INPUT_KEYWORDS) / sizeof *(INPUT_KEYWORDS))
 
@@ -157,6 +166,18 @@ static inline void str_lower(char *str) {
   for (; *str != '\0'; str++) *str = INT_TO_CHAR(tolower(*str));
 }
 
+/* Helper function used by `save_test_config()`. */
+static void write_suite_config(test_suite *const suite, void *const output) {
+  const size_t SUITE_INDEX = (size_t)(suite - TEST_SUITES);
+  size_t i;
+  fprintf(output, SUITE_CONFIG_FILE_FORMAT, SUITE_INDEX, suite->skip ? 1 : 0);
+  for (i = 0; i < suite->num_tests; i++) {
+    const test *const TEST = suite->tests + i;
+    fprintf(output, TEST_CONFIG_FILE_FORMAT, SUITE_INDEX, i,
+            TEST->skip ? 1 : 0);
+  }
+}
+
 /* - EXTERNAL FUNCTIONS - */
 
 inline void display_legend(void) {
@@ -188,6 +209,34 @@ void display_tests(const test_suite *const suite) {
   (void)fflush(stdout);
 }
 
+inline void for_each_suite(const suite_op op, void *args) {
+  size_t i;
+  for (i = 0; i < NUM_TEST_SUITES; i++) op(TEST_SUITES + i, args);
+}
+
+inline void for_each_suite_no_arg(const suite_op_no_arg op) {
+  size_t i;
+  for (i = 0; i < NUM_TEST_SUITES; i++) op(TEST_SUITES + i);
+}
+
+inline void for_each_test(test_suite *const suite, const test_op op,
+                          void *args) {
+  size_t i;
+  for (i = 0; i < suite->num_tests; i++) op(suite->tests + i, args);
+}
+
+inline void for_each_test_no_arg(test_suite *const suite,
+                                 const test_op_no_arg op) {
+  size_t i;
+  for (i = 0; i < suite->num_tests; i++) op(suite->tests + i);
+}
+
+void load_test_config(void) {
+  FILE *const output = fopen(CONFIG_FILENAME, "r");
+
+  fclose(output);
+}
+
 input_status parse_input(size_t *const index_output) {
   char buf[INPUT_BUF_SIZE];
   get_input(buf, sizeof(buf) - 1);
@@ -204,10 +253,7 @@ void run_all_suites(void) {
 }
 
 void run_suite(test_suite *const suite) {
-  if (!suite->skip) {
-    size_t i = 0;
-    for (; i < suite->num_tests; i++) run_test(suite->tests + i);
-  }
+  if (!suite->skip) for_each_test_no_arg(suite, run_test);
 }
 
 void run_test(test *const test) {
@@ -218,15 +264,39 @@ void run_test(test *const test) {
   }
 }
 
-void skip_all_suites(void) {
-  size_t i = 0;
-  for (; i < NUM_TEST_SUITES; i++) TEST_SUITES[i].skip = !TEST_SUITES[i].skip;
+void save_test_config(void) {
+  FILE *const output = fopen(CONFIG_FILENAME, "w");
+  setvbuf(output, NULL, _IOFBF, BUFSIZ);
+  for_each_suite(write_suite_config, output);
+  fclose(output);
 }
 
-void skip_all_tests(test_suite *const suite) {
-  size_t i = 0;
-  for (; i < suite->num_tests; i++)
-    suite->tests[i].skip = !suite->tests[i].skip;
+static void write_suite_results(test_suite *const suite, void *const output) {
+  size_t i;
+  fputs("Test Name, Elapsed Time in Milliseconds, Pass Status, Skip Status\n",
+        output);
+  fprintf(output, "%s:\n", suite->name);
+  for (i = 0; i < suite->num_tests; i++) {
+    const test *CUR_TEST = suite->tests + i;
+    fprintf(output, " - %s %g %d %d\n", CUR_TEST->name,
+            CLOCK_TO_MS(CUR_TEST->elapsed), BOOL_AS_CHAR(CUR_TEST->passed),
+            BOOL_AS_CHAR(CUR_TEST->skip));
+  }
+}
+
+void save_test_results(void) {
+  char filename[L_tmpnam + sizeof(RESULTS_SUFFIX)];
+  FILE *const output = fopen(strcat(tmpnam(filename), RESULTS_SUFFIX), "w");
+  setvbuf(output, NULL, _IOFBF, BUFSIZ);
+  for_each_suite(write_suite_results, output);
+  fclose(output);
+  printf("Results of the most recent test session saved to %s\n", filename);
+}
+
+inline void skip_all_suites(void) { for_each_suite_no_arg(skip_suite); }
+
+inline void skip_all_tests(test_suite *const suite) {
+  for_each_test_no_arg(suite, skip_test);
 }
 
 inline void skip_suite(test_suite *const suite) { suite->skip = !suite->skip; }

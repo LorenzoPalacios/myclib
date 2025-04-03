@@ -2,6 +2,7 @@
 #define TEST_FRAMEWORK
 
 #include <stddef.h>
+#include <stdio.h>
 #include <time.h>
 
 #include "../include/boolmyclib.h"
@@ -34,7 +35,6 @@ typedef bool (*test_func_t)(void);
 typedef struct test {
   const char *const name;
   const test_func_t test;
-  const size_t name_len;
   clock_t elapsed;
   bool passed;
   bool skip;
@@ -43,21 +43,38 @@ typedef struct test {
 typedef struct test_suite {
   const char *const name;
   test *tests;
-  const size_t name_len;
   size_t num_tests;
   bool skip;
 } test_suite;
+
+typedef void (*test_op)(test *, void *);
+typedef void (*test_op_no_arg)(test *);
+
+typedef void (*suite_op)(test_suite *, void *);
+typedef void (*suite_op_no_arg)(test_suite *);
 
 extern test_suite TEST_SUITES[];
 
 extern const size_t NUM_TEST_SUITES;
 
 /* - FUNCTIONS - */
+
+/* - DISPLAY -*/
 void display_legend(void);
 
 void display_suites(void);
 
 void display_tests(const test_suite *suite);
+
+/* - UTILITY -*/
+
+void for_each_suite(suite_op op, void *args);
+
+void for_each_suite_no_arg(suite_op_no_arg op);
+
+void for_each_test_no_arg(test_suite *suite, test_op_no_arg op);
+
+void for_each_test(test_suite *suite, test_op, void *args);
 
 input_status parse_input(size_t *index_output);
 
@@ -74,4 +91,13 @@ void skip_all_tests(test_suite *suite);
 void skip_suite(test_suite *suite);
 
 void skip_test(test *test);
+
+void save_test_results(void);
+
+/* - CONFIGURATION - */
+
+void load_test_config(void);
+
+void save_test_config(void);
+
 #endif

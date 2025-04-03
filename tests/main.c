@@ -7,15 +7,17 @@
 /* - DEFINITIONS - */
 
 typedef enum MAIN_MENU_STATUS {
-  RUN_TESTS = 0x0,
-  RUN_TESTS_NO_FAIL = 0x1,
-  CONFIG_TESTS = 0x2
+  RUN_TESTS = 0,
+  RUN_TESTS_NO_FAIL = 1,
+  CONFIG_TESTS = 2,
+  SAVE_CONFIG = 3,
+  SAVE_RESULTS = 4
 } MAIN_MENU_STATUS;
 
 static const char *const MAIN_MENU_OPTIONS[] = {
-    "Run Tests",
-    "Run Tests (ignore test failure)",
-    "Configure Tests",
+    "Run Tests",         "Run Tests (ignore test failure)",
+    "Configure Tests",   "Save Test Configuration",
+    "Save Test Results",
 };
 
 #define NUM_MAIN_MENU_OPTIONS \
@@ -40,7 +42,10 @@ static inline void warn_unrecognized_input(void) {
   fflush(stdout);
 }
 
-static inline void warn_index(void) { puts("Invalid index."); fflush(stdout); }
+static inline void warn_index(void) {
+  puts("Invalid index.");
+  fflush(stdout);
+}
 
 /* - OPTION GETTERS - */
 
@@ -127,6 +132,12 @@ static inline void parse_main_menu_option(const size_t option) {
     case CONFIG_TESTS:
       get_suite_option();
       break;
+    case SAVE_CONFIG:
+      save_test_config();
+      break;
+    case SAVE_RESULTS:
+      save_test_results();
+      break;
     default:
       warn_unrecognized_input();
       break;
@@ -153,6 +164,7 @@ static void main_menu_loop(void) {
 
 int main(void) {
   (void)setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
+  save_test_results();
   main_menu_loop();
   return 0;
 }
