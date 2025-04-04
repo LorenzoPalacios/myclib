@@ -4,6 +4,8 @@
 *.pch
 *.o
 *.a
+*.results
+*.config
 
 # Specific Files
 CMakeCache.txt

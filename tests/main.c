@@ -10,14 +10,14 @@ typedef enum MAIN_MENU_STATUS {
   RUN_TESTS = 0,
   RUN_TESTS_NO_FAIL = 1,
   CONFIG_TESTS = 2,
-  SAVE_CONFIG = 3,
-  SAVE_RESULTS = 4
+  LOAD_CONFIG = 3,
+  SAVE_CONFIG = 4,
+  SAVE_RESULTS = 5
 } MAIN_MENU_STATUS;
 
 static const char *const MAIN_MENU_OPTIONS[] = {
-    "Run Tests",         "Run Tests (ignore test failure)",
-    "Configure Tests",   "Save Test Configuration",
-    "Save Test Results",
+    "Run Tests",          "Run Tests (ignore failure)", "Configure",
+    "Load Configuration", "Save Configuration",         "Save Results",
 };
 
 #define NUM_MAIN_MENU_OPTIONS \
@@ -35,6 +35,38 @@ static inline void display_menu(void) {
   puts("\n - Testing Menu -");
   print_list(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
   /* `print_list()` calls `fflush()`. */
+}
+
+static inline void load_config_quiet(void) { load_test_config(); }
+
+static inline void load_config_verbose(void) {
+  if (load_test_config())
+    puts("Test configuration loaded from " CONFIG_FILENAME);
+  else
+    perror("Failed to load test configuration");
+  fflush(stdout);
+}
+
+static inline void save_config_verbose(void) {
+  if (save_test_config())
+    puts("Test configuration saved to " CONFIG_FILENAME);
+  else
+    puts(
+        "Failed to save test configuration.\n"
+        "Ensure the program has write access to the current directory"
+        " and is not inhibited by any security policy.");
+  fflush(stdout);
+}
+
+static inline void save_results_verbose(void) {
+  if (save_test_results())
+    puts("Results of the most recent test session saved to " RESULTS_FILENAME);
+  else
+    puts(
+        "Failed to save test results\n"
+        "Ensure the program has write access to the current directory"
+        " and is not inhibited by any security policy.");
+  fflush(stdout);
 }
 
 static inline void warn_unrecognized_input(void) {
@@ -127,16 +159,19 @@ static inline void parse_main_menu_option(const size_t option) {
       run_all_suites();
       break;
     case RUN_TESTS_NO_FAIL:
-      /* TBD */
+      /*run_all_suites_ignore_fail();*/
       break;
     case CONFIG_TESTS:
       get_suite_option();
       break;
+    case LOAD_CONFIG:
+      load_config_verbose();
+      break;
     case SAVE_CONFIG:
-      save_test_config();
+      save_config_verbose();
       break;
     case SAVE_RESULTS:
-      save_test_results();
+      save_results_verbose();
       break;
     default:
       warn_unrecognized_input();
@@ -164,7 +199,7 @@ static void main_menu_loop(void) {
 
 int main(void) {
   (void)setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
-  save_test_results();
+  load_config_quiet();
   main_menu_loop();
   return 0;
 }

@@ -7,10 +7,8 @@
 
 #include "../include/boolmyclib.h"
 
-#define TOGGLE_SKIP(skippable) (skippable).skip = !(skippable).skip
-
 #define TEST_SUITE_ASSERT(expr) \
-  if (expr) return false
+  if (!(expr)) return false
 
 /* - DEFINITIONS - */
 
@@ -57,6 +55,10 @@ extern test_suite TEST_SUITES[];
 
 extern const size_t NUM_TEST_SUITES;
 
+#define CONFIG_FILENAME "test.config"
+
+#define RESULTS_FILENAME "test.results"
+
 /* - FUNCTIONS - */
 
 /* - DISPLAY -*/
@@ -80,9 +82,15 @@ input_status parse_input(size_t *index_output);
 
 void run_all_suites(void);
 
+void run_all_suites_ignore_fail(void);
+
 void run_suite(test_suite *suite);
 
+void run_suite_ignore_fail(test_suite *suite);
+
 void run_test(test *test);
+
+void run_test_ignore_fail(test *test);
 
 void skip_all_suites(void);
 
@@ -92,12 +100,12 @@ void skip_suite(test_suite *suite);
 
 void skip_test(test *test);
 
-void save_test_results(void);
+bool save_test_results(void);
 
 /* - CONFIGURATION - */
 
-void load_test_config(void);
+bool load_test_config(void);
 
-void save_test_config(void);
+bool save_test_config(void);
 
 #endif

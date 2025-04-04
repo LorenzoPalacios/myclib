@@ -21,7 +21,7 @@ bool test_stack_copy(void) {
   while (!stack_is_empty(stk1)) {
     const int num = *stack_pop(stk1);
     const int num_copy = *stack_pop(stk1_copy);
-    TEST_SUITE_ASSERT(num != num_copy);
+    TEST_SUITE_ASSERT(num == num_copy);
   }
 
   stack_delete(stk1);
