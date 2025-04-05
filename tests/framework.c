@@ -62,6 +62,8 @@ const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
 
 /* - INTERNAL DEFINITIONS - */
 
+#define CONFIG_FILENAME "test.config"
+
 #define DISPLAY_FORMAT "%zu. (%c) %s\n"
 
 /*
@@ -81,19 +83,41 @@ static const char *const INPUT_KEYWORDS[] = {
 #define INPUT_SEPARATOR (' ')
 
 static const char *const MAIN_MENU_OPTIONS[] = {
-    "Run Tests",          "Run Tests (ignore failure)", "Configure",
-    "Load Configuration", "Save Configuration",         "Save Results",
+    "Run Tests",          "Configure",    "Load Configuration",
+    "Save Configuration", "Save Results",
 };
+
+typedef enum MAIN_MENU_STATUS {
+  RUN_TESTS = 0,
+  CONFIG_TESTS = RUN_TESTS + 1,
+  LOAD_CONFIG = CONFIG_TESTS + 1,
+  SAVE_CONFIG = LOAD_CONFIG + 1,
+  SAVE_RESULTS = SAVE_CONFIG + 1
+} MAIN_MENU_STATUS;
 
 #define NUM_KEYWORDS (sizeof(INPUT_KEYWORDS) / sizeof *(INPUT_KEYWORDS))
 
 #define NUM_MAIN_MENU_OPTIONS \
   (sizeof(MAIN_MENU_OPTIONS) / sizeof *(MAIN_MENU_OPTIONS))
 
+#define RESULTS_FILENAME "test.results"
+
 /* - INTERNAL FUNCTIONS - */
 
-/* This declaration exists for `get_input()`. */
-static void str_lower(char *str);
+/* - MISCELLANEOUS - */
+
+static inline void print_list(const char *const *strings,
+                              const size_t STR_CNT) {
+  size_t i;
+  for (i = 0; i < STR_CNT; i++) printf("%zu. %s\n", i, strings[i]);
+  fflush(stdout);
+}
+
+static inline void str_lower(char *str) {
+  for (; *str != '\0'; str++) *str = INT_TO_CHAR(tolower(*str));
+}
+
+/* - INPUT - */
 
 static inline void discard_line(void) { while (getchar() != '\n'); }
 
@@ -118,6 +142,8 @@ static void get_input(char *const buf, const size_t buf_size) {
   str_lower(buf);
   if (chr != '\n') discard_line();
 }
+
+/* - PARSING - */
 
 static inline bool is_special_keyword(const input_status keyword) {
   return keyword == STATUS_SKIP_ALL || keyword == STATUS_EXIT ||
@@ -176,16 +202,7 @@ static bool parse_index(const char *str, size_t *const index_output) {
   return STATUS_INDEX;
 }
 
-static inline void print_list(const char *const *strings,
-                              const size_t STR_CNT) {
-  size_t i;
-  for (i = 0; i < STR_CNT; i++) printf("%zu. %s\n", i, strings[i]);
-  fflush(stdout);
-}
-
-static inline void str_lower(char *str) {
-  for (; *str != '\0'; str++) *str = INT_TO_CHAR(tolower(*str));
-}
+/* - OUTPUT - */
 
 /* Helper function used by `save_test_config()`. */
 static void write_suite_config(test_suite *const suite, void *const output) {
@@ -200,19 +217,25 @@ static void write_suite_config(test_suite *const suite, void *const output) {
   }
 }
 
-static void write_suite_results(test_suite *const suite, void *const output) {
-  size_t i;
-  fprintf(output, "%s:\n", suite->name);
-  for (i = 0; i < suite->num_tests; i++) {
-    const test *CUR_TEST = suite->tests + i;
+static inline void write_test_results(test *const test, void *const output) {
+  /*
+   * An elapsed time of -1 means the test has not been run, so we omit it from
+   * the output since it may contain misleading data.
+   */
+  if (test->elapsed != -1)
     fprintf(output,
             "\t- %s:\n"
             "\t\tElapsed time (seconds): %lg\n"
             "\t\tPassed: %s\n"
             "\t\tSkipped: %s\n",
-            CUR_TEST->name, CLOCK_TO_SEC(CUR_TEST->elapsed),
-            BOOL_AS_STRING(CUR_TEST->passed), BOOL_AS_STRING(CUR_TEST->skip));
-  }
+            test->name, CLOCK_TO_SEC(test->elapsed),
+            BOOL_AS_STRING(test->passed), BOOL_AS_STRING(test->skip));
+}
+
+static inline void write_suite_results(test_suite *const suite,
+                                       void *const output) {
+  fprintf(output, "%s:\n", suite->name);
+  for_each_test(suite, write_test_results, output);
 }
 
 /* - EXTERNAL FUNCTIONS - */
@@ -228,7 +251,7 @@ inline void display_legend(void) {
   fflush(stdout);
 }
 
-void display_menu(void) {
+void display_main_menu(void) {
   puts("\n - Testing Menu -");
   print_list(MAIN_MENU_OPTIONS, NUM_MAIN_MENU_OPTIONS);
   /* `print_list()` calls `fflush()`. */
@@ -244,13 +267,61 @@ void display_suites(void) {
   fflush(stdout);
 }
 
-void display_tests(const test_suite *const suite) {
+void display_suite_tests(const test_suite *const suite) {
   size_t i;
   printf("\n - %s -\n", suite->name);
   for (i = 0; i < suite->num_tests; i++) {
     const test CUR_TEST = suite->tests[i];
     printf(DISPLAY_FORMAT, i, SKIP_AS_CHAR(CUR_TEST.skip), CUR_TEST.name);
   }
+  fflush(stdout);
+}
+
+static inline void display_suite_info(void) {
+  display_suites();
+  display_legend();
+}
+
+static inline void display_suite_test_info(const test_suite *const suite) {
+  display_suite_tests(suite);
+  display_legend();
+}
+/* - FEEDBACK - */
+
+static inline void notify_bad_input(void) {
+  puts("Unrecognized input.");
+  fflush(stdout);
+}
+
+static inline void notify_index(void) {
+  puts("Invalid index.");
+  fflush(stdout);
+}
+
+static inline void notify_ran_suite(const test_suite *const suite) {
+  printf("Ran %s\n", suite->name);
+  fflush(stdout);
+}
+
+static inline void notify_ran_test(const test *const test) {
+  printf("Ran %s - %s\n", test->name, test->passed ? "SUCCESS" : "FAILURE");
+  fflush(stdout);
+}
+
+#define notify_skipped(skippable)                                 \
+  printf("%s %s be skipped during testing.\n", (skippable)->name, \
+         (skippable)->skip ? "will" : "will no longer");          \
+  fflush(stdout)
+
+static inline void notify_skipped_all_suites(void) {
+  printf("Toggled skip status for all %zu suite(s).\n", NUM_TEST_SUITES);
+  fflush(stdout);
+}
+
+static inline void notify_skipped_all_suite_tests(
+    const test_suite *const suite) {
+  printf("Toggled skip status for all %zu test(s) in %s.\n", suite->num_tests,
+         suite->name);
   fflush(stdout);
 }
 
@@ -286,18 +357,6 @@ input_status parse_input(size_t *const index_output) {
     const input_status index_status = parse_index(buf, index_output);
     return is_special_keyword(keyword) ? keyword : keyword | index_status;
   }
-}
-
-/* - FEEDBACK - */
-
-inline void warn_bad_input(void) {
-  puts("Unrecognized input.");
-  fflush(stdout);
-}
-
-inline void warn_index(void) {
-  puts("Invalid index.");
-  fflush(stdout);
 }
 
 /* - CONFIGURATION - */
@@ -365,11 +424,9 @@ inline void skip_tests_in_suite(test_suite *const suite) {
 
 /* - TEST RUNNERS - */
 
-inline void run_all_suites(void) {
-  for_each_suite_no_arg(run_suite);
-}
+inline void run_all_suites(void) { for_each_suite_no_arg(run_suite); }
 
-inline void run_suite(const test_suite *const suite) {
+inline void run_suite(test_suite *const suite) {
   if (!suite->skip) for_each_test_no_arg(suite, run_test);
 }
 
@@ -403,4 +460,139 @@ inline bool save_results_verbose(void) {
         " and is not inhibited by any security policy.");
   fflush(stdout);
   return SAVE_SUCCESS;
+}
+
+/* - OPTION PARSERS - */
+
+static inline void parse_main_menu_option(const size_t option) {
+  switch (option) {
+    case RUN_TESTS:
+      run_all_suites();
+      break;
+    case CONFIG_TESTS:
+      suite_prompt();
+      break;
+    case LOAD_CONFIG:
+      load_config_verbose();
+      break;
+    case SAVE_CONFIG:
+      save_config_verbose();
+      break;
+    case SAVE_RESULTS:
+      save_results_verbose();
+      break;
+    default:
+      notify_bad_input();
+      break;
+  }
+}
+
+static inline void parse_suite_prompt_input(const input_status status,
+                                            const size_t option) {
+  switch (status) {
+    case STATUS_SKIP_ALL:
+      skip_all_suites();
+      notify_skipped_all_suites();
+      break;
+    case STATUS_SKIP_INDEX:
+      if (option >= NUM_TEST_SUITES) {
+        notify_index();
+        break;
+      }
+      skip_suite(TEST_SUITES + option);
+      notify_skipped(TEST_SUITES + option);
+      break;
+    case STATUS_INDEX:
+      if (option >= NUM_TEST_SUITES) {
+        notify_index();
+        break;
+      }
+      test_prompt(TEST_SUITES + option);
+      break;
+    case STATUS_RUN_INDEX:
+      if (option >= NUM_TEST_SUITES) {
+        notify_index();
+        break;
+      }
+      run_suite(TEST_SUITES + option);
+      notify_ran_suite(TEST_SUITES + option);
+      break;
+    default:
+      notify_bad_input();
+      break;
+  }
+}
+
+static inline void parse_test_prompt_input(test_suite *const suite,
+                                           const input_status status,
+                                           const size_t option) {
+  switch (status) {
+    case STATUS_EXIT:
+      return;
+    case STATUS_SKIP_ALL:
+      skip_tests_in_suite(suite);
+      notify_skipped_all_suite_tests(suite);
+      break;
+    case STATUS_SKIP_INDEX:
+      if ((option) >= suite->num_tests) {
+        notify_index();
+        break;
+      }
+      skip_test(suite->tests + option);
+      notify_skipped(suite->tests + option);
+      break;
+    case STATUS_RUN_INDEX:
+      if ((option) >= suite->num_tests) {
+        notify_index();
+        break;
+      }
+      run_test(suite->tests + option);
+      notify_ran_test(suite->tests + option);
+      break;
+    default:
+      notify_bad_input();
+      break;
+  }
+}
+
+/* - PROMPTS - */
+
+void main_menu_prompt(void) {
+  display_main_menu();
+  while (true) {
+    size_t option;
+    const input_status status = parse_input(&option);
+    switch (status) {
+      case STATUS_EXIT:
+        return;
+      case STATUS_INDEX:
+        parse_main_menu_option(option);
+        break;
+      default:
+        notify_bad_input();
+    }
+    display_main_menu();
+  }
+}
+
+void test_prompt(test_suite *const suite) {
+  display_suite_test_info(suite);
+  while (true) {
+    size_t option;
+    const input_status status = parse_input(&option);
+    if (status == STATUS_EXIT) break;
+    parse_test_prompt_input(suite, status, option);
+    display_suite_test_info(suite);
+  }
+}
+
+void suite_prompt(void) {
+  display_suite_info();
+  while (true) {
+    size_t option;
+    const input_status status = parse_input(&option);
+    if (status == STATUS_EXIT) break;
+    parse_suite_prompt_input(status, option);
+    display_suite_info();
+  }
 }

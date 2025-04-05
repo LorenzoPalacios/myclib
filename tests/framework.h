@@ -57,21 +57,17 @@ extern test_suite TEST_SUITES[];
 
 extern const size_t NUM_TEST_SUITES;
 
-#define CONFIG_FILENAME "test.config"
-
-#define RESULTS_FILENAME "test.results"
-
 /* - FUNCTIONS - */
 
 /* - DISPLAY - */
 
 void display_legend(void);
 
-void display_menu(void);
+void display_main_menu(void);
 
 void display_suites(void);
 
-void display_tests(const test_suite *suite);
+void display_suite_tests(const test_suite *suite);
 
 /* - UTILITY -*/
 
@@ -84,12 +80,6 @@ void for_each_test_no_arg(const test_suite *suite, test_op_no_arg op);
 void for_each_test(const test_suite *suite, test_op, void *args);
 
 input_status parse_input(size_t *index_output);
-
-/* - FEEDBACK - */
-
-void warn_bad_input(void);
-
-void warn_index(void);
 
 /* - CONFIGURATION - */
 
@@ -119,13 +109,20 @@ bool save_results_verbose(void);
 
 void run_all_suites(void);
 
-void run_all_suites_ignore_fail(void);
+void run_suite(test_suite *suite);
 
-void run_suite(const test_suite *suite);
-
-void run_suite_ignore_fail(const test_suite *suite);
+void run_suite_ignore_fail(test_suite *suite);
 
 void run_test(test *test);
 
 void run_test_ignore_fail(test *test);
+
+/* - PROMPTS - */
+
+void main_menu_prompt(void);
+
+void test_prompt(test_suite *suite);
+
+void suite_prompt(void);
+
 #endif
