@@ -11,6 +11,7 @@
 /* - TESTING HEADERS - */
 
 #include "stacktests/stacktests.h"
+#include "vectortests/vectortests.h"
 
 /* - FUNCTION MACROS - */
 
@@ -52,10 +53,20 @@ static test STACK_TESTS[] = {
     CONSTRUCT_TEST(test_stack_shrink),
 };
 
+static test VECTOR_TESTS[] = {
+    CONSTRUCT_TEST(test_vector_add),    CONSTRUCT_TEST(test_vector_clear),
+    CONSTRUCT_TEST(test_vector_copy),   CONSTRUCT_TEST(test_vector_delete),
+    CONSTRUCT_TEST(test_vector_expand), CONSTRUCT_TEST(test_vector_get),
+    CONSTRUCT_TEST(test_vector_init),   CONSTRUCT_TEST(test_vector_insert),
+    CONSTRUCT_TEST(test_vector_new),    CONSTRUCT_TEST(test_vector_set),
+    CONSTRUCT_TEST(test_vector_shrink),
+};
+
 /* - EXTERNAL DEFINITIONS - */
 
 test_suite TEST_SUITES[] = {
     CONSTRUCT_SUITE(STACK_TESTS),
+    CONSTRUCT_SUITE(VECTOR_TESTS),
 };
 
 const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
@@ -195,7 +206,7 @@ static input_status parse_keywords(const char *str) {
  * @returns `STATUS_INDEX` upon a successful write to `index_output`.
  * Otherwise, `STATUS_NONE`.
  */
-static bool parse_index(const char *str, size_t *const index_output) {
+static input_status parse_index(const char *str, size_t *const index_output) {
   while (!isdigit(*str) && *str != '\0') str++;
   if (*str == '\0') return STATUS_NONE;
   if (sscanf(str, "%zu", index_output) != 1) return STATUS_NONE;
@@ -354,8 +365,8 @@ input_status parse_input(size_t *const index_output) {
   get_input(buf, sizeof(buf) - 1);
   {
     const input_status keyword = parse_keywords(buf);
-    const input_status index_status = parse_index(buf, index_output);
-    return is_special_keyword(keyword) ? keyword : keyword | index_status;
+    const input_status index = parse_index(buf, index_output);
+    return is_special_keyword(keyword) ? keyword : keyword | index;
   }
 }
 
@@ -370,9 +381,9 @@ bool load_config(void) {
     const size_t writes = parse_config_line(data, ARR_LEN(data), input);
     SUITE = TEST_SUITES + data[0];
     if (writes == 1)
-      SUITE->skip = data[1];
+      SUITE->skip = (bool)data[1];
     else if (writes == 2)
-      SUITE->tests[data[1]].skip = data[2];
+      SUITE->tests[data[1]].skip = (bool)data[2];
     else
       break;
   }

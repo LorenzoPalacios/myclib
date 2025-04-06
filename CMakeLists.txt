@@ -5,17 +5,17 @@ include_guard(GLOBAL)
 
 project(myclib)
 
-set(BUILD_TESTS OFF)
+set(BUILD_TESTS ON)
 
 set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 add_compile_options(
-  -O3 -pedantic -Wabi -Wall -Wcast-align -Wcast-qual -Wconversion -Werror
-  -Wextra -Wformat=2 -Wshadow -Wstrict-overflow=5 -Wundef -Wunreachable-code
-  -Wwrite-strings -march=native -mtune=native
+  -D_FORTIFY_SOURCE=1 -march=native -mtune=native -O3 -pedantic -Wabi -Wall
+  -Wcast-align -Wcast-qual -Wconversion -Werror -Wextra -Wformat=2 -Wshadow
+  -Wstrict-overflow=5 -Wundef -Wunreachable-code -Wwrite-strings
 )
 
-set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_STANDARD 99) # This can be freely adjusted.
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_COMPILE_WARNING_AS_ERROR true)
@@ -33,19 +33,7 @@ target_include_directories(str PUBLIC "include")
 target_include_directories(vector PUBLIC "include")
 
 if (BUILD_TESTS)
-set(TESTS_DIR "${PROJECT_SOURCE_DIR}/tests")
-set(STACK_TEST_DIR "${TESTS_DIR}/teststack")
-
-function(init_stack_test target)
-  target_sources(${target}
-    PUBLIC
-    "${STACK_TEST_DIR}/teststack.h"
-    PRIVATE
-    "${STACK_TEST_DIR}/teststack.c"
-  )
-endfunction()
-
-add_executable(tests "${TESTS_DIR}/main.c")
-target_link_libraries(tests stack)
-init_stack_test(tests)
+add_subdirectory("tests")
+add_dependencies(tests stack)
+add_dependencies(tests vector)
 endif()

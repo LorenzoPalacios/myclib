@@ -3,25 +3,8 @@
 
 #include <stddef.h>
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
+#include "../include/boolmyclib.h"
 
-#if (__STDC_VERSION__ < 202311L)
-#include <stdbool.h> /* For C99 to C17. */
-#endif
-
-#else
-
-#define inline /* `inline` keyword is not standardized prior to C99. */
-/* Boolean type for C95 and below. */
-typedef unsigned char bool;
-#ifndef true
-#define true (1)
-#endif
-#ifndef false
-#define false (0)
-#endif
-
-#endif
 
 /* - DEFINITIONS - */
 
@@ -99,7 +82,8 @@ typedef bool (*for_each_op)(void *);
 #define vector_resize(vec, new_capacity) \
   vector_resize_(&(vec), (size_t)(new_capacity))
 
-#define vector_set(vec, elem, index) vector_set_(vec, elem, (size_t)(1 * (index)))
+#define vector_set(vec, elem, index) \
+  vector_set_(vec, elem, (size_t)(1 * (index)))
 
 #define vector_set_range(vec, elem, start, end) \
   vector_set_range_(vec, elem, (size_t)(1 * (start)), (size_t)(1 * (end)))
