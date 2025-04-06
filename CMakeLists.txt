@@ -10,12 +10,12 @@ set(BUILD_TESTS ON)
 set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 add_compile_options(
-  -D_FORTIFY_SOURCE=1 -march=native -mtune=native -O3 -pedantic -Wabi -Wall
+  -D_FORTIFY_SOURCE=1 -march=native -mtune=native -O3 -pedantic -Wall
   -Wcast-align -Wcast-qual -Wconversion -Werror -Wextra -Wformat=2 -Wshadow
   -Wstrict-overflow=5 -Wundef -Wunreachable-code -Wwrite-strings
 )
 
-set(CMAKE_C_STANDARD 99) # This can be freely adjusted.
+set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_COMPILE_WARNING_AS_ERROR true)
