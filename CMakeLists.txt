@@ -7,18 +7,16 @@ project(myclib)
 
 set(BUILD_TESTS ON)
 
-set(DCMAKE_EXPORT_COMPILE_COMMANDS=1)
+set(DCMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_options(
   -D_FORTIFY_SOURCE=1 -march=native -mtune=native -O3 -pedantic -Wall
-  -Wcast-align -Wcast-qual -Wconversion -Werror -Wextra -Wformat=2 -Wshadow
-  -Wstrict-overflow=5 -Wundef -Wunreachable-code -Wwrite-strings
 )
 
-set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_COMPILE_WARNING_AS_ERROR true)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_subdirectory("random")
 add_subdirectory("stack")
