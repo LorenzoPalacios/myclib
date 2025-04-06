@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "../include/compat.h"
+
 #if (CACHE_ALLOWED)
 
 /* - DEFINITIONS - */

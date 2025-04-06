@@ -1,20 +1,7 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
-#if (__STDC_VERSION__ < 202311L)
-/* For C99 to C17. */
-#include <stdbool.h>
-#endif
-#else
-/* For C95 and below. */
-#if (!(defined true || defined false))
-typedef unsigned char bool;
-#define true (1)
-#define false (0)
-#endif
-#define inline
-#endif
+#include "../include/boolmyclib.h"
 
 typedef unsigned int seed_t;
 
