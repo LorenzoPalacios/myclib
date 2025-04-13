@@ -5,26 +5,41 @@ include_guard(GLOBAL)
 
 project(myclib)
 
+set(DEBUG_BUILD ON)
+
 set(BUILD_TESTS ON)
 
 set(DCMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Compiler Arguments
-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set(COMPILER_ARGS
-        -D_FORTIFY_SOURCE=1 -O2 -march=native -mtune=native -Wall -Wcast-align
-        -Wcast-qual -Wconversion -Wextra -Wfloat-equal -Wformat=2 -Winit-self
-        -Winline -Wlogical-op -Wpedantic -Wpointer-arith -Wredundant-decls -Wshadow
-        -Wstrict-overflow=5 -Wstrict-aliasing=2 -Wswitch-default -Wundef
-        -Wunreachable-code)
-elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    set(COMPILER_ARGS
-        -D_FORTIFY_SOURCE=1 -O2 -march=native -mtune=native -Weverything
-        -Wno-c23-compat -Wno-padded -Wno-switch-enum -Wno-unsafe-buffer-usage)
-elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    set(MSVC_ARGS /analyze /guard:cf /Gw /MP /Ox /Wall /WL)
-else()
-    set(COMPILER_ARGS)
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    if(DEBUG_BUILD)
+        set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
+        set(CMAKE_C_FLAGS "{$CMAKE_C_FLAGS} -g -O0")
+    else()
+        set(CMAKE_C_FLAGS "-D_FORTIFY_SOURCE=2 -O2")
+    endif()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mtune=native -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wcast-qual -Wconversion -Wextra")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wfloat-equal -Wformat=2 -Winit-self")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Winline -Wlogical-op -Wpedantic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpointer-arith -Wredundant-decls")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wshadow -Wstrict-overflow=5")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wstrict-aliasing=2 -Wswitch-default")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wundef -Wunreachable-code")
+elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+    if(DEBUG_BUILD)
+        set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0")
+    else()
+        set(CMAKE_C_FLAGS "-D_FORTIFY_SOURCE=2 -O2")
+    endif()
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mtune=native")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Weverything -Wno-c23-compat")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-align -Wno-padded")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-switch-enum -Wno-unsafe-buffer-usage")
+elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    set(CMAKE_C_FLAGS "/analyze /guard:cf /Gw /MP /Ox /Wall /WL")
 endif()
 
 set(CMAKE_COMPILE_WARNING_AS_ERROR true)
@@ -54,8 +69,7 @@ target_sources(myclib
     PUBLIC "${STR_DIR}/str.h"
     PRIVATE "${STR_DIR}/str.c")
 target_sources(myclib
-    PUBLIC "${VECTOR_DIR}/vector.h"
-    PRIVATE "${VECTOR_DIR}/vector.c")
+    PUBLIC "${VECTOR_DIR}/vector.h")
 
 # Building Tests
 
