@@ -6,7 +6,7 @@
 
 #include "../include/boolmyclib.h"
 
-#define TEST_SUITE_ASSERT(expr) \
+#define TEST_CASE_ASSERT(expr) \
   if (!(expr)) return false
 
 /* - DEFINITIONS - */
