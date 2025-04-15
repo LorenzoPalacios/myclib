@@ -5,7 +5,7 @@ include_guard(GLOBAL)
 
 project(myclib)
 
-set(DEBUG_BUILD ON)
+set(DEBUG_BUILD OFF)
 
 set(BUILD_TESTS ON)
 
