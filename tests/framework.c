@@ -54,11 +54,11 @@ static test STACK_TESTS[] = {
 };
 
 static test VECTOR_TESTS[] = {
-    CONSTRUCT_TEST(test_vector_add),    CONSTRUCT_TEST(test_vector_clear),
-    CONSTRUCT_TEST(test_vector_copy),   CONSTRUCT_TEST(test_vector_delete),
-    CONSTRUCT_TEST(test_vector_expand), CONSTRUCT_TEST(test_vector_get),
-    CONSTRUCT_TEST(test_vector_init),   CONSTRUCT_TEST(test_vector_insert),
-    CONSTRUCT_TEST(test_vector_new),    CONSTRUCT_TEST(test_vector_set),
+    CONSTRUCT_TEST(test_vector_clear),  CONSTRUCT_TEST(test_vector_copy),
+    CONSTRUCT_TEST(test_vector_delete), CONSTRUCT_TEST(test_vector_expand),
+    CONSTRUCT_TEST(test_vector_get),    CONSTRUCT_TEST(test_vector_new),
+    CONSTRUCT_TEST(test_vector_insert), CONSTRUCT_TEST(test_vector_push),
+    CONSTRUCT_TEST(test_vector_resize), CONSTRUCT_TEST(test_vector_set),
     CONSTRUCT_TEST(test_vector_shrink),
 };
 
