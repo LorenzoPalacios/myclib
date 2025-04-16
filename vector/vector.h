@@ -41,8 +41,7 @@ typedef struct {
 #define vector_capacity(vec) (+vector_header_const(vec)->capacity)
 
 #define vector_clear(vec)                                     \
-  ((void)(memset(vec, 0, sizeof *(vec) * vector_length(vec)), \
-          vector_header(vec)->length = 0))
+  ((void)(memset(vec, 0, sizeof *(vec) * vector_length(vec))))
 
 #define vector_clear_s(vec) vector_untyped_clear(vec, sizeof *(vec))
 
@@ -87,6 +86,8 @@ typedef struct {
 
 #define vector_push_s(vec, elem) \
   vector_untyped_push((void **)&(vec), (const void *)&(elem), sizeof *(vec))
+
+#define vector_reset(vec) vector_header(vec)->length = 0
 
 /* clang-format off */
 
@@ -158,7 +159,6 @@ static void *vector_untyped_shrink(void **vec, size_t elem_size);
 static inline void vector_untyped_clear(void *const vec,
                                         const size_t elem_size) {
   memset(vec, 0, elem_size * vector_length(vec));
-  vector_header(vec)->length = 0;
 }
 
 static inline void *vector_untyped_copy(const void *const vec,

@@ -19,6 +19,8 @@ bool test_vector_new(void);
 
 bool test_vector_push(void);
 
+bool test_vector_reset(void);
+
 bool test_vector_resize(void);
 
 bool test_vector_set(void);

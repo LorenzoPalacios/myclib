@@ -58,8 +58,8 @@ static test VECTOR_TESTS[] = {
     CONSTRUCT_TEST(test_vector_delete), CONSTRUCT_TEST(test_vector_expand),
     CONSTRUCT_TEST(test_vector_get),    CONSTRUCT_TEST(test_vector_new),
     CONSTRUCT_TEST(test_vector_insert), CONSTRUCT_TEST(test_vector_push),
-    CONSTRUCT_TEST(test_vector_resize), CONSTRUCT_TEST(test_vector_set),
-    CONSTRUCT_TEST(test_vector_shrink),
+    CONSTRUCT_TEST(test_vector_reset),  CONSTRUCT_TEST(test_vector_resize),
+    CONSTRUCT_TEST(test_vector_set),    CONSTRUCT_TEST(test_vector_shrink),
 };
 
 /* - EXTERNAL DEFINITIONS - */

@@ -18,8 +18,6 @@ bool test_vector_clear(void) {
   {
     vector_clear(vec);
 
-    TEST_CASE_ASSERT(vector_length(vec) == 0);
-
     vector_set_s(vec, TEST_DATA[1], 5);
 
     TEST_CASE_ASSERT(vector_get(vec, 0) == 0);
@@ -28,8 +26,6 @@ bool test_vector_clear(void) {
   }
   {
     vector_clear_s(vec);
-
-    TEST_CASE_ASSERT(vector_length(vec) == 0);
 
     vector_set_s(vec, TEST_DATA[1], 10);
 
@@ -155,6 +151,18 @@ bool test_vector_push(void) {
   return true;
 }
 
+bool test_vector_reset(void) {
+  vector(int) vec = vector_new(int, 3);
+
+  vector_push(vec, 2);
+  TEST_CASE_ASSERT(vector_length(vec) != 0);
+
+  vector_reset(vec);
+  TEST_CASE_ASSERT(vector_length(vec) == 0);
+
+  return true;
+}
+
 bool test_vector_resize(void) {
   const size_t SMALL = 1 << 5;
   const size_t MEDIUM = 1 << 10;
@@ -205,7 +213,7 @@ bool test_vector_shrink(void) {
 
   TEST_CASE_ASSERT(vector_capacity(vec) == vector_length(vec));
 
-  vector_clear(vec);
+  vector_reset(vec);
   vector_shrink_s(vec);
 
   TEST_CASE_ASSERT(vector_capacity(vec) == 0);
