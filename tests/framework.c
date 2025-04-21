@@ -11,6 +11,7 @@
 /* - TESTING HEADERS - */
 
 #include "stacktests/stacktests.h"
+#include "strtests/strtests.h"
 #include "vectortests/vectortests.h"
 
 /* - FUNCTION MACROS - */
@@ -53,6 +54,20 @@ static test STACK_TESTS[] = {
     CONSTRUCT_TEST(test_stack_shrink),
 };
 
+static test STR_TESTS[] = {
+    CONSTRUCT_TEST(test_string_append),
+    CONSTRUCT_TEST(test_string_clear),
+    CONSTRUCT_TEST(test_string_copy),
+    CONSTRUCT_TEST(test_string_delete),
+    CONSTRUCT_TEST(test_string_equals),
+    CONSTRUCT_TEST(test_string_expand),
+    CONSTRUCT_TEST(test_string_find_replace),
+    CONSTRUCT_TEST(test_string_insert),
+    CONSTRUCT_TEST(test_string_ctor),
+    CONSTRUCT_TEST(test_string_resize),
+    CONSTRUCT_TEST(test_string_shrink),
+};
+
 static test VECTOR_TESTS[] = {
     CONSTRUCT_TEST(test_vector_clear),  CONSTRUCT_TEST(test_vector_copy),
     CONSTRUCT_TEST(test_vector_delete), CONSTRUCT_TEST(test_vector_expand),
@@ -66,6 +81,7 @@ static test VECTOR_TESTS[] = {
 
 test_suite TEST_SUITES[] = {
     CONSTRUCT_SUITE(STACK_TESTS),
+    CONSTRUCT_SUITE(STR_TESTS),
     CONSTRUCT_SUITE(VECTOR_TESTS),
 };
 

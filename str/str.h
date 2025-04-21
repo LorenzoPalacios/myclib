@@ -3,58 +3,96 @@
 
 #include <stdio.h>
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
-#if (__STDC_VERSION__ < 202311L)
-/* For C99 to C17. */
-#include <stdbool.h>
-#endif
+#include "../include/boolmyclib.h"
+#include "../include/compat.h"
+
+/* - DEFINITIONS - */
+
+typedef char *string;
+
+typedef const char *const_string;
+
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199901L)
+/* Widest basic integral type. */
+typedef long long wb_int;
+/* Widest basic unsigned integral type. */
+typedef unsigned long long wb_uint;
 #else
-/* For C95 and below. */
-#if (!(defined true || defined false))
-typedef unsigned char bool;
-#define true (1)
-#define false (0)
-#endif
-#define inline
+/* Widest basic integral type. */
+typedef long wb_int;
+/* Widest basic unsigned integral type. */
+typedef unsigned long wb_uint;
 #endif
 
-/*
- * `data`     - The character contents of the string.
- * `length`   - The number of characters present within the string (disregarding
- *              the null terminator).
- * `capacity` - The number of characters the string can store (disregarding the
- *              null terminator).
- */
-typedef struct {
-  char *data;
-  size_t length;
-  size_t capacity;
-} string;
+#define STR_DEFAULT_CAPACITY (8192)
 
-#define string_append(str, appended)                 \
-  (_Generic((appended),                              \
-       short: string_append_int,                     \
-       int: string_append_int,                       \
-       long: string_append_int,                      \
-       long long: string_append_int,                 \
-       unsigned short: string_append_uint,           \
-       unsigned int: string_append_uint,             \
-       unsigned long: string_append_uint,            \
-       unsigned long long: string_append_uint,       \
-       string *: string_append_str,                  \
-       const string *: string_append_str,            \
-       char *: string_append_raw_str,                \
-       signed char *: string_append_raw_str,         \
-       unsigned char *: string_append_raw_str,       \
-       const char *: string_append_raw_str,          \
-       const signed char *: string_append_raw_str,   \
-       const unsigned char *: string_append_raw_str, \
-       char: string_append_char,                     \
-       signed char: string_append_char,              \
-       unsigned char: string_append_char)(&(str), appended))
+/* - CONVENIENCE MACROS - */
+
+#define string_append_char(dst, src) string_append_char_(&(dst), src)
+
+#define string_append_str(dst, src) string_append_str_(&(dst), src)
+
+#define string_append_raw_str(dst, src) string_append_raw_str_(&(dst), src)
+
+#define string_append_int(dst, num) string_append_int_(&(dst), (wb_int)(num))
+
+#define string_append_uint(dst, num) string_append_uint_(&(dst), (wb_uint)(num))
+
+#define string_delete(str) string_delete_(&(str))
+
+#define string_expand(str) string_expand_(&(str))
+
+#define string_expand_towards(str, target_capacity) \
+  string_expand_towards_(&(str), target_capacity)
+
+#define string_find_replace_str(src, tgt, repl) \
+  string_find_replace_str_(&(src), tgt, repl)
+
+#define string_find_replace_raw_str(src, tgt, repl) \
+  string_find_replace_raw_str_(&(src), tgt, repl)
+
+#define string_find_replace_char(src, tgt, repl) \
+  string_find_replace_char_(&(src), tgt, repl)
+
+#define string_insert_char(dst, chr, index) \
+  string_insert_char_(&(dst), chr, index)
+
+#define string_insert_int(dst, num, index) \
+  string_insert_int_(&(dst), (wb_int)(num), index)
+
+#define string_insert_uint(dst, num, index) \
+  string_insert_uint_(&(dst), (wb_uint)(num), index)
+
+#define string_insert_raw_str(dst, src, index) \
+  string_insert_raw_str_(&(dst), src, index)
+
+#define string_insert_str(dst, src, index) \
+  string_insert_str_(&(dst), src, index)
+
+#define string_resize(str, new_capacity) string_resize_(&(str), new_capacity)
+
+#define string_shrink(str) string_shrink_(&(str))
+
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
+
+#define string_append(str, appended)           \
+  (_Generic(appended,                          \
+       short: string_append_int,               \
+       int: string_append_int,                 \
+       long: string_append_int,                \
+       long long: string_append_int,           \
+       unsigned short: string_append_uint,     \
+       unsigned int: string_append_uint,       \
+       unsigned long: string_append_uint,      \
+       unsigned long long: string_append_uint, \
+       string: string_append_raw_str,          \
+       const_string: string_append_raw_str,    \
+       char: string_append_char,               \
+       signed char: string_append_char,        \
+       unsigned char: string_append_char)(str, appended))
 
 #define string_find_replace(src, needle, replacer)         \
-  (_Generic((needle),                                      \
+  (_Generic(needle,                                        \
        string *: string_find_replace_str,                  \
        const string *: string_find_replace_str,            \
        char *: string_find_replace_raw_str,                \
@@ -65,50 +103,65 @@ typedef struct {
        const unsigned char *: string_find_replace_raw_str, \
        char: string_find_replace_char,                     \
        signed char: string_find_replace_char,              \
-       unsigned char: string_find_replace_char)(&(str), needle, replacer))
+       unsigned char: string_find_replace_char)(str, needle, replacer))
 
-#define string_insert(str, inserted, index)          \
-  (_Generic((inserted),                              \
-       short: string_insert_int,                     \
-       int: string_insert_int,                       \
-       long: string_insert_int,                      \
-       long long: string_insert_int,                 \
-       unsigned short: string_insert_uint,           \
-       unsigned int: string_insert_uint,             \
-       unsigned long: string_insert_uint,            \
-       unsigned long long: string_insert_uint,       \
-       string *: string_insert_str,                  \
-       const string *: string_insert_str,            \
-       char *: string_insert_raw_str,                \
-       signed char *: string_insert_raw_str,         \
-       unsigned char *: string_insert_raw_str,       \
-       const char *: string_insert_raw_str,          \
-       const signed char *: string_insert_raw_str,   \
-       const unsigned char *: string_insert_raw_str, \
-       char: string_insert_char,                     \
-       signed char: string_insert_char,              \
-       unsigned char: string_insert_char)(&(str), inserted, index))
+#define string_insert(str, inserted, index)    \
+  (_Generic(inserted,                          \
+       short: string_insert_int,               \
+       int: string_insert_int,                 \
+       long: string_insert_int,                \
+       long long: string_insert_int,           \
+       unsigned short: string_insert_uint,     \
+       unsigned int: string_insert_uint,       \
+       unsigned long: string_insert_uint,      \
+       unsigned long long: string_insert_uint, \
+       const_string: string_insert_str,        \
+       string: string_insert_raw_str,          \
+       char: string_insert_char,               \
+       signed char: string_insert_char,        \
+       unsigned char: string_insert_char)(str, inserted, index))
 
-#define string_new(arg)                          \
-  (_Generic((arg),                               \
-       char: string_of_char,                     \
-       signed char: string_of_char,              \
-       unsigned char: string_of_char,            \
-       short: string_of_capacity,                \
-       int: string_of_capacity,                  \
-       long: string_of_capacity,                 \
-       long long: string_of_capacity,            \
-       unsigned short: string_of_capacity,       \
-       unsigned int: string_of_capacity,         \
-       unsigned long: string_of_capacity,        \
-       unsigned long long: string_of_capacity,   \
-       char *: string_of_raw_str,                \
-       signed char *: string_of_raw_str,         \
-       unsigned char *: string_of_raw_str,       \
-       const char *: string_of_raw_str,          \
-       const signed char *: string_of_raw_str,   \
-       const unsigned char *: string_of_raw_str, \
-       FILE *: string_of_stream)(arg))
+#if (__STDC_VERSION__ >= 202311L)
+#define string(...)                                                 \
+  (_Generic((__VA_OPT__((void)) STR_DEFAULT_CAPACITY __VA_OPT__(, ) \
+                 __VA_ARGS__),                                      \
+       char: string_from_char,                                      \
+       signed char: string_from_char,                               \
+       unsigned char: string_from_char,                             \
+       short: string_init,                                          \
+       int: string_init,                                            \
+       long: string_init,                                           \
+       long long: string_init,                                      \
+       unsigned short: string_init,                                 \
+       unsigned int: string_init,                                   \
+       unsigned long: string_init,                                  \
+       unsigned long long: string_init,                             \
+       char *: string_from_raw_str,                                 \
+       const char *: string_from_raw_str,                           \
+       FILE *: string_from_stream)(                                 \
+      (__VA_OPT__((void)) STR_DEFAULT_CAPACITY __VA_OPT__(, ) __VA_ARGS__)))
+#else
+#define string(arg)                       \
+  (_Generic(arg,                          \
+       char: string_from_char,            \
+       signed char: string_from_char,     \
+       unsigned char: string_from_char,   \
+       short: string_init,                \
+       int: string_init,                  \
+       long: string_init,                 \
+       long long: string_init,            \
+       unsigned short: string_init,       \
+       unsigned int: string_init,         \
+       unsigned long: string_init,        \
+       unsigned long long: string_init,   \
+       char *: string_from_raw_str,       \
+       const char *: string_from_raw_str, \
+       FILE *: string_from_stream)(arg))
+#endif
+
+#endif
+
+/* - FUNCTIONS - */
 
 /**
  * @brief Appends a character to the end of the string.
@@ -120,7 +173,7 @@ typedef struct {
  * @param chr The character to append to the string.
  * @return `true` if the character was successfully appended. `false` otherwise.
  */
-bool string_append_char(string *dst, char chr);
+bool string_append_char_(string *dst, char chr);
 
 /**
  * @brief Appends one string to another.
@@ -132,7 +185,7 @@ bool string_append_char(string *dst, char chr);
  * @param src A pointer to the source string.
  * @return `true` if the string was successfully appended. `false` otherwise.
  */
-bool string_append_str(string *dst, const string *src);
+bool string_append_str_(string *dst, const_string src);
 
 /**
  * @brief Appends a raw C-string to the end of the string.
@@ -145,64 +198,8 @@ bool string_append_str(string *dst, const string *src);
  * @param src The raw C-string to append to the string.
  * @return `true` if the C-string was successfully appended. `false` otherwise.
  */
-bool string_append_raw_str(string *dst, const char *src);
+bool string_append_raw_str_(string *dst, const char *src);
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199409L)
-/**
- * @brief Appends an integer to a string.
- *
- * This function converts the given `long long` integer to its string
- * representation and appends it to the end of the string, expanding the
- * string if necessary.
- *
- * @param str A pointer to the string to which the integer will be appended.
- * @param num The integer to append to the string.
- * @return `true` if the integer was successfully appended. `false` otherwise.
- */
-bool string_append_int(string *str, long long num);
-
-/**
- * @brief Appends an unsigned integer to a string.
- *
- * This function converts the given `unsigned long long` integer to its string
- * representation and appends it to the end of the string, expanding the
- * string if necessary.
- *
- * @param str A pointer to the string to which the integer will be appended.
- * @param num The `unsigned long long` integer to append to the string.
- * @return `true` if the unsigned integer was successfully appended. `false`
- * otherwise.
- */
-bool string_append_uint(string *str, unsigned long long num);
-
-/**
- * @brief Inserts an integer into a string at the specified index.
- *
- * This function converts the given `long long` integer to its string
- * representation and inserts it into the string at the specified index,
- * expanding the string if necessary.
- *
- * @param dst A pointer to the string.
- * @param num The integer to insert.
- * @param index The index at which to insert the integer.
- * @return `true` if the insertion occurred successfully. `false` otherwise.
- */
-bool string_insert_int(string *dst, long long num, size_t index);
-
-/**
- * @brief Inserts an unsigned integer into a string at the specified index.
- *
- * This function converts the given `unsigned long long` integer to its string
- * representation and inserts it into the string at the specified index,
- * expanding the string if necessary.
- *
- * @param dst A pointer to the string.
- * @param num The unsigned integer to insert.
- * @param index The index at which to insert the integer.
- * @return `true` if the insertion occurred successfully. `false` otherwise.
- */
-bool string_insert_uint(string *dst, unsigned long long num, size_t index);
-#else
 /**
  * @brief Appends an integer to a string.
  *
@@ -213,7 +210,7 @@ bool string_insert_uint(string *dst, unsigned long long num, size_t index);
  * @param num The integer to append to the string.
  * @return `true` if the integer was successfully appended. `false` otherwise.
  */
-bool string_append_int(string *str, long num);
+bool string_append_int_(string *str, wb_int num);
 
 /**
  * @brief Appends an unsigned integer to a string.
@@ -227,7 +224,7 @@ bool string_append_int(string *str, long num);
  * @return `true` if the unsigned integer was successfully appended. `false`
  * otherwise.
  */
-bool string_append_uint(string *str, unsigned long num);
+bool string_append_uint_(string *str, wb_uint num);
 
 /**
  * @brief Inserts an integer into a string at the specified index.
@@ -241,38 +238,39 @@ bool string_append_uint(string *str, unsigned long num);
  * @param index The index at which to insert the integer.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_int(string *dst, long num, size_t index);
+bool string_insert_int_(string *dst, wb_int num, size_t index);
 
 /**
  * @brief Inserts an unsigned integer into a string at the specified index.
  *
- * This function converts the given unsigned integer to its string
- * representation and inserts it into the string at the specified index,
- * expanding the string if necessary.
+ * This function converts the given integer to its string representation and
+ * inserts it into the string at the specified index, expanding the string if
+ * necessary.
  *
  * @param dst A pointer to the string.
  * @param num The unsigned integer to insert.
  * @param index The index at which to insert the integer.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_uint(string *dst, unsigned long num, size_t index);
-#endif
+bool string_insert_uint_(string *dst, wb_uint num, size_t index);
+
+size_t string_capacity(const_string str);
+
 /**
  * @brief Clears the contents of the string.
  *
  * This function sets the length of the string to 0 and sets the first
- * character of the string data to the `NULL` terminator.
+ * character of the string data to a null terminator.
  *
  * @param str A pointer to the string to be cleared.
  */
-void string_clear(string *str);
+void string_clear(string str);
 
-/**
- * @brief Frees the contents of the string.
- *
- * @param str A pointer to the string to be deleted.
- */
-void string_delete(const string *str);
+string string_copy(const_string str);
+
+void string_delete_(string *str);
+
+bool string_equals(const_string str1, const_string str2);
 
 /**
  * @brief Expands the capacity of the string.
@@ -283,54 +281,49 @@ void string_delete(const string *str);
  * @param str A pointer to the string to be expanded.
  * @return `true` if the expanion was successful. `false` otherwise.
  */
-bool string_expand(string *str);
+bool string_expand_(string *str);
+
+/**
+ * @brief Expands the capacity of the string to at least the target capacity.
+ *
+ * @param str A pointer to the string to be expanded.
+ * @return `true` if the expanion was successful. `false` otherwise.
+ */
+bool string_expand_towards_(string *str, size_t target_capacity);
 
 /**
  * @brief Finds and replaces the first occurrence of a substring within a
  * string.
- *
- * This function finds the first occurrence of the needle string within the
- * haystack string and replaces it with the replacement string, expanding the
- * haystack string if necessary.
  *
  * @param src A pointer to the haystack string.
  * @param tgt A pointer to the needle string.
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_str(string *src, const string *tgt,
-                             const string *replace);
+bool string_find_replace_str_(string *src, const_string tgt,
+                              const_string replace);
 
 /**
- * @brief Finds and replaces the first occurrence of a raw C-string within a
- * string.
- *
- * This function finds the first occurrence of the needle raw C-string within
- * the haystack string and replaces it with the replacement string, expanding
- * the haystack string if necessary.
+ * @brief Finds and replaces the first occurrence of a C-string.
  *
  * @param src A pointer to the haystack string.
  * @param tgt A pointer to the needle raw C-string.
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_raw_str(string *src, const char *tgt,
-                                 const string *replace);
+bool string_find_replace_raw_str_(string *src, const char *tgt,
+                                  const_string replace);
 
 /**
  * @brief Finds and replaces the first occurrence of a character within a
  * string.
- *
- * This function finds the first occurrence of the needle character within the
- * haystack string and replaces it with the replacement string, expanding the
- * haystack string if necessary.
  *
  * @param src A pointer to the haystack string.
  * @param tgt The needle character.
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_char(string *src, char tgt, const string *replace);
+bool string_find_replace_char_(string *src, char tgt, const_string replace);
 
 /**
  * @brief Inserts a character into the string at the specified index.
@@ -343,7 +336,7 @@ bool string_find_replace_char(string *src, char tgt, const string *replace);
  * @param index The index at which to insert the character.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_char(string *dst, char chr, size_t index);
+bool string_insert_char_(string *dst, char chr, size_t index);
 
 /**
  * @brief Inserts a raw C-string into a string at the specified index.
@@ -356,7 +349,7 @@ bool string_insert_char(string *dst, char chr, size_t index);
  * @param index The index at which to insert the raw C-string.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_raw_str(string *dst, const char *src, size_t index);
+bool string_insert_raw_str_(string *dst, const char *src, size_t index);
 
 /**
  * @brief Inserts one string into another at the specified index.
@@ -370,7 +363,7 @@ bool string_insert_raw_str(string *dst, const char *src, size_t index);
  * @param index The index at which to insert the source string.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_str(string *dst, const string *src, size_t index);
+bool string_insert_str_(string *dst, const_string src, size_t index);
 
 /**
  * @brief Creates a new string of a specified capacity.
@@ -393,7 +386,7 @@ string string_init(size_t capacity);
  * @return A string of default capacity whose contents are solely the passed
  * character.
  */
-string string_new_char(char chr);
+string string_from_char(char chr);
 
 /**
  * @brief Creates a new string from a raw C-string.
@@ -401,11 +394,11 @@ string string_new_char(char chr);
  * This function creates a new string object containing the characters from
  * the specified raw C-string.
  *
- * @param c_str The raw C-string to be contained in the new string.
+ * @param raw_str The raw C-string to be contained in the new string.
  * @return A string of default capacity whose contents are a copy of the passed
  * C-string.
  */
-string string_new_c_str(const char *c_str);
+string string_from_raw_str(const char *raw_str);
 
 /**
  * @brief Creates a new string from a single line of input from stdin.
@@ -416,7 +409,7 @@ string string_new_c_str(const char *c_str);
  * @return A string whose contents are that of a single line of input from
  * `stdin`.
  */
-string string_new_stdin(void);
+string string_from_stdin(void);
 
 /**
  * @brief Creates a new string from a stream.
@@ -428,7 +421,7 @@ string string_new_stdin(void);
  * @return A string whose contents are all of the characters within the passed
  * stream.
  */
-string string_new_stream(FILE *stream);
+string string_from_stream(FILE *stream);
 
 /**
  * @brief Creates a new string from a stream until a delimiter is met.
@@ -444,7 +437,9 @@ string string_new_stream(FILE *stream);
  * the delimiter character, the contents of the string will be all of the
  * characters within the passed stream.
  */
-string string_new_stream_delim(FILE *stream, char delim);
+string string_from_stream_delim(FILE *stream, char delim);
+
+size_t string_length(const_string str);
 
 /**
  * @brief Resizes the string to the specified number of characters.
@@ -456,7 +451,7 @@ string string_new_stream_delim(FILE *stream, char delim);
  * @param new_capacity The new capacity of the string in bytes.
  * @return `true` if the string was successfully resized. `false` otherwise.
  */
-bool string_resize(string *str, size_t new_capacity);
+bool string_resize_(string *str, size_t new_capacity);
 
 /**
  * @brief Shrinks the memory used for the string to fit its contents.
@@ -467,6 +462,6 @@ bool string_resize(string *str, size_t new_capacity);
  * @param str A pointer to the string to be shrank.
  * @return `true` if the string was successfully shrank. `false` otherwise.
  */
-bool string_shrink_alloc(string *str);
+bool string_shrink_(string *str);
 
 #endif
