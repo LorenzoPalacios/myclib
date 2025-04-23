@@ -5,7 +5,7 @@ include_guard(GLOBAL)
 
 project(myclib)
 
-set(DEBUG_BUILD OFF)
+set(DEBUG_BUILD ON)
 
 set(BUILD_TESTS ON)
 
@@ -26,7 +26,7 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpointer-arith -Wredundant-decls")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wshadow -Wstrict-overflow=5")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wstrict-aliasing=2 -Wswitch-default")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wundef -Wunreachable-code")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wunreachable-code")
 elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
     if(DEBUG_BUILD)
         set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
@@ -42,7 +42,7 @@ elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_C_FLAGS "/analyze /guard:cf /Gw /MP /Ox /Wall /WL")
 endif()
 
-set(CMAKE_COMPILE_WARNING_AS_ERROR false)
+set(CMAKE_COMPILE_WARNING_AS_ERROR true)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
 set(CMAKE_C_STANDARD_REQUIRED ON)
