@@ -3,8 +3,7 @@
 
 #include <stdio.h>
 
-#include "../include/boolmyclib.h"
-#include "../include/compat.h"
+#include "../include/myclib.h"
 
 /* - DEFINITIONS - */
 
@@ -12,25 +11,13 @@ typedef char *string;
 
 typedef const char *const_string;
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ > 199901L)
-/* Widest basic integral type. */
-typedef long long wb_int;
-/* Widest basic unsigned integral type. */
-typedef unsigned long long wb_uint;
-#else
-/* Widest basic integral type. */
-typedef long wb_int;
-/* Widest basic unsigned integral type. */
-typedef unsigned long wb_uint;
-#endif
-
 #define STR_DEFAULT_CAPACITY (8192)
 
 /* - CONVENIENCE MACROS - */
 
 #define string_append_char(dst, src) string_append_char_(&(dst), src)
 
-#define string_append_str(dst, src) string_append_str_(&(dst), src)
+#define string_append_str(dst, src) string_append_str_(&(dst), &(src))
 
 #define string_append_raw_str(dst, src) string_append_raw_str_(&(dst), src)
 
@@ -67,61 +54,55 @@ typedef unsigned long wb_uint;
   string_insert_raw_str_(&(dst), src, index)
 
 #define string_insert_str(dst, src, index) \
-  string_insert_str_(&(dst), src, index)
+  string_insert_str_(&(dst), &(src), index)
 
 #define string_resize(str, new_capacity) string_resize_(&(str), new_capacity)
 
 #define string_shrink(str) string_shrink_(&(str))
 
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
+#if (IS_STDC11 && !IS_CPP)
+#define string_append(str, appended)            \
+  (_Generic(appended,                           \
+       short: string_append_int_,               \
+       int: string_append_int_,                 \
+       long: string_append_int_,                \
+       long long: string_append_int_,           \
+       unsigned short: string_append_uint_,     \
+       unsigned int: string_append_uint_,       \
+       unsigned long: string_append_uint_,      \
+       unsigned long long: string_append_uint_, \
+       char: string_append_char_,               \
+       signed char: string_append_char_,        \
+       unsigned char: string_append_char_,      \
+       string: string_append_raw_str_,          \
+       const_string: string_append_raw_str_)(&(str), appended))
 
-#define string_append(str, appended)           \
-  (_Generic(appended,                          \
-       short: string_append_int,               \
-       int: string_append_int,                 \
-       long: string_append_int,                \
-       long long: string_append_int,           \
-       unsigned short: string_append_uint,     \
-       unsigned int: string_append_uint,       \
-       unsigned long: string_append_uint,      \
-       unsigned long long: string_append_uint, \
-       string: string_append_raw_str,          \
-       const_string: string_append_raw_str,    \
-       char: string_append_char,               \
-       signed char: string_append_char,        \
-       unsigned char: string_append_char)(str, appended))
+#define string_find_replace(src, needle, replacer) \
+  (_Generic(needle,                                \
+       string *: string_find_replace_str_,         \
+       const string *: string_find_replace_str_,   \
+       char *: string_find_replace_raw_str_,       \
+       char: string_find_replace_char_,            \
+       signed char: string_find_replace_char_,     \
+       unsigned char: string_find_replace_char_)(&(str), needle, replacer))
 
-#define string_find_replace(src, needle, replacer)         \
-  (_Generic(needle,                                        \
-       string *: string_find_replace_str,                  \
-       const string *: string_find_replace_str,            \
-       char *: string_find_replace_raw_str,                \
-       signed char *: string_find_replace_raw_str,         \
-       unsigned char *: string_find_replace_raw_str,       \
-       const char *: string_find_replace_raw_str,          \
-       const signed char *: string_find_replace_raw_str,   \
-       const unsigned char *: string_find_replace_raw_str, \
-       char: string_find_replace_char,                     \
-       signed char: string_find_replace_char,              \
-       unsigned char: string_find_replace_char)(str, needle, replacer))
+#define string_insert(str, inserted, index)     \
+  (_Generic(inserted,                           \
+       short: string_insert_int_,               \
+       int: string_insert_int_,                 \
+       long: string_insert_int_,                \
+       long long: string_insert_int_,           \
+       unsigned short: string_insert_uint_,     \
+       unsigned int: string_insert_uint_,       \
+       unsigned long: string_insert_uint_,      \
+       unsigned long long: string_insert_uint_, \
+       char: string_insert_char_,               \
+       signed char: string_insert_char_,        \
+       unsigned char: string_insert_char_,      \
+       const char *: string_insert_raw_str_,    \
+       char *: string_insert_raw_str_)(&(str), inserted, index))
 
-#define string_insert(str, inserted, index)    \
-  (_Generic(inserted,                          \
-       short: string_insert_int,               \
-       int: string_insert_int,                 \
-       long: string_insert_int,                \
-       long long: string_insert_int,           \
-       unsigned short: string_insert_uint,     \
-       unsigned int: string_insert_uint,       \
-       unsigned long: string_insert_uint,      \
-       unsigned long long: string_insert_uint, \
-       const_string: string_insert_str,        \
-       string: string_insert_raw_str,          \
-       char: string_insert_char,               \
-       signed char: string_insert_char,        \
-       unsigned char: string_insert_char)(str, inserted, index))
-
-#if (__STDC_VERSION__ >= 202311L)
+#if (IS_STDC23)
 #define string(...)                                                 \
   (_Generic((__VA_OPT__((void)) STR_DEFAULT_CAPACITY __VA_OPT__(, ) \
                  __VA_ARGS__),                                      \
@@ -158,7 +139,6 @@ typedef unsigned long wb_uint;
        const char *: string_from_raw_str, \
        FILE *: string_from_stream)(arg))
 #endif
-
 #endif
 
 /* - FUNCTIONS - */
@@ -270,7 +250,7 @@ string string_copy(const_string str);
 
 void string_delete_(string *str);
 
-bool string_equals(const_string str1, const_string str2);
+bool string_equals(const char *str1, const char *str2);
 
 /**
  * @brief Expands the capacity of the string.
@@ -292,16 +272,15 @@ bool string_expand_(string *str);
 bool string_expand_towards_(string *str, size_t target_capacity);
 
 /**
- * @brief Finds and replaces the first occurrence of a substring within a
+ * @brief Finds and replaces the first occurrence of a character within a
  * string.
  *
  * @param src A pointer to the haystack string.
- * @param tgt A pointer to the needle string.
+ * @param tgt The needle character.
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_str_(string *src, const_string tgt,
-                              const_string replace);
+bool string_find_replace_char_(string *src, char tgt, const_string replace);
 
 /**
  * @brief Finds and replaces the first occurrence of a C-string.
@@ -315,15 +294,16 @@ bool string_find_replace_raw_str_(string *src, const char *tgt,
                                   const_string replace);
 
 /**
- * @brief Finds and replaces the first occurrence of a character within a
+ * @brief Finds and replaces the first occurrence of a substring within a
  * string.
  *
  * @param src A pointer to the haystack string.
- * @param tgt The needle character.
+ * @param tgt A pointer to the needle string.
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_char_(string *src, char tgt, const_string replace);
+bool string_find_replace_str_(string *src, const_string tgt,
+                              const_string replace);
 
 /**
  * @brief Inserts a character into the string at the specified index.

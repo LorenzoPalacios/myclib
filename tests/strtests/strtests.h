@@ -1,7 +1,7 @@
 #ifndef TEST_STR_H
 #define TEST_STR_H
 
-#include "../../include/boolmyclib.h"
+#include "../../include/myclib.h"
 
 bool test_string_append(void);
 

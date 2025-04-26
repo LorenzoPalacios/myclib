@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <time.h>
 
-#include "../include/boolmyclib.h"
+#include "../include/myclib.h"
 
 #define TEST_CASE_ASSERT(expr) \
   if (!(expr)) return false
@@ -33,15 +33,15 @@ typedef enum input_status {
 typedef bool (*test_func_t)(void);
 
 typedef struct test {
-  const char *const name;
-  const test_func_t test;
+  const char *const NAME;
+  const test_func_t TEST;
   clock_t elapsed;
   bool passed;
   bool skip;
 } test;
 
 typedef struct test_suite {
-  const char *const name;
+  const char *const NAME;
   test *tests;
   size_t num_tests;
   bool skip;
