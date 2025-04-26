@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../include/compat.h"
+#include "../include/myclib.h"
 
 /* - DEFINITIONS -*/
 
@@ -16,8 +16,6 @@ typedef struct stack {
   size_t height;
   size_t capacity;
 } stack;
-
-typedef unsigned char byte;
 
 inline size_t *stack_capacity_(void *const stk) {
   return &((stack *)stack_header(stk))->capacity;

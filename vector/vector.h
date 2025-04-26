@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../include/compat.h"
-#include "../include/utilmyclib.h"
+#include "../include/myclib.h"
 
 /* - DEFINITIONS - */
 

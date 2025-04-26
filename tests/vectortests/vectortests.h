@@ -1,7 +1,7 @@
 #ifndef TEST_VECTOR_H
 #define TEST_VECTOR_H
 
-#include "../../include/boolmyclib.h"
+#include "../../include/myclib.h"
 
 bool test_vector_clear(void);
 

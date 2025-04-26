@@ -1,7 +1,7 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
-#include "../include/boolmyclib.h"
+#include "../include/myclib.h"
 
 typedef unsigned int seed_t;
 

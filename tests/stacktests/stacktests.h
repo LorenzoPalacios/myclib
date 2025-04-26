@@ -1,7 +1,7 @@
 #ifndef TEST_STACK_H
 #define TEST_STACK_H
 
-#include "../../include/boolmyclib.h"
+#include "../../include/myclib.h"
 
 /* - AVAILABLE TEST FUNCTIONS - */
 

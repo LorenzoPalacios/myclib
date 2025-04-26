@@ -1,10 +1,9 @@
 #include "random.h"
 
 #include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
-
-#include "../include/compat.h"
 
 #if (CACHE_ALLOWED)
 
@@ -125,19 +124,21 @@ void random_destroy_caches(void) {
 #endif
 
 static inline seed_t generate_seed(void) {
-  const size_t PROGRAM_TIME =
-      (size_t)clock() >> (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ == 201112L)
+  seed_t seed;
+  size_t program_time = (size_t)clock();
+  if (program_time > UINT_MAX)
+    program_time >>= (CHAR_BIT * (sizeof(clock_t) - sizeof(seed_t)));
+#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
   struct timespec t_spec;
   (void)timespec_get(&t_spec, TIME_UTC);
   const size_t UTC_NANOSEC =
       (size_t)t_spec.tv_nsec >> (CHAR_BIT * (sizeof(size_t) - sizeof(seed_t)));
-  seed_t SEED = (seed_t)(UTC_NANOSEC ^ PROGRAM_TIME);
+  seed = (seed_t)(UTC_NANOSEC ^ program_time);
 #else
-  seed_t SEED = (seed_t)PROGRAM_TIME;
+  seed = (seed_t)program_time;
 #endif
-  SEED = (SEED & 1) ? -SEED : SEED;
-  return SEED;
+  if (seed & 1) seed = ~seed;
+  return seed;
 }
 
 seed_t random_init(void) {
