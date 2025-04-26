@@ -5,20 +5,19 @@ include_guard(GLOBAL)
 
 project(myclib)
 
-set(DEBUG_BUILD ON)
-
 set(BUILD_TESTS ON)
+
+set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
+set(CMAKE_COMPILE_WARNING_AS_ERROR true)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(DCMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(DEBUG_BUILD OFF)
+
 # Compiler Arguments
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-    if(DEBUG_BUILD)
-        set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0")
-    else()
-        set(CMAKE_C_FLAGS "-D_FORTIFY_SOURCE=2 -O2")
-    endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mtune=native -Wall")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wcast-qual -Wconversion -Wextra")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wfloat-equal -Wformat=2 -Winit-self")
@@ -27,25 +26,38 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wshadow -Wstrict-overflow=5")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wstrict-aliasing=2 -Wswitch-default")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wunreachable-code")
-elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+
     if(DEBUG_BUILD)
         set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0")
     else()
         set(CMAKE_C_FLAGS "-D_FORTIFY_SOURCE=2 -O2")
     endif()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mtune=native")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Weverything -Wno-c23-compat")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-align -Wno-padded")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-switch-enum -Wno-unsafe-buffer-usage")
+elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -mtune=native")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Weverything -Wno-c23-compat")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-align -Wno-switch-enum")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-padded")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unsafe-buffer-usage")
+
+    if(DEBUG_BUILD)
+        set(CMAKE_C_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0")
+    else()
+        set(CMAKE_C_FLAGS "-D_FORTIFY_SOURCE=2 -O2")
+    endif()
+
+    if(CMAKE_C_STANDARD GREATER_EQUAL 11)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-pre-c11-compat")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-declaration-after-statement")
+    endif()
+
+    if(CMAKE_C_STANDARD GREATER_EQUAL 23)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-pre-c23-compat")
+    endif()
 elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_C_FLAGS "/analyze /guard:cf /Gw /MP /Ox /Wall /WL")
 endif()
-
-set(CMAKE_COMPILE_WARNING_AS_ERROR true)
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
-set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Building Library
 
