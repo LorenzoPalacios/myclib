@@ -104,17 +104,20 @@ typedef unsigned char byte;
 /* - WIDEST BASIC INTEGRAL TYPES - */
 
 #if (IS_STDC99)
+#include <inttypes.h>
+#include <stdint.h>
+
 /* Widest basic integral type. */
-typedef long long wb_int;
+typedef intmax_t wb_int;
 /* Widest basic unsigned integral type. */
-typedef unsigned long long wb_uint;
+typedef uintmax_t wb_uint;
 
 #define WB_INT_FMT "%lld"
 #define WB_UINT_FMT "%llu"
 
-#define WB_INT_MAX (LLONG_MAX)
-#define WB_UINT_MAX (ULLONG_MAX)
-#define WB_INT_MIN (LLONG_MIN)
+#define WB_INT_MAX (INTMAX_MAX)
+#define WB_UINT_MAX (UINTMAX_MAX)
+#define WB_INT_MIN (INTMAX_MIN)
 #else
 /* Widest basic integral type. */
 typedef long wb_int;

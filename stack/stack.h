@@ -87,7 +87,7 @@
  * the `typeof` operator, which is the purpose of the following preprocessor
  * section.
  */
-#if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 202311)
+#if (IS_STDC23)
 #undef stack_copy
 #define stack_copy(stk)                                             \
   (typeof(stk))stack_new_((const void *)(stk), stack_capacity(stk), \

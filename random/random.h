@@ -5,16 +5,9 @@
 
 typedef unsigned int seed_t;
 
-/*
- * Set to `true` for certain random generator functions to generate
- * a cache of data as needed and return elements from that cache.
- */
-#define CACHE_ALLOWED (true)
+seed_t random_seed(void);
 
-#if (CACHE_ALLOWED)
-
-/* This is the size of each generator's cache in terms of elements. */
-#define CACHED_ELEMS (8192)
+bool random_create_caches(void);
 
 /**
  * @brief Destroys all caches used by the random generator functions.
@@ -22,36 +15,29 @@ typedef unsigned int seed_t;
  * This function frees any memory allocated for caches used by the random
  * generator functions.
  */
-void random_destroy_caches(void);
-
-#endif
+bool random_destroy_caches(void);
 
 /**
  * @brief Initializes the random generator.
  *
  * This function sets up the random generator with an initial seed, and if
- * `RANDOM_CACHE_ALLOWED` is `true`, will allocate a cache for each generator.
+ * `RANDOM_CACHE_ALLOWED` is `true`, will allocate a cache for each
+ * generator.
  *
  * This should be called before any random generation functions are used.
  *
- * @return seed_t The initial seed value used for the random number generator.
+ * @return seed_t The seed value used for the random number generator.
  */
-seed_t random_init(void);
+seed_t random_init(const seed_t *seed);
 
 /**
  * @brief Returns a random boolean value.
- *
- * If caching is enabled, the first call to this function will create a
- * cache, then return the first element from the created cache.
- *
  * @return `true` or `false`.
  */
 bool random_bool(void);
 
 /**
  * @brief Returns a random integer value.
- *
- * This function generates and returns a random integer value.
  *
  * @return A random integer.
  */
