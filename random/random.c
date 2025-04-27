@@ -24,7 +24,11 @@ static bool caching_enabled = true;
 
 static size_t cache_size = DEFAULT_CACHE_SIZE;
 
-static size_t rand_max_highest_bit;
+/* Calculated by random_init(). */
+static size_t rand_highest_bit;
+
+/* Calculated by random_init(). */
+static size_t rand_usable_bytes;
 
 /* - FUNCTION DEFINITIONS - */
 static void destroy_cache(cache_handle(void) handle);
@@ -58,21 +62,12 @@ static inline size_t highest_bit_index(register wb_uint n) {
   return i;
 }
 
-static void randomize_bytes(byte *const bytes, const size_t byte_cnt) {
-  size_t bytes_i;
-  size_t val_bit_i;
+static inline void randomize_bytes(byte *const bytes, const size_t byte_cnt) {
+  size_t i;
   int val = rand();
-  for (bytes_i = 0, val_bit_i = 0; bytes_i < byte_cnt; bytes_i++) {
-    size_t byte_bit_i = 0;
-    while (byte_bit_i < CHAR_BIT) {
-      if (val_bit_i == rand_max_highest_bit) {
-        val_bit_i = 0;
-        val = rand();
-      }
-      bytes[bytes_i] |= val & (1 << val_bit_i);
-      byte_bit_i++;
-      val_bit_i++;
-    }
+  for (i = 0; i < byte_cnt; i++) {
+    memset(bytes + i, val, rand_usable_bytes);
+    val = rand();
   }
 }
 
@@ -108,7 +103,7 @@ static inline cache_handle(void) int_cache_ctor(void) {
   return &cache;
 }
 
-static inline bool int_cache_pop(void) {
+static inline int int_cache_pop(void) {
   cache_handle(void) handle = int_cache_ctor();
   int value;
   if (*handle != NULL) {
@@ -164,36 +159,23 @@ int random_int(void) {
 seed_t random_init(const seed_t *const seed) {
   const seed_t SEED_ACTUAL = (seed != NULL) ? *seed : random_seed();
   srand(SEED_ACTUAL);
-  rand_max_highest_bit = highest_bit_index(RAND_MAX);
+  rand_highest_bit = highest_bit_index(RAND_MAX);
+  rand_usable_bytes = rand_highest_bit / CHAR_BIT;
   if (caching_enabled) construct_all_caches();
   return SEED_ACTUAL;
 }
 
 seed_t random_seed(void) {
   seed_t seed;
-  wb_uint program_time = (wb_uint)clock();
-
+  const wb_uint PROGRAM_TIME = (wb_uint)clock();
+  /* Not guaranteed to be an integral type, but is often defined as such. */
+  const wb_uint EPOCH_TIME = (wb_uint)time(NULL);
 #if (IS_STDC11)
   struct timespec t_spec;
   timespec_get(&t_spec, TIME_UTC);
   const wb_uint UTC_NANOSEC = (wb_uint)t_spec.tv_nsec;
-  seed = INTEGRAL_CAST((UTC_NANOSEC ^ program_time), seed_t);
-#else
-  seed = (seed_t)program_time;
+  seed = INTEGRAL_CAST((UTC_NANOSEC), seed_t);
 #endif
-
+  seed = (seed_t)(PROGRAM_TIME ^ EPOCH_TIME);
   return ~seed;
-}
-
-int main(void) {
-  random_init(NULL);
-  setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
-  caching_enabled = true;
-  {
-    while (true) {
-      printf("%d ", random_int());
-    }
-  }
-
-  return 0;
 }
