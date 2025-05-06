@@ -6,6 +6,7 @@ include_guard(GLOBAL)
 project(myclib)
 
 set(BUILD_TESTS ON)
+set(DEBUG_BUILD OFF)
 
 set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
 set(CMAKE_COMPILE_WARNING_AS_ERROR true)
@@ -13,8 +14,6 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(DCMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-set(DEBUG_BUILD OFF)
 
 # Compiler Arguments
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
