@@ -11,6 +11,18 @@
 
 #define vector(type) type *
 
+/*
+ * The single parameter is an array of pointers whose contents are as follows:
+ *
+ * The first element is the vector itself.
+ * The second element is the current element of the vector in the for-each
+ * sequence.
+ * The third element is a pointer to any additional arguments that were
+ * specified, except for when its value is `NULL`, in which case this element
+ * will not exist.
+ */
+typedef void (*vec_for_each_op)(void *args[]);
+
 /* - INTERNAL USE ONLY - */
 
 #define VEC_EXPANSION_FACTOR (2)
@@ -24,10 +36,9 @@ typedef struct {
   size_t length;
 } vec_header;
 
-#define vector_header(vec) ((vec_header *)((byte *)(vec) - sizeof(vec_header)))
+#define vector_header(vec) ((vec_header *)(vec) - 1)
 
-#define vector_header_const(vec) \
-  ((const vec_header *)((const byte *)(vec) - sizeof(vec_header)))
+#define vector_header_const(vec) ((const vec_header *)(vec) - 1)
 
 /* - CONVENIENCE MACROS - */
 
@@ -39,7 +50,7 @@ typedef struct {
 /* Unary `+` for rvalue conversion, preventing assignment. */
 #define vector_capacity(vec) (+vector_header_const(vec)->capacity)
 
-#define vector_clear(vec)                                     \
+#define vector_clear(vec) \
   ((void)(memset(vec, 0, sizeof *(vec) * vector_length(vec))))
 
 #define vector_clear_s(vec) vector_untyped_clear(vec, sizeof *(vec))
@@ -66,6 +77,20 @@ typedef struct {
 #define vector_expand_s(vec) \
   vector_untyped_expand((void **)&(vec), sizeof *(vec))
 
+#define vector_for_each(vec, elem_ident, expr)                  \
+  {                                                             \
+    size_t elem_ident##i;                                       \
+    for (elem_ident##i = 0; elem_ident##i < vector_length(vec); \
+         elem_ident##i++) {                                     \
+      void *(elem_ident) = (vec) + elem_ident##i;               \
+      expr;                                                     \
+    }                                                           \
+  }                                                             \
+  ((void)0)
+
+#define vector_for_each_s(vec, op, args) \
+  vector_untyped_for_each(vec, op, args, sizeof *(vec))
+
 #define vector_get(vec, index) \
   (util_assert((size_t)(index) < vector_length(vec)), (vec)[(size_t)(index)])
 
@@ -73,11 +98,13 @@ typedef struct {
 
 #define vector_is_empty(vec) (vector_length(vec) == 0)
 
-/* Unary `+` for rvalue conversion, preventing assignment. */
 #define vector_length(vec) (+vector_header_const(vec)->length)
 
 #define vector_new(type, capacity) \
   ((type *)vector_untyped_new(sizeof(type), capacity))
+
+#define vector_pop(vec) \
+  (inline_if(!vector_is_empty(vec), (void)vector_header(vec)->length--, NULL))
 
 #define vector_push(vec, elem)                       \
   ((void)vector_resize(vec, vector_length(vec) + 1), \
@@ -86,7 +113,16 @@ typedef struct {
 #define vector_push_s(vec, elem) \
   vector_untyped_push((void **)&(vec), (const void *)&(elem), sizeof *(vec))
 
-#define vector_reset(vec) vector_header(vec)->length = 0
+#define vector_remove(vec, index)                                  \
+  (util_assert((size_t)(index) < vector_length(vec)),              \
+   (void)(memmove((vec) + (index), (vec) + (index) + 1,            \
+                  sizeof *(vec) * (vector_length(vec) - (index) - 1)), \
+          vector_header(vec)->length--))
+
+#define vector_remove_s(vec, index) \
+  vector_untyped_remove(vec, index, sizeof *(vec))
+
+#define vector_reset(vec) ((void)(vector_header(vec)->length = 0))
 
 /* clang-format off */
 
@@ -111,6 +147,7 @@ typedef struct {
       vector_header(vec), (sizeof *(vec) * (new_length)) + sizeof(vec_header) \
       )) + 1                                                                  \
     ),                                                                        \
+    util_assert((vec) != NULL),                                               \
     vector_header(vec)->length = vector_header(vec)->capacity = (new_length)  \
   )                                                                           \
 ), (vec))
@@ -143,10 +180,13 @@ static void vector_untyped_clear(void *vec, size_t elem_size);
 static void *vector_untyped_copy(const void *vec, size_t elem_size);
 static void vector_untyped_delete(void **vec);
 static void *vector_untyped_expand(void **vec, size_t elem_size);
+static void vector_untyped_for_each(void *vec, vec_for_each_op op, void *args,
+                                    size_t elem_size);
 static void *vector_untyped_get(void *vec, size_t index, size_t elem_size);
 static void *vector_untyped_new(size_t elem_size, size_t num_elems);
 static void *vector_untyped_push(void **vec, const void *elem,
                                  size_t elem_size);
+static void vector_untyped_remove(void *vec, size_t index, size_t elem_size);
 static void *vector_untyped_resize(void **vec, size_t new_length,
                                    size_t elem_size);
 static void *vector_untyped_set(void **vec, const void *elem, size_t index,
@@ -190,6 +230,26 @@ static inline void *vector_untyped_expand(void **const vec,
   return expansion_attempt;
 }
 
+static inline void vector_untyped_for_each(void *const vec, vec_for_each_op op,
+                                           void *const args,
+                                           const size_t elem_size) {
+  const size_t LENGTH = vector_length(vec);
+  size_t i;
+  if (args == NULL) {
+    void *arg_list[2] = {vec, NULL};
+    for (i = 0; i < LENGTH; i++) {
+      arg_list[1] = (byte *)vec + (i * elem_size);
+      op(arg_list);
+    }
+  } else {
+    void *arg_list[3] = {vec, NULL, args};
+    for (i = 0; i < LENGTH; i++) {
+      arg_list[1] = (byte *)vec + (i * elem_size);
+      op(arg_list);
+    }
+  }
+}
+
 static inline void *vector_untyped_get(void *const vec, const size_t index,
                                        const size_t elem_size) {
   util_assert(index < vector_length(vec));
@@ -210,16 +270,27 @@ static inline void *vector_untyped_push(void **const vec,
   return vector_untyped_set(vec, elem, vector_length(*vec), elem_size);
 }
 
+static inline void vector_untyped_remove(void *const vec, const size_t index,
+                                         const size_t elem_size) {
+  byte *const dst = (byte *)vec + (index * elem_size);
+  byte *const src = dst + elem_size;
+  const size_t SHIFT_SIZE = elem_size * (vector_length(vec) - index - 1);
+  util_assert(index < vector_length(vec));
+  memmove(dst, src, SHIFT_SIZE);
+  vector_header(vec)->length--;
+}
+
 static inline void *vector_untyped_resize(void **const vec,
                                           const size_t new_length,
                                           const size_t elem_size) {
-  register vec_header *header = vector_header(*vec);
+  vec_header *header = vector_header(*vec);
   if (new_length <= header->capacity) {
     header->length = new_length;
   } else {
     const size_t ALLOCATION = (elem_size * new_length) + sizeof(vec_header);
-    header = realloc(header, ALLOCATION);
-    if (header == NULL) return NULL;
+    vec_header *const new_header = realloc(header, ALLOCATION);
+    if (new_header == NULL) return NULL;
+    header = new_header;
     header->capacity = new_length;
     header->length = new_length;
     *vec = header + 1;
@@ -251,7 +322,8 @@ static inline void *vector_untyped_set(void **const vec, const void *const elem,
 
 static inline void *vector_untyped_shrink(void **const vec,
                                           const size_t elem_size) {
-  const size_t ALLOCATION = elem_size * vector_length(*vec) + sizeof(vec_header);
+  const size_t ALLOCATION =
+      (elem_size * vector_length(*vec)) + sizeof(vec_header);
   vec_header *shrunk_vec = realloc(vector_header(*vec), ALLOCATION);
   if (shrunk_vec != NULL) {
     shrunk_vec->capacity = shrunk_vec->length;
@@ -259,5 +331,4 @@ static inline void *vector_untyped_shrink(void **const vec,
   }
   return shrunk_vec;
 }
-
 #endif
