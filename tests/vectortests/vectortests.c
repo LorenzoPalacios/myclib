@@ -36,7 +36,6 @@ bool test_vector_clear(void) {
   }
 
   vector_delete(vec);
-
   return true;
 }
 
@@ -93,17 +92,37 @@ bool test_vector_delete(void) {
 bool test_vector_expand(void) {
   vector(int) vec = vector_new(int, 0);
   {
-    const size_t length = vector_length(vec);
+    const size_t LENGTH = vector_length(vec);
     vector_expand(vec);
-    TEST_CASE_ASSERT(vector_length(vec) > length);
+    TEST_CASE_ASSERT(vector_length(vec) > LENGTH);
   }
   {
-    const size_t length = vector_length(vec);
+    const size_t LENGTH = vector_length(vec);
     vector_expand_s(vec);
-    TEST_CASE_ASSERT(vector_length(vec) > length);
+    TEST_CASE_ASSERT(vector_length(vec) > LENGTH);
   }
 
   vector_delete(vec);
+  return true;
+}
+
+static void test_vector_for_each_helper(void **args) { *(int *)args[1] = 0; }
+
+bool test_vector_for_each(void) {
+  vector(int) vec = vector_new(int, 3);
+
+  vector_push(vec, 1);
+  vector_push(vec, 2);
+  vector_push(vec, 3);
+
+  vector_for_each(vec, i, *(int *)i += 1);
+
+  TEST_CASE_ASSERT(vector_get(vec, 0) == 2);
+  TEST_CASE_ASSERT(vector_get(vec, 1) == 3);
+  TEST_CASE_ASSERT(vector_get(vec, 2) == 4);
+
+  vector_for_each_s(vec, test_vector_for_each_helper, NULL);
+  vector_for_each(vec, i, TEST_CASE_ASSERT(*(int *)i == 0));
 
   return true;
 }
@@ -120,7 +139,6 @@ bool test_vector_get(void) {
   }
 
   vector_delete(vec);
-
   return true;
 }
 
@@ -137,6 +155,21 @@ bool test_vector_new(void) {
 
 bool test_vector_insert(void) { return true; }
 
+bool test_vector_pop(void) {
+  vector(int) vec = vector_new(int, 3);
+
+  vector_push(vec, 1);
+  vector_push(vec, 2);
+  {
+    const size_t INITIAL_LENGTH = vector_length(vec);
+    vector_pop(vec);
+    TEST_CASE_ASSERT(vector_length(vec) == INITIAL_LENGTH - 1);
+    TEST_CASE_ASSERT(vector_get(vec, 0) == 1);
+  }
+  vector_delete(vec);
+  return true;
+}
+
 bool test_vector_push(void) {
   const size_t CAPACITY = 3;
   vector(int) vec = vector_new(int, CAPACITY);
@@ -147,7 +180,36 @@ bool test_vector_push(void) {
     TEST_CASE_ASSERT(vector_push(vec, ELEM) == ELEM);
     TEST_CASE_ASSERT(*(int *)vector_push_s(vec, ELEM) == ELEM);
   }
+  vector_delete(vec);
+  return true;
+}
 
+bool test_vector_remove(void) {
+  vector(int) vec = vector_new(int, 0);
+
+  vector_push(vec, 1);
+  vector_push(vec, 2);
+  vector_push(vec, 3);
+  {
+    const size_t INITIAL_LENGTH = vector_length(vec);
+    vector_remove(vec, 1);
+    TEST_CASE_ASSERT(vector_length(vec) == INITIAL_LENGTH - 1);
+    TEST_CASE_ASSERT(vector_get(vec, 1) == 3);
+  }
+  while (!vector_is_empty(vec)) vector_remove(vec, 0);
+
+  vector_push(vec, 1);
+  vector_push(vec, 2);
+  vector_push(vec, 3);
+  {
+    const size_t INITIAL_LENGTH = vector_length(vec);
+    vector_remove_s(vec, 1);
+    TEST_CASE_ASSERT(vector_length(vec) == INITIAL_LENGTH - 1);
+    TEST_CASE_ASSERT(vector_get(vec, 1) == 3);
+  }
+  while (!vector_is_empty(vec)) vector_remove_s(vec, 0);
+
+  vector_delete(vec);
   return true;
 }
 
@@ -160,13 +222,14 @@ bool test_vector_reset(void) {
   vector_reset(vec);
   TEST_CASE_ASSERT(vector_length(vec) == 0);
 
+  vector_delete(vec);
   return true;
 }
 
 bool test_vector_resize(void) {
-  const size_t SMALL = 1 << 5;
-  const size_t MEDIUM = 1 << 10;
-  const size_t LARGE = 1 << 20;
+  const size_t SMALL = 1 << 6;
+  const size_t MEDIUM = 1 << 12;
+  const size_t LARGE = 1 << 18;
   vector(int) vec = vector_new(int, 0);
 
   TEST_CASE_ASSERT(vector_resize(vec, SMALL) != NULL);
@@ -179,7 +242,6 @@ bool test_vector_resize(void) {
   TEST_CASE_ASSERT(vector_length(vec) == LARGE);
 
   vector_delete(vec);
-
   return true;
 }
 
@@ -202,6 +264,7 @@ bool test_vector_set(void) {
   TEST_CASE_ASSERT(vector_get(vec, POS_3) == ELEM);
   TEST_CASE_ASSERT(vector_get(vec, POS_3 - 1) == 0);
 
+  vector_delete(vec);
   return true;
 }
 
@@ -219,6 +282,5 @@ bool test_vector_shrink(void) {
   TEST_CASE_ASSERT(vector_capacity(vec) == 0);
 
   vector_delete(vec);
-
   return true;
 }

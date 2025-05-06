@@ -11,13 +11,19 @@ bool test_vector_delete(void);
 
 bool test_vector_expand(void);
 
+bool test_vector_for_each(void);
+
 bool test_vector_get(void);
 
 bool test_vector_insert(void);
 
 bool test_vector_new(void);
 
+bool test_vector_pop(void);
+
 bool test_vector_push(void);
+
+bool test_vector_remove(void);
 
 bool test_vector_reset(void);
 
