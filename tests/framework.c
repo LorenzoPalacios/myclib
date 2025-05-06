@@ -63,12 +63,14 @@ static test str_tests[] = {
 };
 
 static test vector_tests[] = {
-    CONSTRUCT_TEST(test_vector_clear),  CONSTRUCT_TEST(test_vector_copy),
-    CONSTRUCT_TEST(test_vector_delete), CONSTRUCT_TEST(test_vector_expand),
-    CONSTRUCT_TEST(test_vector_get),    CONSTRUCT_TEST(test_vector_new),
-    CONSTRUCT_TEST(test_vector_insert), CONSTRUCT_TEST(test_vector_push),
-    CONSTRUCT_TEST(test_vector_reset),  CONSTRUCT_TEST(test_vector_resize),
-    CONSTRUCT_TEST(test_vector_set),    CONSTRUCT_TEST(test_vector_shrink),
+    CONSTRUCT_TEST(test_vector_clear),    CONSTRUCT_TEST(test_vector_copy),
+    CONSTRUCT_TEST(test_vector_delete),   CONSTRUCT_TEST(test_vector_expand),
+    CONSTRUCT_TEST(test_vector_for_each), CONSTRUCT_TEST(test_vector_get),
+    CONSTRUCT_TEST(test_vector_new),      CONSTRUCT_TEST(test_vector_insert),
+    CONSTRUCT_TEST(test_vector_pop),      CONSTRUCT_TEST(test_vector_push),
+    CONSTRUCT_TEST(test_vector_remove),   CONSTRUCT_TEST(test_vector_reset),
+    CONSTRUCT_TEST(test_vector_resize),   CONSTRUCT_TEST(test_vector_set),
+    CONSTRUCT_TEST(test_vector_shrink),
 };
 
 /* - EXTERNAL DEFINITIONS - */
