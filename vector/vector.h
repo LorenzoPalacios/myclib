@@ -23,6 +23,8 @@
  */
 typedef void (*vec_for_each_op)(void *args[]);
 
+typedef void (*vec_for_each_op_const)(const void *args[]);
+
 /* - INTERNAL USE ONLY - */
 
 #define VEC_EXPANSION_FACTOR (2)
@@ -77,16 +79,42 @@ typedef struct {
 #define vector_expand_s(vec) \
   vector_untyped_expand((void **)&(vec), sizeof *(vec))
 
-#define vector_for_each(vec, elem_ident, expr)                  \
-  {                                                             \
-    size_t elem_ident##i;                                       \
-    for (elem_ident##i = 0; elem_ident##i < vector_length(vec); \
-         elem_ident##i++) {                                     \
-      void *(elem_ident) = (vec) + elem_ident##i;               \
-      expr;                                                     \
-    }                                                           \
-  }                                                             \
+/* Accesses the for-each iterator in the `vector_for_each` macros. */
+#define vector_fei(elem_ident) elem_ident##_##i
+
+/*
+ * The identifer for the iterator is `elem_ident` with an underscore and 'i'
+ * appended. This iterator may be accessed from `expr`.
+ *
+ * The final semicolon in `expr` is optional.
+ */
+#define vector_for_each(vec, elem_ident, expr)                       \
+  {                                                                  \
+    size_t vector_fei(elem_ident);                                   \
+    for (vector_fei(elem_ident) = 0;                                 \
+         vector_fei(elem_ident) < vector_length(vec);                \
+         vector_fei(elem_ident)++) {                                 \
+      void *(elem_ident) = (void *)((vec) + vector_fei(elem_ident)); \
+      expr;                                                          \
+    }                                                                \
+  }                                                                  \
   ((void)0)
+
+#define vector_for_each_const(vec, elem_ident, expr)      \
+  {                                                       \
+    size_t vector_fei(elem_ident);                        \
+    for (vector_fei(elem_ident) = 0;                      \
+         vector_fei(elem_ident) < vector_length(vec);     \
+         vector_fei(elem_ident)++) {                      \
+      const void *(elem_ident) =                          \
+          (const void *)((vec) + vector_fei(elem_ident)); \
+      expr;                                               \
+    }                                                     \
+  }                                                       \
+  ((void)0)
+
+#define vector_for_each_const_s(vec, op, args) \
+  vector_untyped_for_each_const(vec, op, args, sizeof *(vec))
 
 #define vector_for_each_s(vec, op, args) \
   vector_untyped_for_each(vec, op, args, sizeof *(vec))
@@ -113,9 +141,10 @@ typedef struct {
 #define vector_push_s(vec, elem) \
   vector_untyped_push((void **)&(vec), (const void *)&(elem), sizeof *(vec))
 
-#define vector_remove(vec, index)                                  \
-  (util_assert((size_t)(index) < vector_length(vec)),              \
-   (void)(memmove((vec) + (index), (vec) + (index) + 1,            \
+#define vector_remove(vec, index)                                      \
+  (util_assert((size_t)(index) < vector_length(vec)),                  \
+   (void)(memmove((void *)((vec) + (index)),                           \
+                  (const void *)((vec) + (index) + 1),                 \
                   sizeof *(vec) * (vector_length(vec) - (index) - 1)), \
           vector_header(vec)->length--))
 
@@ -182,6 +211,9 @@ static void vector_untyped_delete(void **vec);
 static void *vector_untyped_expand(void **vec, size_t elem_size);
 static void vector_untyped_for_each(void *vec, vec_for_each_op op, void *args,
                                     size_t elem_size);
+static void vector_untyped_for_each_const(const void *vec,
+                                          vec_for_each_op_const op,
+                                          const void *args, size_t elem_size);
 static void *vector_untyped_get(void *vec, size_t index, size_t elem_size);
 static void *vector_untyped_new(size_t elem_size, size_t num_elems);
 static void *vector_untyped_push(void **vec, const void *elem,
@@ -245,6 +277,27 @@ static inline void vector_untyped_for_each(void *const vec, vec_for_each_op op,
     void *arg_list[3] = {vec, NULL, args};
     for (i = 0; i < LENGTH; i++) {
       arg_list[1] = (byte *)vec + (i * elem_size);
+      op(arg_list);
+    }
+  }
+}
+
+static inline void vector_untyped_for_each_const(const void *const vec,
+                                                 vec_for_each_op_const op,
+                                                 const void *const args,
+                                                 const size_t elem_size) {
+  const size_t LENGTH = vector_length(vec);
+  size_t i;
+  if (args == NULL) {
+    const void *arg_list[2] = {vec, NULL};
+    for (i = 0; i < LENGTH; i++) {
+      arg_list[1] = (const byte *)vec + (i * elem_size);
+      op(arg_list);
+    }
+  } else {
+    const void *arg_list[3] = {vec, NULL, args};
+    for (i = 0; i < LENGTH; i++) {
+      arg_list[1] = (const byte *)vec + (i * elem_size);
       op(arg_list);
     }
   }
