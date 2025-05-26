@@ -45,14 +45,22 @@
 
 /* - DEFINITIONS - */
 
+typedef unsigned char byte;
+
 /* - BOOL - */
+
 #if (!IS_CPP && !IS_STDC23)
+
 #if (IS_STDC99)
 
-#include <stdbool.h> /* For C99 to C17. */
+#ifndef bool
+#define bool _Bool
+#endif
+
 #else
-/* Boolean type for standards prior to C99. */
-typedef unsigned char bool;
+typedef byte bool; /* Boolean type for standards prior to C99. */
+#endif
+
 #ifndef true
 #define true (1)
 #endif
@@ -61,27 +69,24 @@ typedef unsigned char bool;
 #endif
 
 #endif
-#endif
-
-typedef unsigned char byte;
 
 /* - ASSERTION - */
 
 #if (IS_STDC99)
-#define util_assert_msg(expr)                                              \
-  ((fputs("\n"__FILE__                                                     \
-          ":" STRINGIFY(__LINE__) " in function ",                         \
-          stderr),                                                         \
-    fputs(__func__, stderr),                                               \
-    fputs(" - Expression\n\n" STRINGIFY(expr) "\n\nevaluated to false!\n", \
-          stderr),                                                         \
+#define util_assert_msg(expr)                                   \
+  ((fputs("\n"__FILE__                                          \
+          ":" EXPAND_AND_STRINGIFY(__LINE__) " in function ",   \
+          stderr),                                              \
+    fputs(__func__, stderr), fputs("()\n\n", stderr),           \
+    fputs(STRINGIFY(expr) "\n\nevaluated to false!\n", stderr), \
     fflush(stderr)))
 #else
-#define util_assert_msg(expr)                                        \
-  fputs(                                                             \
-      "\n"__FILE__                                                   \
-      ":" STRINGIFY(__LINE__) " - Expression evaluated to false!\n", \
-      stderr),                                                       \
+#define util_assert_msg(expr)                          \
+  fputs(                                               \
+      "\n"__FILE__                                     \
+      ":" EXPAND_AND_STRINGIFY(__LINE__)               \
+          STRINGIFY(expr) "\n\nevaluated to false!\n", \
+      stderr),                                         \
       fflush(stderr)
 #endif
 
@@ -92,6 +97,10 @@ typedef unsigned char byte;
 /* - MISCELLANEOUS - */
 
 #define ARR_LEN(arr) (sizeof(arr) / sizeof *(arr))
+
+#define discard_line(stream) ((void)(fscanf(stream, "%*[^\n]"), fgetc(stream)))
+
+#define EXPAND_AND_STRINGIFY(x) STRINGIFY(x)
 
 #define inline_if(cond, true_branch_expr, false_branch_expr) \
   ((cond) ? (void)(true_branch_expr) : (void)(false_branch_expr))
