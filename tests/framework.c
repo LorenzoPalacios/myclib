@@ -66,11 +66,11 @@ static test vector_tests[] = {
     CONSTRUCT_TEST(test_vector_clear),    CONSTRUCT_TEST(test_vector_copy),
     CONSTRUCT_TEST(test_vector_delete),   CONSTRUCT_TEST(test_vector_expand),
     CONSTRUCT_TEST(test_vector_for_each), CONSTRUCT_TEST(test_vector_get),
-    CONSTRUCT_TEST(test_vector_new),      CONSTRUCT_TEST(test_vector_insert),
-    CONSTRUCT_TEST(test_vector_pop),      CONSTRUCT_TEST(test_vector_push),
-    CONSTRUCT_TEST(test_vector_remove),   CONSTRUCT_TEST(test_vector_reset),
-    CONSTRUCT_TEST(test_vector_resize),   CONSTRUCT_TEST(test_vector_set),
-    CONSTRUCT_TEST(test_vector_shrink),
+    CONSTRUCT_TEST(test_vector_new),      CONSTRUCT_TEST(test_vector_index_of),
+    CONSTRUCT_TEST(test_vector_insert),   CONSTRUCT_TEST(test_vector_pop),
+    CONSTRUCT_TEST(test_vector_push),     CONSTRUCT_TEST(test_vector_remove),
+    CONSTRUCT_TEST(test_vector_reset),    CONSTRUCT_TEST(test_vector_resize),
+    CONSTRUCT_TEST(test_vector_set),      CONSTRUCT_TEST(test_vector_shrink),
 };
 
 /* - EXTERNAL DEFINITIONS - */
@@ -142,8 +142,6 @@ static inline void str_lower(char *str) {
 
 /* - INPUT - */
 
-static inline void discard_line(void) { (void)scanf("*[\n]"); }
-
 static void get_input(char *const buf, const size_t buf_size) {
   size_t i = 0;
   int chr = getchar();
@@ -163,7 +161,7 @@ static void get_input(char *const buf, const size_t buf_size) {
   }
   buf[i] = '\0';
   str_lower(buf);
-  if (chr != '\n') discard_line();
+  if (chr != '\n') discard_line(stdin);
 }
 
 /* - PARSING - */

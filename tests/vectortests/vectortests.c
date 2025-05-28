@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "../../include/myclib.h"
 #include "../../vector/vector.h"
 #include "../framework.h"
 
@@ -115,14 +116,18 @@ bool test_vector_for_each(void) {
   vector_push(vec, 2);
   vector_push(vec, 3);
 
-  vector_for_each(vec, i, *(int *)i += 1);
+  vector_for_each(int n, vec, vector_get(vec, i) = n + 1);
 
   TEST_CASE_ASSERT(vector_get(vec, 0) == 2);
   TEST_CASE_ASSERT(vector_get(vec, 1) == 3);
   TEST_CASE_ASSERT(vector_get(vec, 2) == 4);
 
   vector_for_each_s(vec, test_vector_for_each_helper, NULL);
-  vector_for_each(vec, i, TEST_CASE_ASSERT(*(int *)i == 0));
+  vector_for_each(int n, vec, TEST_CASE_ASSERT(n == 0));
+#if (IS_STDC99)
+  vector_for_each(int n, vec, n = 0, vector_get(vec, i) = n);
+  vector_for_each(int n, vec, TEST_CASE_ASSERT(n == 0));
+#endif
 
   return true;
 }
@@ -142,6 +147,68 @@ bool test_vector_get(void) {
   return true;
 }
 
+bool test_vector_index_of(void) {
+  vector(int) vec = vector_new(int, 3);
+
+  const int ELEM_1 = 0;
+  const int ELEM_2 = 1;
+  const int ELEM_3 = ~(ELEM_1 & ELEM_2);
+
+  vector_push(vec, ELEM_1);
+  vector_push(vec, ELEM_2);
+
+  {
+    const size_t INDEX_ELEM_1 = vector_index_of(vec, ELEM_1);
+    const size_t INDEX_ELEM_2 = vector_index_of(vec, ELEM_2);
+    const size_t INDEX_ELEM_3 = vector_index_of(vec, ELEM_3);
+    TEST_CASE_ASSERT(INDEX_ELEM_1 != VEC_BAD_INDEX);
+    TEST_CASE_ASSERT(INDEX_ELEM_2 != VEC_BAD_INDEX);
+    TEST_CASE_ASSERT(INDEX_ELEM_3 == VEC_BAD_INDEX);
+    TEST_CASE_ASSERT(vector_get(vec, INDEX_ELEM_1) == ELEM_1);
+    TEST_CASE_ASSERT(vector_get(vec, INDEX_ELEM_2) == ELEM_2);
+  }
+  return true;
+}
+
+bool test_vector_insert(void) {
+  vector(int) vec = vector_new(int, 3);
+
+  const int ELEM_1 = 1;
+  const int ELEM_2 = 2;
+  const int ELEM_3 = 3;
+  const size_t INDEX_1 = 0;
+  const size_t INDEX_2 = 1;
+  const size_t INDEX_3 = 4;
+
+  TEST_CASE_ASSERT(vector_insert(vec, ELEM_1, INDEX_1) == ELEM_1);
+  TEST_CASE_ASSERT(*(int *)vector_insert_s(vec, ELEM_2, INDEX_2) == ELEM_2);
+  TEST_CASE_ASSERT(vector_insert(vec, ELEM_3, INDEX_3) == ELEM_3);
+
+  TEST_CASE_ASSERT(*(int *)vector_insert_s(vec, ELEM_3, 0) == ELEM_3);
+  TEST_CASE_ASSERT(vector_insert(vec, ELEM_2, 0) == ELEM_2);
+  TEST_CASE_ASSERT(*(int *)vector_insert_s(vec, ELEM_1, 0) == ELEM_1);
+
+  /*
+   * We add `3` to the indicies below since three insertions were made at the
+   * beginning of the vector.
+   */
+  /* clang-format off */
+  vector_for_each(
+    int n, vec,
+    if (n == ELEM_1) {
+      TEST_CASE_ASSERT(i == 0 || i == INDEX_1 + 3);
+    }
+    if (n == ELEM_2) {
+      TEST_CASE_ASSERT(i == 1 || i == INDEX_2 + 3);
+    }
+    if (n == ELEM_3) {
+      TEST_CASE_ASSERT(i == 2 || i == INDEX_3 + 3);
+    }
+  );
+  /* clang-format on */
+  return true;
+}
+
 bool test_vector_new(void) {
   const size_t CAPACITY = 3;
   vector(int) vec = vector_new(int, CAPACITY);
@@ -152,8 +219,6 @@ bool test_vector_new(void) {
   vector_delete(vec);
   return true;
 }
-
-bool test_vector_insert(void) { return true; }
 
 bool test_vector_pop(void) {
   vector(int) vec = vector_new(int, 3);
@@ -240,6 +305,12 @@ bool test_vector_resize(void) {
 
   TEST_CASE_ASSERT(vector_resize(vec, LARGE) != NULL);
   TEST_CASE_ASSERT(vector_length(vec) == LARGE);
+
+  TEST_CASE_ASSERT(vector_resize(vec, MEDIUM) != NULL);
+  TEST_CASE_ASSERT(vector_length(vec) == MEDIUM);
+
+  TEST_CASE_ASSERT(vector_resize_s(vec, SMALL) != NULL);
+  TEST_CASE_ASSERT(vector_length(vec) == SMALL);
 
   vector_delete(vec);
   return true;

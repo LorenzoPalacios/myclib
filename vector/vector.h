@@ -11,6 +11,8 @@
 
 #define vector(type) type *
 
+#define VEC_BAD_INDEX ((size_t)-1)
+
 /*
  * The single parameter is an array of pointers whose contents are as follows:
  *
@@ -49,7 +51,6 @@ typedef struct {
  * than once.
  */
 
-/* Unary `+` for rvalue conversion, preventing assignment. */
 #define vector_capacity(vec) (+vector_header_const(vec)->capacity)
 
 #define vector_clear(vec) \
@@ -79,50 +80,76 @@ typedef struct {
 #define vector_expand_s(vec) \
   vector_untyped_expand((void **)&(vec), sizeof *(vec))
 
-/* Accesses the for-each iterator in the `vector_for_each` macros. */
-#define vector_fei(elem_ident) elem_ident##_##i
-
 /*
- * The identifer for the iterator is `elem_ident` with an underscore and 'i'
- * appended. This iterator may be accessed from `expr`.
+ * C99 and later versions of C support variable arguments to macros, which can
+ * be helpful if a user passes an `expr` containing commas, such as in the
+ * following example:
  *
- * The final semicolon in `expr` is optional.
+ * `vector_for_each(int n, vec, n++, n--);`
+ *
+ * where `n++, n--` is the intended `expr`.
+ *
+ * In contrast, prior versions of C (e.g. C90) require that such an `expr` be
+ * enclosed in parentheses, like so:
+ *
+ * `vector_for_each(int n, vec, (n++, n--));`
  */
-#define vector_for_each(vec, elem_ident, expr)                       \
-  {                                                                  \
-    size_t vector_fei(elem_ident);                                   \
-    for (vector_fei(elem_ident) = 0;                                 \
-         vector_fei(elem_ident) < vector_length(vec);                \
-         vector_fei(elem_ident)++) {                                 \
-      void *(elem_ident) = (void *)((vec) + vector_fei(elem_ident)); \
-      expr;                                                          \
-    }                                                                \
-  }                                                                  \
-  ((void)0)
+#if (IS_STDC99)
+/*
+ * The identifer for the iterator is `i`. The iterator exists in a separate
+ * scope from all other declarations and may be accessed from `expr`.
+ *
+ * A terminating semicolon for `expr` is optional.
+ */
+#define vector_for_each(var_decl, vec, ...)    \
+  {                                            \
+    size_t i;                                  \
+    for (i = 0; i < vector_length(vec); i++) { \
+      var_decl = (vec)[i];                     \
+      {                                        \
+        __VA_ARGS__;                           \
+      }                                        \
+    }                                          \
+  }                                            \
+  (void)0
+#else
+#define vector_for_each(var_decl, vec, expr)   \
+  {                                            \
+    size_t i;                                  \
+    for (i = 0; i < vector_length(vec); i++) { \
+      var_decl = (vec)[i];                     \
+      {                                        \
+        expr;                                  \
+      }                                        \
+    }                                          \
+  }                                            \
+  (void)0
+#endif
 
-#define vector_for_each_const(vec, elem_ident, expr)      \
-  {                                                       \
-    size_t vector_fei(elem_ident);                        \
-    for (vector_fei(elem_ident) = 0;                      \
-         vector_fei(elem_ident) < vector_length(vec);     \
-         vector_fei(elem_ident)++) {                      \
-      const void *(elem_ident) =                          \
-          (const void *)((vec) + vector_fei(elem_ident)); \
-      expr;                                               \
-    }                                                     \
-  }                                                       \
-  ((void)0)
-
-#define vector_for_each_const_s(vec, op, args) \
-  vector_untyped_for_each_const(vec, op, args, sizeof *(vec))
+#define vector_for_each_c_s(vec, op, args) \
+  vector_untyped_for_each_c(vec, op, args, sizeof *(vec))
 
 #define vector_for_each_s(vec, op, args) \
   vector_untyped_for_each(vec, op, args, sizeof *(vec))
 
 #define vector_get(vec, index) \
-  (util_assert((size_t)(index) < vector_length(vec)), (vec)[(size_t)(index)])
+  ((vec)[util_assert((size_t)(index) < vector_length(vec)), (size_t)(index)])
 
 #define vector_get_s(vec, index) vector_untyped_get(vec, index, sizeof *(vec))
+
+#define vector_index_of(vec, elem) \
+  vector_untyped_index_of(vec, &(elem), sizeof *(vec))
+
+#define vector_insert(vec, elem, index)                                     \
+  (inline_if((index) < vector_length(vec),                                  \
+             ((void)(vector_resize(vec, vector_length(vec) + 1)),           \
+              memmove((vec) + (index) + 1, (vec) + (index),                 \
+                      sizeof *(vec) * (vector_length(vec) - (index) - 1))), \
+             vector_resize(vec, (index) + 1)),                              \
+   (vec)[index] = (elem))
+
+#define vector_insert_s(vec, elem, index) \
+  vector_untyped_insert((void **)&(vec), &(elem), index, sizeof *(vec))
 
 #define vector_is_empty(vec) (vector_length(vec) == 0)
 
@@ -131,8 +158,11 @@ typedef struct {
 #define vector_new(type, capacity) \
   ((type *)vector_untyped_new(sizeof(type), capacity))
 
-#define vector_pop(vec) \
-  (inline_if(!vector_is_empty(vec), (void)vector_header(vec)->length--, NULL))
+#define vector_pop(vec)                                                        \
+  (inline_if(!vector_is_empty(vec), (void)vector_header(vec)->length--, NULL), \
+   (vec)[vector_length(vec)])
+
+#define vector_pop_s(vec) vector_untyped_pop(vec, sizeof *(vec))
 
 #define vector_push(vec, elem)                       \
   ((void)vector_resize(vec, vector_length(vec) + 1), \
@@ -156,33 +186,40 @@ typedef struct {
 /* clang-format off */
 
 #define vector_resize(vec, new_length)                                        \
-(inline_if                                                                    \
 (                                                                             \
-  vector_capacity(vec) >= (size_t)(new_length),                               \
-  (                                                                           \
-    inline_if(                                                                \
-      (size_t)(new_length) > vector_length(vec),                              \
-      memset(                                                                 \
-        (void *)((vec) + vector_length(vec)),                                 \
-        0,                                                                    \
-        sizeof*(vec) * ((new_length) - vector_length(vec))                    \
+  inline_if                                                                   \
+    ( /* Condition (depth 1) - Is the vector expanding? */                    \
+      vector_length(vec) < (new_length),                                      \
+      ( /* True branch (depth 1) */                                           \
+        inline_if                                                             \
+          ( /* Condition (depth 2) - Is there enough capacity? */             \
+            vector_capacity(vec) < (new_length),                              \
+            ( /* True branch (depth 2) - Add enough capacity. */              \
+              (vec) = (void *)                                                \
+                (                                                             \
+                  1 + (vec_header *)realloc                                   \
+                  (                                                           \
+                    vector_header(vec),                                       \
+                    sizeof(vec_header) + (sizeof *(vec) * (new_length))       \
+                  )                                                           \
+                ),                                                            \
+              util_assert((vec) != NULL),                                     \
+              vector_header(vec)->capacity = (new_length)                     \
+            ),                                                                \
+            ( /* False branch (depth 2) */                                    \
+              NULL                                                            \
+            )                                                                 \
+          ),                                                                  \
+          memset((void *)((vec) + vector_length(vec)), 0,                     \
+                  sizeof*(vec) * ((new_length) - vector_length(vec)))         \
       ),                                                                      \
-      NULL                                                                    \
-    ),                                                                        \
-    vector_header(vec)->length = (new_length)                                 \
-  ),                                                                          \
-  (                                                                           \
-    (vec) = (void *)(((vec_header *)realloc(                                  \
-      vector_header(vec), (sizeof *(vec) * (new_length)) + sizeof(vec_header) \
-      )) + 1                                                                  \
-    ),                                                                        \
-    util_assert((vec) != NULL),                                               \
-    vector_header(vec)->length = vector_header(vec)->capacity = (new_length)  \
-  )                                                                           \
-), (vec))
+      ( /* False branch (depth 1) */                                          \
+        NULL                                                                  \
+      )                                                                       \
+    ), (void)(vector_header(vec)->length = (new_length)), (vec)               \
+)
 
 /* clang-format on */
-
 #define vector_resize_s(vec, new_length) \
   vector_untyped_resize((void **)&(vec), new_length, sizeof *(vec))
 
@@ -205,25 +242,32 @@ typedef struct {
 
 /* - FUNCTION DECLARATIONS - */
 
-static void vector_untyped_clear(void *vec, size_t elem_size);
-static void *vector_untyped_copy(const void *vec, size_t elem_size);
-static void vector_untyped_delete(void **vec);
-static void *vector_untyped_expand(void **vec, size_t elem_size);
-static void vector_untyped_for_each(void *vec, vec_for_each_op op, void *args,
-                                    size_t elem_size);
-static void vector_untyped_for_each_const(const void *vec,
-                                          vec_for_each_op_const op,
-                                          const void *args, size_t elem_size);
-static void *vector_untyped_get(void *vec, size_t index, size_t elem_size);
-static void *vector_untyped_new(size_t elem_size, size_t num_elems);
-static void *vector_untyped_push(void **vec, const void *elem,
-                                 size_t elem_size);
-static void vector_untyped_remove(void *vec, size_t index, size_t elem_size);
-static void *vector_untyped_resize(void **vec, size_t new_length,
-                                   size_t elem_size);
-static void *vector_untyped_set(void **vec, const void *elem, size_t index,
+static void vector_untyped_clear(vector(void) vec, size_t elem_size);
+static void *vector_untyped_copy(const vector(void) vec, size_t elem_size);
+static void vector_untyped_delete(vector(void) * vec);
+static void *vector_untyped_expand(vector(void) * vec, size_t elem_size);
+static void vector_untyped_for_each(vector(void) vec, vec_for_each_op op,
+                                    void *args, size_t elem_size);
+static void vector_untyped_for_each_c(const vector(void) vec,
+                                      vec_for_each_op_const op,
+                                      const void *args, size_t elem_size);
+static void *vector_untyped_get(vector(void) vec, size_t index,
                                 size_t elem_size);
-static void *vector_untyped_shrink(void **vec, size_t elem_size);
+static size_t vector_untyped_index_of(const vector(void) vec, const void *elem,
+                                      size_t elem_size);
+static void *vector_untyped_insert(vector(void) * vec, const void *elem,
+                                   size_t index, size_t elem_size);
+static void *vector_untyped_new(size_t elem_size, size_t capacity);
+static void *vector_untyped_pop(vector(void) vec, size_t elem_size);
+static void *vector_untyped_push(vector(void) * vec, const void *elem,
+                                 size_t elem_size);
+static void vector_untyped_remove(vector(void) vec, size_t index,
+                                  size_t elem_size);
+static void *vector_untyped_resize(vector(void) * vec, size_t new_length,
+                                   size_t elem_size);
+static void *vector_untyped_set(vector(void) * vec, const void *elem,
+                                size_t index, size_t elem_size);
+static void *vector_untyped_shrink(vector(void) * vec, size_t elem_size);
 
 /* - FUNCTION DEFINITIONS - */
 
@@ -252,14 +296,14 @@ static inline void vector_untyped_delete(void **const vec) {
 static inline void *vector_untyped_expand(void **const vec,
                                           const size_t elem_size) {
   const size_t LENGTH = vector_length(*vec);
-  void *expansion_attempt =
+  void *attempt =
       vector_untyped_resize(vec, VEC_EXPANSION_FACTOR * LENGTH, elem_size);
-  if (expansion_attempt == NULL) {
-    expansion_attempt = vector_untyped_resize(vec, LENGTH + 1, elem_size);
-    if (expansion_attempt == NULL) return NULL;
+  if (attempt == NULL) {
+    attempt = vector_untyped_resize(vec, LENGTH + 1, elem_size);
+    if (attempt == NULL) return NULL;
   }
-  *vec = expansion_attempt;
-  return expansion_attempt;
+  *vec = attempt;
+  return attempt;
 }
 
 static inline void vector_untyped_for_each(void *const vec, vec_for_each_op op,
@@ -282,10 +326,10 @@ static inline void vector_untyped_for_each(void *const vec, vec_for_each_op op,
   }
 }
 
-static inline void vector_untyped_for_each_const(const void *const vec,
-                                                 vec_for_each_op_const op,
-                                                 const void *const args,
-                                                 const size_t elem_size) {
+static inline void vector_untyped_for_each_c(const void *const vec,
+                                             vec_for_each_op_const op,
+                                             const void *const args,
+                                             const size_t elem_size) {
   const size_t LENGTH = vector_length(vec);
   size_t i;
   if (args == NULL) {
@@ -309,12 +353,41 @@ static inline void *vector_untyped_get(void *const vec, const size_t index,
   return (byte *)vec + (elem_size * index);
 }
 
+static inline size_t vector_untyped_index_of(const void *vec,
+                                             const void *const elem,
+                                             const size_t elem_size) {
+  const size_t LEN = vector_length(vec);
+  size_t i;
+  for (i = 0; i < LEN; i++) {
+    if (memcmp((const byte *)vec + (i * elem_size), elem, elem_size) == 0)
+      return i;
+  }
+  return VEC_BAD_INDEX;
+}
+
+static void *vector_untyped_insert(void **const vec, const void *elem,
+                                   size_t index, size_t elem_size) {
+  const size_t LENGTH = vector_length(*vec);
+  byte *dst;
+  if (index < LENGTH) {
+    vector_untyped_resize(vec, LENGTH + 1, elem_size);
+    dst = (byte *)*vec + (elem_size * index);
+    memmove(dst + elem_size, dst, elem_size * (LENGTH - index));
+  }
+  return vector_untyped_set(vec, elem, index, elem_size);
+}
+
 static inline void *vector_untyped_new(const size_t elem_size,
-                                       const size_t num_elems) {
-  vec_header *const vec = malloc((elem_size * num_elems) + sizeof(vec_header));
-  vec->capacity = num_elems;
+                                       const size_t capacity) {
+  vec_header *const vec = malloc((elem_size * capacity) + sizeof(vec_header));
+  if (vec == NULL) return NULL;
+  vec->capacity = capacity;
   vec->length = 0;
   return vec + 1;
+}
+
+static inline void *vector_untyped_pop(void *const vec, size_t elem_size) {
+  return (byte *)vec + (--vector_header(vec)->length * elem_size);
 }
 
 static inline void *vector_untyped_push(void **const vec,

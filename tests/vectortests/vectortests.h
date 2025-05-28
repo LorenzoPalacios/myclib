@@ -15,6 +15,8 @@ bool test_vector_for_each(void);
 
 bool test_vector_get(void);
 
+bool test_vector_index_of(void);
+
 bool test_vector_insert(void);
 
 bool test_vector_new(void);

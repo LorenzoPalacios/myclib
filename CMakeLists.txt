@@ -1,11 +1,10 @@
-# This version is subject to change as we figure out what standards we will use.
 cmake_minimum_required(VERSION 3.10)
 
 include_guard(GLOBAL)
 
 project(myclib)
 
-set(BUILD_TESTS ON)
+set(BUILD_TESTS OFF)
 set(DEBUG_BUILD OFF)
 
 set(CMAKE_C_STANDARD 90) # This can be freely adjusted.
