@@ -12,13 +12,13 @@
  *  `capacity`  - The maximum number of values a stack can store before
  *                expansion is necessary.
  */
-typedef struct stack {
+typedef struct {
   size_t height;
   size_t capacity;
-} stack;
+} stk_header;
 
 inline size_t *stack_capacity_(void *const stk) {
-  return &((stack *)stack_header(stk))->capacity;
+  return &((stk_header *)stack_header(stk))->capacity;
 }
 
 inline void stack_delete_(void **const stk) {
@@ -43,10 +43,10 @@ bool stack_expand_(void **const stk, const size_t value_size) {
   return true;
 }
 
-inline void *stack_header_(void *const stk) { return (byte *)stk - sizeof(stack); }
+inline void *stack_header_(void *const stk) { return (byte *)stk - sizeof(stk_header); }
 
 inline size_t *stack_height_(void *const stk) {
-  return &((stack *)stack_header(stk))->height;
+  return &((stk_header *)stack_header(stk))->height;
 }
 
 inline bool stack_is_full_(void *const stk) {
@@ -55,14 +55,16 @@ inline bool stack_is_full_(void *const stk) {
 
 void *stack_new_(const void *const data, const size_t length,
                  const size_t value_size) {
-  stack *const stk = malloc((value_size * length) + sizeof(stack));
+  stk_header *const stk = malloc((value_size * length) + sizeof(stk_header));
+  if (stk == NULL) return NULL;
   stk->height = stk->capacity = length;
   memcpy(stk + 1, data, value_size * length);
   return stk + 1;
 }
 
 void *stack_init_(const size_t value_size, const size_t capacity) {
-  stack *const stk = malloc((value_size * capacity) + sizeof(stack));
+  stk_header *const stk = malloc((value_size * capacity) + sizeof(stk_header));
+  if (stk == NULL) return NULL;
   (void)(stk->height = 0), stk->capacity = capacity;
   return stk + 1;
 }
@@ -71,17 +73,17 @@ inline void stack_reset_(void *const stk) { stack_height(stk) = 0; }
 
 bool stack_resize_(void **const stk, const size_t new_capacity,
                    const size_t value_size) {
-  stack *stk_header = stack_header(*stk);
+  stk_header *header = stack_header(*stk);
   if (new_capacity == stack_capacity(*stk)) return false;
   {
-    const size_t ALLOCATION = (new_capacity * value_size) + sizeof(stack);
-    stack *const new_stk = realloc(stk_header, ALLOCATION);
+    const size_t ALLOCATION = (new_capacity * value_size) + sizeof(stk_header);
+    stk_header *const new_stk = realloc(header, ALLOCATION);
     if (new_stk == NULL) return false;
-    stk_header = new_stk;
-    *stk = stk_header + 1;
+    header = new_stk;
+    *stk = header + 1;
   }
-  stk_header->capacity = new_capacity;
-  if (new_capacity < stk_header->height) stk_header->height = new_capacity;
+  header->capacity = new_capacity;
+  if (new_capacity < header->height) header->height = new_capacity;
   return true;
 }
 
