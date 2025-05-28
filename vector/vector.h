@@ -38,11 +38,11 @@ typedef void (*vec_for_each_op_const)(const void *args[]);
 typedef struct {
   size_t capacity;
   size_t length;
-} vec_header;
+} vector_header;
 
-#define vector_header(vec) ((vec_header *)(vec) - 1)
+#define vector_header(vec) ((vector_header *)(vec) - 1)
 
-#define vector_header_const(vec) ((const vec_header *)(vec) - 1)
+#define vector_header_const(vec) ((const vector_header *)(vec) - 1)
 
 /* - CONVENIENCE MACROS - */
 
@@ -59,11 +59,11 @@ typedef struct {
 #define vector_clear_s(vec) vector_untyped_clear(vec, sizeof *(vec))
 
 #define vector_copy(vec)                                                       \
-  ((void *)((vec_header *)memcpy(                                              \
+  ((void *)((vector_header *)memcpy(                                              \
                 malloc((sizeof *(vec) * vector_capacity(vec)) +                \
-                       sizeof(vec_header)),                                    \
+                       sizeof(vector_header)),                                    \
                 vector_header_const(vec),                                      \
-                (sizeof *(vec) * vector_capacity(vec)) + sizeof(vec_header)) + \
+                (sizeof *(vec) * vector_capacity(vec)) + sizeof(vector_header)) + \
             1))
 
 #define vector_copy_s(vec) vector_untyped_copy(vec, sizeof *(vec))
@@ -197,10 +197,10 @@ typedef struct {
             ( /* True branch (depth 2) - Add enough capacity. */              \
               (vec) = (void *)                                                \
                 (                                                             \
-                  1 + (vec_header *)realloc                                   \
+                  1 + (vector_header *)realloc                                   \
                   (                                                           \
                     vector_header(vec),                                       \
-                    sizeof(vec_header) + (sizeof *(vec) * (new_length))       \
+                    sizeof(vector_header) + (sizeof *(vec) * (new_length))       \
                   )                                                           \
                 ),                                                            \
               util_assert((vec) != NULL),                                     \
@@ -230,10 +230,10 @@ typedef struct {
   vector_untyped_set((void **)&(vec), &(elem), index, sizeof *(vec))
 
 #define vector_shrink(vec)                                            \
-  ((void)((vec) = (void *)((vec_header *)(realloc(                    \
+  ((void)((vec) = (void *)((vector_header *)(realloc(                    \
                                vector_header(vec),                    \
                                (sizeof *(vec) * vector_length(vec)) + \
-                                   sizeof(vec_header))) +             \
+                                   sizeof(vector_header))) +             \
                            1)),                                       \
    (void)(vector_header(vec)->capacity = vector_length(vec)), (vec))
 
@@ -279,11 +279,11 @@ static inline void vector_untyped_clear(void *const vec,
 static inline void *vector_untyped_copy(const void *const vec,
                                         const size_t elem_size) {
   const size_t ALLOCATION =
-      (elem_size * vector_capacity(vec)) + sizeof(vec_header);
+      (elem_size * vector_capacity(vec)) + sizeof(vector_header);
   void *vec_copy = malloc(ALLOCATION);
   if (vec_copy != NULL) {
     memcpy(vec_copy, vector_header_const(vec), ALLOCATION);
-    vec_copy = (vec_header *)vec_copy + 1;
+    vec_copy = (vector_header *)vec_copy + 1;
   }
   return vec_copy;
 }
@@ -379,7 +379,7 @@ static void *vector_untyped_insert(void **const vec, const void *elem,
 
 static inline void *vector_untyped_new(const size_t elem_size,
                                        const size_t capacity) {
-  vec_header *const vec = malloc((elem_size * capacity) + sizeof(vec_header));
+  vector_header *const vec = malloc((elem_size * capacity) + sizeof(vector_header));
   if (vec == NULL) return NULL;
   vec->capacity = capacity;
   vec->length = 0;
@@ -409,12 +409,12 @@ static inline void vector_untyped_remove(void *const vec, const size_t index,
 static inline void *vector_untyped_resize(void **const vec,
                                           const size_t new_length,
                                           const size_t elem_size) {
-  vec_header *header = vector_header(*vec);
+  vector_header *header = vector_header(*vec);
   if (new_length <= header->capacity) {
     header->length = new_length;
   } else {
-    const size_t ALLOCATION = (elem_size * new_length) + sizeof(vec_header);
-    vec_header *const new_header = realloc(header, ALLOCATION);
+    const size_t ALLOCATION = (elem_size * new_length) + sizeof(vector_header);
+    vector_header *const new_header = realloc(header, ALLOCATION);
     if (new_header == NULL) return NULL;
     header = new_header;
     header->capacity = new_length;
@@ -449,8 +449,8 @@ static inline void *vector_untyped_set(void **const vec, const void *const elem,
 static inline void *vector_untyped_shrink(void **const vec,
                                           const size_t elem_size) {
   const size_t ALLOCATION =
-      (elem_size * vector_length(*vec)) + sizeof(vec_header);
-  vec_header *shrunk_vec = realloc(vector_header(*vec), ALLOCATION);
+      (elem_size * vector_length(*vec)) + sizeof(vector_header);
+  vector_header *shrunk_vec = realloc(vector_header(*vec), ALLOCATION);
   if (shrunk_vec != NULL) {
     shrunk_vec->capacity = shrunk_vec->length;
     *vec = shrunk_vec + 1;
