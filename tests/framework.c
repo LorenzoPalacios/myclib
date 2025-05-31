@@ -40,12 +40,10 @@
 /* - TESTS - */
 
 static test stack_tests[] = {
-    CONSTRUCT_TEST(test_stack_copy),   CONSTRUCT_TEST(test_stack_delete),
-    CONSTRUCT_TEST(test_stack_expand), CONSTRUCT_TEST(test_stack_init),
+    CONSTRUCT_TEST(test_stack_copy),   CONSTRUCT_TEST(test_stack_expand),
     CONSTRUCT_TEST(test_stack_new),    CONSTRUCT_TEST(test_stack_peek),
     CONSTRUCT_TEST(test_stack_pop),    CONSTRUCT_TEST(test_stack_push),
-    CONSTRUCT_TEST(test_stack_reset),  CONSTRUCT_TEST(test_stack_resize),
-    CONSTRUCT_TEST(test_stack_shrink),
+    CONSTRUCT_TEST(test_stack_resize), CONSTRUCT_TEST(test_stack_shrink),
 };
 
 static test str_tests[] = {

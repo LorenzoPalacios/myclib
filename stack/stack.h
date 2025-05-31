@@ -3,193 +3,117 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../include/myclib.h"
 
 /* - DEFINITIONS - */
 
+/*
+ *   `height`   - The current height of a stack.
+ *  `capacity`  - The maximum number of values a stack can store before
+ *                expansion is necessary.
+ */
+typedef struct {
+  size_t height;
+  size_t capacity;
+} stack_header;
+
 #define stack(type) type *
 
-/* The factor by which to expand a stack's capacity. */
 #define STK_EXPANSION_FACTOR ((size_t)2)
 
 /* - CONVENIENCE MACROS - */
 
-#define stack_capacity(stk) (*stack_capacity_((void *)(stk)))
+#define stack_header(stk) ((stack_header *)(stk) - 1)
 
-#define stack_copy(stk) \
-  stack_new_((const void *)(stk), stack_capacity(stk), sizeof *(stk))
+#define const_stack_header(stk) ((const stack_header *)(stk) - 1)
 
-#define stack_delete(stk)            \
-  free(stack_header((void *)(stk))); \
-  (stk) = NULL
+#define stack_capacity(stk) (+const_stack_header(stk)->capacity)
 
-#define stack_delete_s(stk) stack_delete_((void **)&(stk))
+#define stack_copy(stk)                                            \
+  ((void *)(1 + (stack_header *)memcpy(                            \
+                    malloc((sizeof *(stk) * stack_capacity(stk)) + \
+                           sizeof(stack_header)),                  \
+                    stack_header(stk),                             \
+                    (sizeof *(stk) * stack_capacity(stk)) +        \
+                        sizeof(stack_header))))
 
-#define stack_expand(stk)                                        \
-  (stack_resize(stk, STK_EXPANSION_FACTOR * stack_capacity(stk)) \
-       ? true                                                    \
-       : stack_resize(stk, stack_capacity(stk) + 1))
+#define stack_copy_s(stk) stack_untyped_copy((void *)(stk), sizeof *(stk))
 
-#define stack_expand_s(stk) stack_expand_((void **)&(stk), sizeof *(stk))
+#define stack_delete(stk) free(stack_header(stk))
 
-#define stack_header(stk) stack_header_((void *)(stk))
+#define stack_expand(stk)                    \
+  stack_resize(stk, stack_capacity(stk) == 0 \
+                        ? 1                  \
+                        : STK_EXPANSION_FACTOR * stack_capacity(stk))
 
-#define stack_height(stk) (*stack_height_((void *)(stk)))
+#define stack_expand_s(stk) stack_untyped_expand((void **)&(stk), sizeof *(stk))
 
-#define stack_init(type, capacity) \
-  ((type *)stack_init_(sizeof *((type *)NULL), (size_t)(capacity)))
+#define stack_height(stk) (+const_stack_header(stk)->height)
 
 #define stack_is_full(stk) (stack_height(stk) == stack_capacity(stk))
 
-#define stack_is_full_s(stk) stack_is_full_((void *)(stk))
+#define stack_is_full_s(stk) stack_untyped_is_full((void *)(stk))
 
 #define stack_is_empty(stk) (stack_height(stk) == 0)
 
-#define stack_new(arr) \
-  stack_new_((const void *)(arr), sizeof(arr) / sizeof *(arr), sizeof *(arr))
+#define stack_new(type, capacity) \
+  ((type *)stack_untyped_new(capacity, sizeof(type)))
 
 #define stack_peek(stk) \
-  (stack_is_empty(stk) ? NULL : (stk) + (stack_height(stk) - 1))
+  (util_assert(!stack_is_empty(stk)), (stk)[stack_height(stk) - 1])
 
-#define stack_peek_s(stk) stack_peek_untyped((void *)(stk), sizeof *(stk))
+#define stack_peek_s(stk) stack_untyped_peek((void *)(stk), sizeof *(stk))
 
 #define stack_pop(stk) \
-  (stack_is_empty(stk) ? NULL : (stk) + (--(stack_height(stk))))
+  (util_assert(!stack_is_empty(stk)), (stk)[--stack_header(stk)->height])
 
-#define stack_pop_s(stk) stack_pop_untyped((void *)(stk), sizeof *(stk))
+#define stack_pop_s(stk) stack_untyped_pop((void *)(stk), sizeof *(stk))
 
-#define stack_push(stk, value)                                    \
-  (stack_height(stk) == stack_capacity(stk) && !stack_expand(stk) \
-       ? false                                                    \
-       : ((void)((stk)[(stack_height(stk))++] = *(value)), true))
+#define stack_push(stk, value)                             \
+  (inline_if(stack_is_full(stk), stack_expand(stk), NULL), \
+   (stk)[stack_header(stk)->height++] = (value))
 
 #define stack_push_s(stk, value) \
-  stack_push_((void **)&(stk), value, sizeof *(stk))
+  stack_untyped_push((void **)&(stk), &(value), sizeof *(stk))
 
-#define stack_reset(stk) (stack_height(stk) = 0)
+#define stack_resize(stk, new_capacity)                                        \
+  ((stk) =                                                                     \
+       (void *)(1 + (stack_header *)realloc(stack_header(stk),                 \
+                                            (sizeof *(stk) * (new_capacity)) + \
+                                                sizeof(stack_header))),        \
+   util_assert((stk) != NULL),                                                 \
+   inline_if(stack_height(stk) > (new_capacity),                               \
+             stack_header(stk)->height = (new_capacity), NULL),                \
+   stack_header(stk)->capacity = (new_capacity), (stk))
 
-#define stack_reset_s(stk) stack_reset_((void *)(stk))
-
-#define stack_resize(stk, new_capacity) \
-  stack_resize_((void **)&(stk), (size_t)(new_capacity), sizeof *(stk))
+#define stack_resize_s(stk, new_capacity) \
+  stack_untyped_resize((void **)&(stk), (size_t)(new_capacity), sizeof *(stk))
 
 #define stack_shrink(stk) stack_resize(stk, stack_height(stk))
 
-#define stack_shrink_s(stk) stack_shrink_((void **)&(stk), sizeof *(stk))
-
-/*
- * Some of the provided macros rely upon a function that operates with pointers
- * to void type, which may cause linter warnings or compilation errors depending
- * on usage.
- *
- * These pointers can be casted to appropriate types under the C23 standard with
- * the `typeof` operator, which is the purpose of the following preprocessor
- * section.
- */
-#if (IS_STDC23)
-#undef stack_copy
-#define stack_copy(stk)                                             \
-  (typeof(stk))stack_new_((const void *)(stk), stack_capacity(stk), \
-                          sizeof *(stk))
-
-#undef stack_new
-#define stack_new(arr)                  \
-  ((typeof_unqual(*(arr)) *)stack_new_( \
-      (const void *)(arr), sizeof(arr) / sizeof *(arr), sizeof *(arr)))
-
-#undef stack_peek_s
-#define stack_peek_s(stk) \
-  (typeof(stk))stack_peek_untyped((void *)(stk), sizeof *(stk))
-
-#undef stack_pop_s
-#define stack_pop_s(stk) \
-  (typeof(stk))stack_pop_untyped((void *)(stk), sizeof *(stk))
-
-#endif
+#define stack_shrink_s(stk) stack_untyped_shrink((void **)&(stk), sizeof *(stk))
 
 /* - FUNCTIONS - */
 
-size_t *stack_capacity_(void *stk);
+stack(void) stack_untyped_copy(const stack(void), size_t value_size);
 
-/**
- * @brief Deletes a stack.
- *
- * @param stk The stack to be deleted.
- */
-void stack_delete_(void **stk);
+stack(void) stack_untyped_expand(stack(void) *, size_t value_size);
 
-/**
- * @brief Expands the capacity of a stack.
- *
- * @param stk The stack to be expanded.
- * @return `true` if the stack was successfully expanded.
- * `false` otherwise.
- */
-bool stack_expand_(void **stk, size_t value_size);
+bool stack_untyped_is_full(const stack(void));
 
-void *stack_header_(void *stk);
+stack(void) stack_untyped_new(size_t capacity, size_t value_size);
 
-size_t *stack_height_(void *stk);
+void *stack_untyped_peek(stack(void), size_t value_size);
 
-/**
- * @brief Creates a new and empty stack.
- *
- * @param capacity The number of values the stack should be
- * capable of holding.
- * @param value_size The size of each value in the stack.
- * @return A stack capable of containing `capacity` values
- * of size `value_size`.
- */
-void *stack_init_(size_t value_size, size_t capacity);
+void *stack_untyped_pop(stack(void), size_t value_size);
 
-bool stack_is_full_(void *stk);
+void *stack_untyped_push(stack(void) *, const void *value, size_t value_size);
 
-/**
- * @brief Creates a stack based off the elements in `data`.
- *
- * @param data Pointer to the data.
- * @param length Length of the data.
- * @param value_size Size of each element.
- * @return A new stack whose contents are a copy of `length`
- * values at `data`.
- */
-void *stack_new_(const void *data, size_t length, size_t value_size);
+stack(void)
+    stack_untyped_resize(stack(void) *, size_t new_capacity, size_t value_size);
 
-void *stack_peek_untyped(void *stk, size_t value_size);
+stack(void) stack_untyped_shrink(stack(void) *, size_t value_size);
 
-void *stack_pop_untyped(void *stk, size_t value_size);
-
-/**
- * @brief Resizes the memory used by a stack to accommodate
- * `new_capacity` elements.
- *
- * @param stk The stack to be resized.
- * @param new_capacity The new capacity of the stack.
- * @return `true` if the stack was successfully resized.
- * `false` otherwise.
- */
-bool stack_resize_(void **stk, size_t new_capacity, size_t value_size);
-
-void stack_reset_(void *stk);
-
-/**
- * @brief Shrinks the memory used by a stack to the minimum
- * necessary to preserve data.
- *
- * @param stk The stack to be shrunk.
- * @return `true` if the stack was successfully shrunk.
- * `false` otherwise.
- */
-bool stack_shrink_(void **stk, size_t value_size);
-
-/**
- * @brief Pushes `value` onto the top of a stack.
- *
- * @param stk The stack to push an element upon.
- * @param value Pointer to the value to be pushed.
- * @return `true` if the value was successfully pushed onto
- * the stack. `false` otherwise.
- */
-bool stack_push_(void **stk, const void *value, size_t value_size);
 #endif
