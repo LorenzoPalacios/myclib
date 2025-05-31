@@ -1,161 +1,147 @@
 #ifndef BINARYTREE_H
 #define BINARYTREE_H
 
-#include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
-// Stacks are used to track unallocated nodes in trees and in
-// `bt_traverse()` to avoid the usage of recursion.
+#include "../../include/myclib.h"
 #include "../../stack/stack.h"
 
-#define NULL_INDEX (SIZE_MAX)
+/* - DEFINITIONS - */
 
-// Binary tree node.
-typedef struct bt_node bt_node;
+#define binary_tree(type) type *
 
-// Binary tree header.
-typedef struct binary_tree binary_tree;
+#define binary_tree_new(type, capacity) \
+  ((type *)bt_untyped_new(capacity, sizeof(type)))
 
-/**
- * @brief Macro to create a new binary tree.
- *
- * This macro initializes a new binary tree with the given data.
- *
- * @param data The data to initialize the binary tree with.
- */
-#define bt_new(data) bt_new_(data, sizeof *(data), sizeof(data) / sizeof *(data))
+struct bt_node {
+  size_t left;
+  size_t right;
+  size_t parent;
+};
 
-/**
- * @brief Macro to traverse a binary tree.
- *
- * This macro traverses the binary tree starting from the root node and applies the given operation.
- *
- * @param tree The binary tree to traverse.
- * @param op The operation to apply to each node during traversal.
- */
-#define bt_traverse_tree(tree, op) bt_traverse(tree, get_root_node(tree), op)
+struct bt_header {
+  stack(size_t) deleted_nodes;
+  size_t active_nodes;
+  size_t allocation;
+  size_t root;
+};
 
-/**
- * @brief Adds a new node with the given value to the binary tree.
- *
- * @param tree A pointer to the binary tree.
- * @param value A pointer to the value to be added.
- * @return A pointer to the updated binary tree, or `NULL` if the operation
- * fails.
- * @note The added value must be the same size as `tree->value_size`.
- */
-binary_tree *bt_add_node(binary_tree *tree, const void *value);
+typedef struct bt_node *bt_node;
 
-/**
- * @brief Deletes the binary tree and frees its memory.
- *
- * @param tree A pointer to the binary tree to be deleted.
- */
-void bt_delete(binary_tree *tree);
+typedef struct bt_header *bt_header;
 
-/**
- * @brief Deletes a specific node and its descendants from the binary tree.
- *
- * @param tree A pointer to the binary tree.
- * @param node A pointer to the node to be deleted.
- */
-void bt_delete_node(binary_tree *tree, bt_node *node);
+typedef const struct bt_node *const_bt_node;
 
-/**
- * @brief Expands the binary tree to accommodate more nodes.
- *
- * @param tree A pointer to the binary tree.
- * @return A pointer to the expanded binary tree, or NULL if the operation
- * fails.
- */
-binary_tree *bt_expand(binary_tree *tree);
+typedef const struct bt_header *const_bt_header;
 
-/**
- * @brief Initializes a binary tree with a specified number of nodes.
- *
- * @param value_size The size of each value in bytes.
- * @param node_cnt The number of nodes to allocate.
- * @return A pointer to the initialized binary tree, or NULL if the operation
- * fails.
- */
-binary_tree *bt_init(size_t value_size, size_t node_cnt);
+#define NULL_INDEX ((size_t)-1)
 
-/**
- * @brief Initializes a binary tree with the given elements from the passed
- * array.
- *
- * The first element in the array is always the root node and subsequent
- * array elements fill into each node's `left` and `right` consecutively
- * starting from the left.
- *
- * Ex. Consider an array of seven elements: {7, 4, 9, 3, 0, 1, 0}.
- *     The resultant binary tree would look like this:
- *
- *         7
- *       /   \
- *      4     9
- *     / \   / \
- *    3   0 1   0
- *
- * @param data A pointer to the array of values.
- * @param value_size The size of each value in bytes.
- * @param num_values The number of values in the array.
- * @return A pointer to the initialized binary tree, or NULL if the operation
- * fails.
- */
-binary_tree *bt_new_(const void *data, size_t value_size, size_t num_values);
+/* - TREE MANIPULATION - */
 
-/**
- * @brief Retrieves the value stored in a given node of a binary tree.
- *
- * @param tree A pointer to the binary tree.
- * @param node A pointer to the node whose value is to be retrieved.
- * @return A pointer to the value stored in the specified node.
- */
-void *bt_node_value(binary_tree *tree, bt_node *node);
+#define bt_add_node_s(tree, parent, add_to_left, value)                \
+  bt_untyped_add_node((void **)&(tree), parent, add_to_left, &(value), \
+                      sizeof *(tree))
 
-/**
- * @brief Resizes the memory allocated for the binary tree to the new
- * capacity.
- *
- * @param tree A pointer to the binary tree.
- * @param new_capacity The new capacity for the binary tree.
- * @return A pointer to the resized binary tree, or NULL if the operation
- * fails.
- * @note If `new_capacity` would cause active nodes to be lost, the
- * operation will fail.
- */
-binary_tree *bt_resize(binary_tree *tree, size_t new_capacity);
+#define bt_get_deleted_node(tree)                                     \
+  (!stack_is_empty(bt_header(tree))                                   \
+       ? bt_get_node(tree, stack_pop(bt_header(tree)->deleted_nodes)) \
+       : NULL)
 
-/**
- * @brief Swaps the values of two nodes in a binary tree.
- *
- * This function takes a binary tree and two nodes within that tree and swaps
- * their values. The structure of the tree remains unchanged.
- *
- * @param tree A pointer to the binary tree.
- * @param node_1 A pointer to the first node whose value is to be swapped.
- * @param node_2 A pointer to the second node whose value is to be swapped.
- */
-void bt_swap_values(binary_tree *tree, bt_node *node_1, bt_node *node_2);
+#define bt_get_node(tree, index) (bt_node_arena(tree) + (index))
 
-/**
- * @brief Traverses all of the descendant nodes of `origin` and `origin`.
- *
- * This function passes `tree` and each traversed node to `operation` until
- * `operation` returns `false` or all the nodes in the lineage of `origin`
- * have been traversed.
- *
- * This function is NOT recursive; it has a dependency on the `stack` data
- * structure implemented elsewhere in this library.
- *
- * @param tree A pointer to the binary tree.
- * @param from A pointer to the starting node for traversal.
- * @param operation A function pointer to the operation to be performed on each
- * node.
- */
-void bt_traverse(binary_tree *tree, bt_node *from,
-                 bool (*operation)(binary_tree *tree, bt_node *node));
+#define bt_get_open_node(tree)                                        \
+  (!stack_is_empty((tree)->deleted_nodes) ? bt_get_deleted_node(tree) \
+                                          : bt_get_unused_node(tree))
+
+#define bt_get_unused_node(tree)                          \
+  ((bt_header(tree))->active_nodes < bt_total_nodes(tree) \
+       ? bt_get_node(tree, bt_header(tree)->active_nodes) \
+       : NULL)
+
+#define bt_has_root(tree) (bt_header(tree)->root != NULL_INDEX)
+
+#define bt_header(tree) ((bt_header)(tree) - 1)
+
+#define bt_header_const(tree) ((const struct bt_header *)(tree) - 1)
+
+#define bt_padding(tree) \
+  (sizeof(size_t) - ((sizeof *(tree) * bt_total_nodes(tree)) % sizeof(size_t)))
+
+#define bt_root_node(tree) \
+  (bt_has_root(tree) ? bt_get_node(tree, bt_header(tree)->root) : NULL)
+
+#define bt_total_nodes(tree) (bt_non_header_size(tree) / bt_nv_pair_size(tree))
+
+#define bt_node_arena(tree) \
+  ((bt_node)((byte *)((tree) + bt_total_nodes(tree)) + bt_padding(tree)))
+
+#define bt_non_header_size(tree) \
+  (bt_header_const(tree)->allocation - sizeof(struct bt_header))
+
+#define bt_nv_pair_size(tree) (sizeof(struct bt_node) + sizeof *(tree))
+
+/* - NODE MANIPULATION - */
+
+#define bt_node_delete(tree, node)                                       \
+  stack_push(bt_header(tree)->deleted_nodes, bt_node_index(tree, node)); \
+  bt_node_disconnect(tree, node)
+
+#define bt_node_disconnect(tree, node)                           \
+  if (bt_node_has_parent(node)) {                                \
+    if (bt_node_is_left(tree, node, bt_node_parent(tree, node))) \
+      bt_node_parent(tree, node)->left = NULL_INDEX;             \
+    else                                                         \
+      bt_node_parent(tree, node)->right = NULL_INDEX;            \
+  }                                                              \
+  (void)0
+
+#define bt_node_get_value(tree, node) ((tree)[bt_node_index(tree, node)])
+
+#define bt_node_has_left(node) ((node)->left != NULL_INDEX)
+
+#define bt_node_has_parent(node) ((node)->parent != NULL_INDEX)
+
+#define bt_node_has_right(node) ((node)->right != NULL_INDEX)
+
+#define bt_node_index(tree, node) ((size_t)((node) - bt_node_arena(tree)))
+
+#define bt_node_initialize(node) \
+  (void)((node)->left = (node)->right = NULL_INDEX)
+
+#define bt_node_is_root(tree, node) \
+  (bt_node_arena(tree) + bt_header(tree)->root == (node))
+
+#define bt_node_is_left(tree, child, parent) \
+  ((parent)->left == bt_node_index(tree, child))
+
+#define bt_node_is_right(tree, child, parent) \
+  ((parent)->right == bt_node_index(tree, child))
+
+#define bt_node_left(tree, node) \
+  (bt_node_has_left(node) ? bt_get_node(tree, (node)->left) : NULL)
+
+#define bt_node_right(tree, node) \
+  (bt_node_has_right(node) ? bt_get_node(tree, (node)->right) : NULL)
+
+#define bt_node_parent(tree, node) \
+  (bt_node_has_parent(node) ? bt_get_node(tree, (node)->right) : NULL)
+
+#define bt_node_value(tree, node) ((tree)[bt_node_index(tree, node)])
+
+/* - FUNCTIONS - */
+
+bt_node bt_untyped_add_node(binary_tree(void) *, bt_node parent,
+                            bool add_to_left, const void *value,
+                            size_t value_size);
+
+void *bt_untyped_get_value(binary_tree(void), const_bt_node node,
+                           size_t value_size);
+
+void *bt_untyped_set_value(binary_tree(void), const_bt_node, const void *value,
+                           size_t value_size);
+
+binary_tree(void) bt_untyped_new(size_t capacity, size_t value_size);
+
+void bt_untyped_traverse(binary_tree(void), size_t value_size);
 
 #endif
