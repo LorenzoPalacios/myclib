@@ -73,20 +73,20 @@ typedef byte bool; /* Boolean type for standards prior to C99. */
 /* - ASSERTION - */
 
 #if (IS_STDC99)
-#define util_assert_msg(expr)                                   \
-  ((fputs("\n"__FILE__                                          \
-          ":" EXPAND_AND_STRINGIFY(__LINE__) " in function ",   \
-          stderr),                                              \
-    fputs(__func__, stderr), fputs("()\n\n", stderr),           \
-    fputs(STRINGIFY(expr) "\n\nevaluated to false!\n", stderr), \
-    fflush(stderr)))
+#define util_assert_msg(expr)                                \
+  fprintf(stderr,                                            \
+          "\nIn function %s() at "__FILE__                   \
+          ":" EXPAND_AND_STRINGIFY(__LINE__) "\n" STRINGIFY( \
+              expr) " evaluated to false!\n",                \
+          __func__),                                         \
+      fflush(stderr)
 #else
-#define util_assert_msg(expr)                          \
-  fputs(                                               \
-      "\n"__FILE__                                     \
-      ":" EXPAND_AND_STRINGIFY(__LINE__)               \
-          STRINGIFY(expr) "\n\nevaluated to false!\n", \
-      stderr),                                         \
+#define util_assert_msg(expr)                            \
+  fputs(                                                 \
+      "\nAt "__FILE__                                    \
+      ":" EXPAND_AND_STRINGIFY(__LINE__) "\n" STRINGIFY( \
+          expr) " evaluated to false!\n",                \
+      stderr),                                           \
       fflush(stderr)
 #endif
 
@@ -96,9 +96,11 @@ typedef byte bool; /* Boolean type for standards prior to C99. */
 
 /* - MISCELLANEOUS - */
 
+#ifndef ARR_LEN
 #define ARR_LEN(arr) (sizeof(arr) / sizeof *(arr))
+#endif
 
-#define discard_line(stream) ((void)(fscanf(stream, "%*[^\n]"), fgetc(stream)))
+#define discard_line(stream) (void)(fscanf(stream, "%*[^\n]"), fgetc(stream))
 
 #define EXPAND_AND_STRINGIFY(x) STRINGIFY(x)
 
@@ -108,7 +110,9 @@ typedef byte bool; /* Boolean type for standards prior to C99. */
 #define INTEGRAL_CAST(n, cast_type) \
   ((cast_type)((wb_uint)(n) & (wb_uint)(~(cast_type)0)))
 
+#ifndef STRINGIFY
 #define STRINGIFY(x) #x
+#endif
 
 /* - WIDEST BASIC INTEGRAL TYPES - */
 
