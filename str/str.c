@@ -29,7 +29,7 @@ typedef struct {
 
 /* - INTERNAL - */
 
-static inline bool append_(string *const dst, const char *const src,
+static inline bool append_(string_ref dst, const char *const src,
                            const size_t src_len) {
   const size_t OLD_LEN = string_length(*dst);
   const size_t NEW_LEN = OLD_LEN + src_len;
@@ -51,7 +51,7 @@ static inline size_t cnt_digits_(wb_uint n, const size_t base) {
   return digits;
 }
 
-static bool find_replace_(string *const src, const char *const tgt,
+static bool find_replace_(string_ref src, const char *const tgt,
                           const size_t tgt_len, const char *const repl,
                           const size_t repl_len) {
   const size_t SRC_LEN = string_length(*src);
@@ -73,8 +73,8 @@ static bool find_replace_(string *const src, const char *const tgt,
   return false;
 }
 
-static bool insert_(string *const dst, const size_t index,
-                    const char *const src, const size_t src_len) {
+static bool insert_(string_ref dst, const size_t index, const char *const src,
+                    const size_t src_len) {
   const size_t NEW_LEN = string_length(*dst) + src_len;
   char *const dst_pos = *dst + index;
   const size_t REMAINDER = string_length(*dst) - index;
@@ -91,11 +91,11 @@ static bool insert_(string *const dst, const size_t index,
 
 /* - LIBRARY FUNCTIONS - */
 
-bool string_append_char_(string *const dst, const char chr) {
+bool string_append_char_(string_ref dst, const char chr) {
   return append_(dst, &chr, 1);
 }
 
-bool string_append_int_(string *const str, const wb_int num) {
+bool string_append_int_(string_ref str, const wb_int num) {
   const size_t DIGIT_CNT = cnt_digits(num, 10);
   const size_t NEW_LEN = string_length(*str) + DIGIT_CNT;
   if (string_capacity(*str) < NEW_LEN)
@@ -105,15 +105,15 @@ bool string_append_int_(string *const str, const wb_int num) {
   return true;
 }
 
-bool string_append_raw_str_(string *const dst, const char *src) {
+bool string_append_raw_str_(string_ref dst, const char *src) {
   return append_(dst, src, strlen(src));
 }
 
-bool string_append_str_(string *const dst, const_string src) {
+bool string_append_str_(string_ref dst, const_string src) {
   return append_(dst, src, string_length(src));
 }
 
-bool string_append_uint_(string *const str, const wb_uint num) {
+bool string_append_uint_(string_ref str, const wb_uint num) {
   const size_t DIGIT_CNT = cnt_digits(num, 10);
   const size_t NEW_LEN = string_length(*str) + DIGIT_CNT;
   if (string_capacity(*str) < NEW_LEN)
@@ -140,7 +140,7 @@ inline string string_copy(const_string str) {
   return copy;
 }
 
-inline void string_delete_(string *const str) {
+inline void string_delete_(string_ref str) {
   free(string_header(*str));
   *str = NULL;
 }
@@ -152,14 +152,14 @@ inline bool string_equals(register const char *str1,
   return *str1 == *str2;
 }
 
-inline bool string_expand_(string *const str) {
+inline bool string_expand_(string_ref str) {
   const size_t NEW_CAPACITY =
       string_capacity(*str) == 0 ? 1 : EXPANSION_FACTOR * string_capacity(*str);
   return string_resize_(str, NEW_CAPACITY) ||
          string_resize_(str, string_capacity(*str) + 1);
 }
 
-inline bool string_expand_towards_(string *const str,
+inline bool string_expand_towards_(string_ref str,
                                    const size_t target_capacity) {
   const size_t CUR_CAPACITY = string_capacity(*str);
   const size_t CAP_RATIO = (target_capacity / (CUR_CAPACITY + 1)) + 1;
@@ -170,18 +170,18 @@ inline bool string_expand_towards_(string *const str,
          string_resize_(str, target_capacity);
 }
 
-bool string_find_replace_str_(string *const src, const_string tgt,
+bool string_find_replace_str_(string_ref src, const_string tgt,
                               const_string repl) {
   return find_replace_(src, tgt, string_length(tgt), repl, string_length(repl));
 }
 
-bool string_find_replace_raw_str_(string *const src, const char *const tgt,
+bool string_find_replace_raw_str_(string_ref src, const char *const tgt,
                                   const_string repl) {
   const size_t TGT_LEN = strlen(tgt);
   return find_replace_(src, tgt, TGT_LEN, repl, string_length(repl));
 }
 
-bool string_find_replace_char_(string *const src, const char tgt,
+bool string_find_replace_char_(string_ref src, const char tgt,
                                const_string repl) {
   return find_replace_(src, &tgt, 1, repl, string_length(repl));
 }
@@ -232,7 +232,7 @@ string string_from_stream_delim(FILE *const stream, const char delim) {
   size_t i;
   int chr;
   for (i = 0; (chr = getc(stream)) != delim && chr != EOF; i++) {
-    str[i] = INTEGRAL_CAST(chr, char);
+    str[i] = (char)chr;
     if (i == string_capacity(str) && !string_expand_(&str)) {
       string_delete_(&str);
       return NULL;
@@ -253,13 +253,11 @@ inline string string_init(const size_t capacity) {
   return str;
 }
 
-bool string_insert_char_(string *const dst, const char chr,
-                         const size_t index) {
+bool string_insert_char_(string_ref dst, const char chr, const size_t index) {
   return insert_(dst, index, &chr, 1);
 }
 
-bool string_insert_int_(string *const str, const wb_int num,
-                        const size_t index) {
+bool string_insert_int_(string_ref str, const wb_int num, const size_t index) {
   const size_t DIGIT_CNT = cnt_digits(num, 10) + (num < 0 ? 1 : 0);
   const size_t NEW_LEN = string_length(*str) + DIGIT_CNT;
   const char OVERWRITTEN_CHR = (*str)[index];
@@ -273,18 +271,17 @@ bool string_insert_int_(string *const str, const wb_int num,
   return true;
 }
 
-bool string_insert_raw_str_(string *dst, const char *const src,
+bool string_insert_raw_str_(string_ref dst, const char *const src,
                             const size_t index) {
   const size_t SRC_LEN = strlen(src);
   return insert_(dst, index, src, SRC_LEN);
 }
 
-bool string_insert_str_(string *const dst, const_string src,
-                        const size_t index) {
+bool string_insert_str_(string_ref dst, const_string src, const size_t index) {
   return insert_(dst, index, src, string_length(src));
 }
 
-bool string_insert_uint_(string *const str, const wb_uint num,
+bool string_insert_uint_(string_ref str, const wb_uint num,
                          const size_t index) {
   const size_t DIGIT_CNT = cnt_digits(num, 10);
   const size_t NEW_LEN = string_length(*str) + DIGIT_CNT;
@@ -303,7 +300,7 @@ inline size_t string_length(const_string str) {
   return const_string_header(str)->length;
 }
 
-inline bool string_resize_(string *const str, const size_t new_capacity) {
+inline bool string_resize_(string_ref str, const size_t new_capacity) {
   /* Adding one to account for a null terminator. */
   const size_t ALLOCATION = sizeof(string_header) + new_capacity + 1;
   string new_str =
@@ -318,6 +315,23 @@ inline bool string_resize_(string *const str, const size_t new_capacity) {
   return true;
 }
 
-inline bool string_shrink_(string *const str) {
+inline bool string_shrink_(string_ref str) {
   return string_resize_(str, string_length(*str));
+}
+
+string string_write_from_stream_(string_ref str_ref, FILE *const stream,
+                                 const char delim) {
+  string str = str_ref != NULL ? *str_ref : string_init(STR_DEFAULT_CAPACITY);
+  if (str != NULL) {
+    size_t len = string_length(str);
+    int chr = getc(stream);
+    while (chr != EOF && chr != delim) {
+      str[len++] = (char)chr;
+      if (len == string_capacity(str) && !string_expand_(&str)) break;
+      chr = getc(stream);
+    }
+    str[len] = '\0';
+    string_header(str)->length = len;
+  }
+  return str;
 }

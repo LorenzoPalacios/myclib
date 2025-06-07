@@ -11,6 +11,10 @@ typedef char *string;
 
 typedef const char *const_string;
 
+typedef string *string_ref;
+
+typedef const_string *const_string_ref;
+
 #define STR_DEFAULT_CAPACITY (8192)
 
 /* - CONVENIENCE MACROS - */
@@ -60,6 +64,9 @@ typedef const char *const_string;
 
 #define string_shrink(str) string_shrink_(&(str))
 
+#define string_write_from_stream(str, stream, delim) \
+  string_write_from_stream_(&(str), stream, delim)
+
 #if (IS_STDC11 && !IS_CPP)
 #define string_append(str, appended)            \
   (_Generic(appended,                           \
@@ -79,8 +86,8 @@ typedef const char *const_string;
 
 #define string_find_replace(src, needle, replacer) \
   (_Generic(needle,                                \
-       string *: string_find_replace_str_,         \
-       const string *: string_find_replace_str_,   \
+       string_ref: string_find_replace_str_,       \
+       const_string_ref: string_find_replace_str_, \
        char *: string_find_replace_raw_str_,       \
        char: string_find_replace_char_,            \
        signed char: string_find_replace_char_,     \
@@ -153,7 +160,7 @@ typedef const char *const_string;
  * @param chr The character to append to the string.
  * @return `true` if the character was successfully appended. `false` otherwise.
  */
-bool string_append_char_(string *dst, char chr);
+bool string_append_char_(string_ref dst, char chr);
 
 /**
  * @brief Appends one string to another.
@@ -165,7 +172,7 @@ bool string_append_char_(string *dst, char chr);
  * @param src A pointer to the source string.
  * @return `true` if the string was successfully appended. `false` otherwise.
  */
-bool string_append_str_(string *dst, const_string src);
+bool string_append_str_(string_ref dst, const_string src);
 
 /**
  * @brief Appends a raw C-string to the end of the string.
@@ -178,7 +185,7 @@ bool string_append_str_(string *dst, const_string src);
  * @param src The raw C-string to append to the string.
  * @return `true` if the C-string was successfully appended. `false` otherwise.
  */
-bool string_append_raw_str_(string *dst, const char *src);
+bool string_append_raw_str_(string_ref dst, const char *src);
 
 /**
  * @brief Appends an integer to a string.
@@ -190,7 +197,7 @@ bool string_append_raw_str_(string *dst, const char *src);
  * @param num The integer to append to the string.
  * @return `true` if the integer was successfully appended. `false` otherwise.
  */
-bool string_append_int_(string *str, wb_int num);
+bool string_append_int_(string_ref str, wb_int num);
 
 /**
  * @brief Appends an unsigned integer to a string.
@@ -204,7 +211,7 @@ bool string_append_int_(string *str, wb_int num);
  * @return `true` if the unsigned integer was successfully appended. `false`
  * otherwise.
  */
-bool string_append_uint_(string *str, wb_uint num);
+bool string_append_uint_(string_ref str, wb_uint num);
 
 /**
  * @brief Inserts an integer into a string at the specified index.
@@ -218,7 +225,7 @@ bool string_append_uint_(string *str, wb_uint num);
  * @param index The index at which to insert the integer.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_int_(string *dst, wb_int num, size_t index);
+bool string_insert_int_(string_ref dst, wb_int num, size_t index);
 
 /**
  * @brief Inserts an unsigned integer into a string at the specified index.
@@ -232,7 +239,7 @@ bool string_insert_int_(string *dst, wb_int num, size_t index);
  * @param index The index at which to insert the integer.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_uint_(string *dst, wb_uint num, size_t index);
+bool string_insert_uint_(string_ref dst, wb_uint num, size_t index);
 
 size_t string_capacity(const_string str);
 
@@ -248,7 +255,7 @@ void string_clear(string str);
 
 string string_copy(const_string str);
 
-void string_delete_(string *str);
+void string_delete_(string_ref str);
 
 bool string_equals(const char *str1, const char *str2);
 
@@ -261,7 +268,7 @@ bool string_equals(const char *str1, const char *str2);
  * @param str A pointer to the string to be expanded.
  * @return `true` if the expanion was successful. `false` otherwise.
  */
-bool string_expand_(string *str);
+bool string_expand_(string_ref str);
 
 /**
  * @brief Expands the capacity of the string to at least the target capacity.
@@ -269,7 +276,7 @@ bool string_expand_(string *str);
  * @param str A pointer to the string to be expanded.
  * @return `true` if the expanion was successful. `false` otherwise.
  */
-bool string_expand_towards_(string *str, size_t target_capacity);
+bool string_expand_towards_(string_ref str, size_t target_capacity);
 
 /**
  * @brief Finds and replaces the first occurrence of a character within a
@@ -280,7 +287,7 @@ bool string_expand_towards_(string *str, size_t target_capacity);
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_char_(string *src, char tgt, const_string replace);
+bool string_find_replace_char_(string_ref src, char tgt, const_string replace);
 
 /**
  * @brief Finds and replaces the first occurrence of a C-string.
@@ -290,7 +297,7 @@ bool string_find_replace_char_(string *src, char tgt, const_string replace);
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_raw_str_(string *src, const char *tgt,
+bool string_find_replace_raw_str_(string_ref src, const char *tgt,
                                   const_string replace);
 
 /**
@@ -302,7 +309,7 @@ bool string_find_replace_raw_str_(string *src, const char *tgt,
  * @param replace A pointer to the replacement string.
  * @return `true` if the replacement occurred successfully. `false` otherwise.
  */
-bool string_find_replace_str_(string *src, const_string tgt,
+bool string_find_replace_str_(string_ref src, const_string tgt,
                               const_string replace);
 
 /**
@@ -316,7 +323,7 @@ bool string_find_replace_str_(string *src, const_string tgt,
  * @param index The index at which to insert the character.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_char_(string *dst, char chr, size_t index);
+bool string_insert_char_(string_ref dst, char chr, size_t index);
 
 /**
  * @brief Inserts a raw C-string into a string at the specified index.
@@ -329,7 +336,7 @@ bool string_insert_char_(string *dst, char chr, size_t index);
  * @param index The index at which to insert the raw C-string.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_raw_str_(string *dst, const char *src, size_t index);
+bool string_insert_raw_str_(string_ref dst, const char *src, size_t index);
 
 /**
  * @brief Inserts one string into another at the specified index.
@@ -343,7 +350,7 @@ bool string_insert_raw_str_(string *dst, const char *src, size_t index);
  * @param index The index at which to insert the source string.
  * @return `true` if the insertion occurred successfully. `false` otherwise.
  */
-bool string_insert_str_(string *dst, const_string src, size_t index);
+bool string_insert_str_(string_ref dst, const_string src, size_t index);
 
 /**
  * @brief Creates a new string of a specified capacity.
@@ -431,7 +438,7 @@ size_t string_length(const_string str);
  * @param new_capacity The new capacity of the string in bytes.
  * @return `true` if the string was successfully resized. `false` otherwise.
  */
-bool string_resize_(string *str, size_t new_capacity);
+bool string_resize_(string_ref str, size_t new_capacity);
 
 /**
  * @brief Shrinks the memory used for the string to fit its contents.
@@ -442,6 +449,7 @@ bool string_resize_(string *str, size_t new_capacity);
  * @param str A pointer to the string to be shrank.
  * @return `true` if the string was successfully shrank. `false` otherwise.
  */
-bool string_shrink_(string *str);
+bool string_shrink_(string_ref str);
 
+string string_write_from_stream_(string_ref str, FILE *stream, char delim);
 #endif
