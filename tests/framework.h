@@ -53,7 +53,7 @@ typedef void (*test_op_no_arg)(test *);
 typedef void (*suite_op)(test_suite *, void *);
 typedef void (*suite_op_no_arg)(test_suite *);
 
-extern test_suite TEST_SUITES[];
+extern test_suite test_suites[];
 
 extern const size_t NUM_TEST_SUITES;
 

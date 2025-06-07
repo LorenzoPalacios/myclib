@@ -73,13 +73,13 @@ static test vector_tests[] = {
 
 /* - EXTERNAL DEFINITIONS - */
 
-test_suite TEST_SUITES[] = {
+test_suite test_suites[] = {
     CONSTRUCT_SUITE(stack_tests),
     CONSTRUCT_SUITE(str_tests),
     CONSTRUCT_SUITE(vector_tests),
 };
 
-const size_t NUM_TEST_SUITES = ARR_LEN(TEST_SUITES);
+const size_t NUM_TEST_SUITES = ARR_LEN(test_suites);
 
 /* - INTERNAL DEFINITIONS - */
 
@@ -225,7 +225,7 @@ static input_status parse_index(const char *str, size_t *const index_output) {
 
 /* Helper function used by `save_test_config()`. */
 static void write_suite_config(test_suite *const suite, void *const output) {
-  const size_t SUITE_INDEX = (size_t)(suite - TEST_SUITES);
+  const size_t SUITE_INDEX = (size_t)(suite - test_suites);
   size_t i;
   (void)fprintf(output, SUITE_CONFIG_FILE_FORMAT, SUITE_INDEX,
                 BOOL_AS_CHAR(suite->skip));
@@ -280,7 +280,7 @@ void display_suites(void) {
   size_t i;
   puts("\n - Suites -");
   for (i = 0; i < NUM_TEST_SUITES; i++) {
-    const test_suite CUR_SUITE = TEST_SUITES[i];
+    const test_suite CUR_SUITE = test_suites[i];
     printf(DISPLAY_FORMAT, i, SKIP_AS_CHAR(CUR_SUITE.skip), CUR_SUITE.NAME);
   }
   (void)fflush(stdout);
@@ -348,12 +348,12 @@ static inline void notify_skipped_all_suite_tests(
 
 inline void for_each_suite(const suite_op op, void *args) {
   size_t i;
-  for (i = 0; i < NUM_TEST_SUITES; i++) op(TEST_SUITES + i, args);
+  for (i = 0; i < NUM_TEST_SUITES; i++) op(test_suites + i, args);
 }
 
 inline void for_each_suite_no_arg(const suite_op_no_arg op) {
   size_t i;
-  for (i = 0; i < NUM_TEST_SUITES; i++) op(TEST_SUITES + i);
+  for (i = 0; i < NUM_TEST_SUITES; i++) op(test_suites + i);
 }
 
 inline void for_each_test(const test_suite *const suite, const test_op op,
@@ -387,7 +387,7 @@ bool load_config(void) {
     test_suite *suite;
     size_t data[3];
     const size_t WRITES = parse_config_line(data, ARR_LEN(data), input);
-    suite = TEST_SUITES + data[0];
+    suite = test_suites + data[0];
     if (WRITES == 1)
       suite->skip = (bool)data[1];
     else if (WRITES == 2)
@@ -518,23 +518,23 @@ static inline void parse_suite_prompt_input(const input_status status,
         notify_index();
         break;
       }
-      skip_suite(TEST_SUITES + option);
-      notify_skipped(TEST_SUITES + option);
+      skip_suite(test_suites + option);
+      notify_skipped(test_suites + option);
       break;
     case STATUS_INDEX:
       if (option >= NUM_TEST_SUITES) {
         notify_index();
         break;
       }
-      test_prompt(TEST_SUITES + option);
+      test_prompt(test_suites + option);
       break;
     case STATUS_RUN_INDEX:
       if (option >= NUM_TEST_SUITES) {
         notify_index();
         break;
       }
-      run_suite(TEST_SUITES + option);
-      notify_ran_suite(TEST_SUITES + option);
+      run_suite(test_suites + option);
+      notify_ran_suite(test_suites + option);
       break;
     default:
       notify_bad_input();
