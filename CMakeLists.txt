@@ -61,6 +61,7 @@ endif()
 
 set(INCLUDE_DIR "${PROJECT_SOURCE_DIR}")
 
+set(BT_DIR "${PROJECT_SOURCE_DIR}/trees/binarytree")
 set(RANDOM_DIR "${PROJECT_SOURCE_DIR}/random")
 set(STACK_DIR "${PROJECT_SOURCE_DIR}/stack")
 set(STR_DIR "${PROJECT_SOURCE_DIR}/str")
@@ -69,6 +70,9 @@ set(VECTOR_DIR "${PROJECT_SOURCE_DIR}/vector")
 add_library(myclib STATIC)
 target_include_directories(myclib PUBLIC ${INCLUDE_DIR})
 
+target_sources(myclib
+    PUBLIC "${BT_DIR}/binarytree.h"
+    PRIVATE "${BT_DIR}/binarytree.c")
 target_sources(myclib
     PUBLIC "${RANDOM_DIR}/random.h"
     PRIVATE "${RANDOM_DIR}/random.c")
